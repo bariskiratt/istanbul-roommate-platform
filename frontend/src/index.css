@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 252 33% 97%;
+    --foreground: 234 33% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 234 33% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 234 33% 14%;
+
+    --primary: 220 90% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 234 87% 67%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 10% 92%;
+    --muted-foreground: 240 3% 55%;
+
+    --accent: 165 70% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 6 100% 69%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 15% 92%;
+    --input: 40 15% 90%;
+    --ring: 220 90% 60%;
+
+    --radius: 1rem;
+
+    /* Brand tokens */
+    --lavender: 244 100% 92%;
+    --sand: 33 33% 85%;
+    --coral: 6 100% 69%;
+    --mint: 165 70% 58%;
+    --indigo: 234 87% 67%;
+
+    --sidebar-background: 252 33% 97%;
+    --sidebar-foreground: 234 33% 14%;
+    --sidebar-primary: 220 90% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 33% 95%;
+    --sidebar-accent-foreground: 234 33% 14%;
+    --sidebar-border: 40 15% 92%;
+    --sidebar-ring: 220 90% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  /* Navigation — shadow only, no border */
+  .nav-header {
+    @apply bg-card/80 backdrop-blur-lg text-foreground;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  /* Cards — white on cream, warm shadow */
+  .card-listing {
+    @apply bg-card rounded-2xl overflow-hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Swipe action buttons — large circles with colored shadows */
+  .btn-swipe-like {
+    @apply bg-card text-accent rounded-full transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 16px hsl(var(--mint) / 0.3);
+  }
+  .btn-swipe-like:hover {
+    box-shadow: 0 6px 24px hsl(var(--mint) / 0.4);
+  }
+
+  .btn-swipe-pass {
+    @apply bg-card text-destructive rounded-full transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 16px hsl(var(--coral) / 0.3);
+  }
+  .btn-swipe-pass:hover {
+    box-shadow: 0 6px 24px hsl(var(--coral) / 0.4);
+  }
+
+  .btn-supermatch {
+    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 16px hsl(var(--indigo) / 0.3);
+  }
+  .btn-supermatch:hover {
+    box-shadow: 0 6px 24px hsl(var(--indigo) / 0.4);
+  }
+
+  /* Tags */
+  .tag-lifestyle {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-lavender/40 text-foreground;
+  }
+
+  .tag-lifestyle-active {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary;
+  }
+
+  /* Badge */
+  .badge-unread {
+    @apply absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center;
+  }
+
+  /* Progress — thin animated bar */
+  .progress-step {
+    @apply h-[3px] rounded-full bg-muted transition-all duration-500;
+  }
+
+  .progress-step-active {
+    @apply h-[3px] rounded-full bg-primary transition-all duration-500;
+  }
+
+  /* Messages — 20px radius */
+  .message-sent {
+    @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-[20px] rounded-br-md px-4 py-3;
+  }
+
+  .message-received {
+    @apply bg-sand text-foreground rounded-[20px] rounded-bl-md px-4 py-3;
+  }
+
+  /* Bottom nav — shadow, no border */
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-1 text-muted-foreground transition-colors duration-200;
+  }
+
+  .bottom-nav-item-active {
+    @apply flex flex-col items-center gap-1 text-primary font-semibold transition-colors duration-200;
+  }
+
+  /* Glass card */
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-xl rounded-2xl;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Gradient hero for match popup */
+  .gradient-hero {
+    background: radial-gradient(ellipse at center, hsl(var(--lavender)) 0%, hsl(var(--background)) 70%);
+  }
+
+  /* Floating action button */
+  .floating-action {
+    @apply rounded-full flex items-center justify-center transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+}
+
+@layer utilities {
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+
+  .swipe-card {
+    @apply touch-none select-none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

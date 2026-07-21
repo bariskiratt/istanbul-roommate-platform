@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+
+# Ortam / sırlar
+.env
+.env.*
+
+# Editör / OS
+.vscode/
+.idea/
+.DS_Store
+.claude/settings.local.json
+
+# Geçici veri dosyaları
+data/raw/mahalle_fixed.geojson
+response_*.json
+
+# Eğitilmiş model (~6 MB) — 'python -m scripts.train_model' ile yeniden üretilir
+models/*.joblib
+
+# Kişisel dosyalar (herkese açık depoya gitmemeli)
+resume.tex
+
+# Overpass ham yanıt önbelleği (transit_stations.json bundan üretilir)
+data/raw/transit_overpass_raw.json

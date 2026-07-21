@@ -1,0 +1,540 @@
+district,neighborhood,total_listings,avg_price,avg_price_per_m2
+Beşiktaş,Nisbetiye Mah.,95,241000.0,845.0704225352113
+Beşiktaş,Levazım Mah.,44,240000.0,1213.6363636363635
+Üsküdar,Kandilli Mah.,4,197500.0,560.9679446888749
+Sarıyer,Uskumruköy Mah.,7,175000.0,406.9767441860465
+Beşiktaş,Levent Mah.,74,152500.0,598.6111111111111
+Beykoz,Örnekköy Mah.,5,150000.0,181.8181818181818
+Zeytinburnu,Kazlıçeşme Mah.,6,137500.0,866.6666666666666
+Üsküdar,Beylerbeyi Mah.,5,135000.0,931.0344827586207
+Sarıyer,Ferahevler Mah.,14,130000.0,479.16666666666663
+Beşiktaş,Akat Mah.,28,122500.0,772.9934867107889
+Beşiktaş,Vişnezade Mah.,42,120000.0,842.1985815602836
+Beşiktaş,Bebek Mah.,17,115000.0,1000.0
+Beykoz,Acarlar Mah.,43,110000.0,500.0
+Şişli,Harbiye Mah.,27,100000.0,701.2987012987013
+Beşiktaş,Arnavutköy Mah.,9,100000.0,833.3333333333334
+Beşiktaş,Ulus Mah.,28,92500.0,531.5626911314985
+Eyüpsultan,Mimar Sinan Mah.,17,90000.0,609.375
+Beyoğlu,Şahkulu Mah.,8,90000.0,741.6666666666667
+Beykoz,Riva Mah.,6,87500.0,280.55555555555554
+Bakırköy,Şenlikköy Mah.,140,85000.0,411.7647058823529
+Şişli,Esentepe Mah.,21,80000.0,666.6666666666666
+Sarıyer,Emirgan Mah.,5,80000.0,666.6666666666666
+Eyüpsultan,Göktürk Merkez Mah.,49,80000.0,500.0
+Sarıyer,Maden Mah.,27,80000.0,433.3333333333333
+Kağıthane,Emniyet Evleri Mah.,31,80000.0,533.3333333333334
+Kadıköy,Suadiye Mah.,30,79705.0,593.073593073593
+Beşiktaş,Ortaköy Mah.,16,77500.0,593.8940092165899
+Kadıköy,Caddebostan Mah.,16,76500.0,600.9615384615385
+Kadıköy,Fenerbahçe Mah.,18,75495.0,621.978021978022
+Sarıyer,Maslak Mah.,246,75000.0,510.478384902348
+Kadıköy,Göztepe Mah.,34,75000.0,578.6401098901099
+Beşiktaş,Etiler Mah.,39,75000.0,733.3333333333334
+Şişli,Teşvikiye Mah.,57,70000.0,641.025641025641
+Üsküdar,Altunizade Mah.,5,68000.0,400.0
+Kadıköy,Erenköy Mah.,14,66000.0,529.6296296296297
+Üsküdar,Barbaros Mah.,7,65000.0,363.6363636363636
+Ümraniye,Şerifali Mah.,3,65000.0,347.82608695652175
+Beşiktaş,Kültür Mah.,17,65000.0,541.6666666666666
+Şişli,Halaskargazi Mah.,15,65000.0,487.8048780487805
+Bakırköy,Basınköy Mah.,8,62500.0,378.2467532467532
+Bakırköy,Yeşilköy Mah.,19,62000.0,555.5555555555555
+Beşiktaş,Yıldız Mah.,32,62000.0,557.7625570776256
+Sarıyer,Tarabya Mah.,33,60000.0,520.0
+Beyoğlu,Pürtelaş Hasan Efendi Mah.,9,60000.0,472.1212121212121
+Kadıköy,Bostancı Mah.,21,60000.0,470.5882352941176
+Beyoğlu,Kılıçali Paşa Mah.,24,60000.0,539.2857142857142
+Ataşehir,Atatürk Mah.,20,60000.0,543.4782608695652
+Sarıyer,Huzur Mah.,85,58000.0,591.9003115264798
+Üsküdar,Çengelköy Mah.,11,56000.0,380.0
+Kadıköy,19 Mayıs Mah.,14,55750.0,355.0915948275862
+Sarıyer,Yeniköy Mah.,23,55000.0,360.0
+Beyoğlu,Müeyyetzade Mah.,4,55000.0,497.7941176470588
+Şişli,Fulya Mah.,69,55000.0,495.7264957264957
+Sarıyer,Rumeli Hisarı Mah.,7,55000.0,423.0769230769231
+Çekmeköy,Güngören Mah.,3,55000.0,494.01197604790417
+Beyoğlu,Tomtom Mah.,12,54300.0,669.2546583850932
+Kadıköy,Kozyatağı Mah.,22,53000.0,531.578947368421
+Beykoz,Soğuksu Mah.,9,53000.0,374.1496598639456
+Beyoğlu,Asmalı Mescit Mah.,6,52500.0,692.8571428571429
+Üsküdar,Acıbadem Mah.,7,52000.0,379.3103448275862
+Ümraniye,Saray Mah.,3,52000.0,444.44444444444446
+Sarıyer,Zekeriyaköy Mah.,65,50000.0,533.3333333333334
+Üsküdar,Kuzguncuk Mah.,3,50000.0,514.2857142857143
+Sarıyer,İstinye Mah.,10,50000.0,428.1779661016949
+Şişli,Merkez Mah.,85,50000.0,588.2352941176471
+Gaziosmanpaşa,Karayolları Mah.,8,50000.0,443.65721997300943
+Sarıyer,Çayırbaşı Mah.,3,50000.0,500.0
+Şişli,Cumhuriyet Mah.,66,50000.0,566.1962365591398
+Silivri,Balaban Mah.,3,50000.0,217.3913043478261
+Kadıköy,Feneryolu Mah.,8,49750.0,413.4259259259259
+Kadıköy,Fikirtepe Mah.,14,49500.0,458.5016835016835
+Kadıköy,Zühtüpaşa Mah.,6,49000.0,392.0
+Sarıyer,Demirciköy Mah.,6,47500.0,341.66666666666663
+Sarıyer,Ayazağa Mah.,79,47500.0,546.875
+Üsküdar,Küçüksu Mah.,11,47000.0,321.42857142857144
+Beşiktaş,Gayrettepe Mah.,41,46500.0,468.75
+Sarıyer,Yeni Mah.,6,46250.0,366.26984126984127
+Kağıthane,Hamidiye Mah.,64,45500.0,468.3235867446394
+Beyoğlu,İstiklal Mah.,4,45000.0,558.4811529933481
+Kadıköy,Caferağa Mah.,25,45000.0,444.44444444444446
+Beykoz,Anadolu Hisarı Mah.,10,45000.0,362.96296296296293
+Kadıköy,Merdivenköy Mah.,13,45000.0,373.13432835820896
+Beyoğlu,Cihangir Mah.,45,45000.0,416.6666666666667
+Sarıyer,Büyükdere Mah.,13,45000.0,297.2972972972973
+Bahçelievler,Bahçelievler Mah.,60,44500.0,367.8181818181818
+Adalar,Nizam Mah.,20,44500.0,433.0357142857143
+Beylikdüzü,Marmara Mah.,18,42750.0,276.0233918128655
+Sarıyer,Kumköy Mah.,4,42500.0,341.66666666666663
+Kadıköy,Sahrayı Cedit Mah.,7,42500.0,345.5284552845528
+Fatih,Karagümrük Mah.,4,41500.0,286.2068965517241
+Bakırköy,Ataköy 3-4-11. Kısım Mah.,4,41000.0,368.44229217110575
+Sancaktepe,Atatürk Mah.,5,41000.0,253.5211267605634
+Bakırköy,Sakızağacı Mah.,10,41000.0,375.3968253968254
+Beyoğlu,Gümüşsuyu Mah.,18,40500.0,547.159090909091
+Beşiktaş,Dikilitaş Mah.,40,40000.0,452.27272727272725
+Bakırköy,Ataköy 2-5-6. Kısım Mah.,3,40000.0,363.6363636363636
+Bakırköy,Ataköy 7-8-9-10. Kısım Mah.,13,40000.0,530.7692307692307
+Beyoğlu,Bereketzade Mah.,7,40000.0,500.0
+Sarıyer,Kireçburnu Mah.,23,40000.0,300.0
+Şişli,Meşrutiyet Mah.,23,40000.0,499.98571428571427
+Güngören,Mehmet Nesih Özmen Mah.,3,40000.0,296.2962962962963
+Beyoğlu,Ömer Avni Mah.,9,40000.0,437.5
+Sarıyer,Sarıyer Merkez Mah.,11,40000.0,357.14285714285717
+Ümraniye,Tatlısu Mah.,3,40000.0,344.82758620689657
+Adalar,Heybeliada Mah.,7,40000.0,454.54545454545456
+Beşiktaş,Kuruçeşme Mah.,3,40000.0,300.0
+Kartal,Kordonboyu Mah.,11,40000.0,492.3076923076923
+Kartal,Soğanlık Yeni Mah.,5,40000.0,400.0
+Şile,Kumbaba Mah.,3,40000.0,352.94117647058823
+Sarıyer,Bahçeköy Yeni Mah.,4,40000.0,232.32323232323233
+Ataşehir,Barbaros Mah.,12,39750.0,530.2222222222222
+Ataşehir,Küçükbakkalköy Mah.,15,39500.0,392.85714285714283
+Maltepe,Cevizli Mah.,8,39250.0,412.42424242424244
+Ümraniye,Aşağı Dudullu Mah.,5,39000.0,293.75
+Maltepe,Çınar Mah.,17,38750.0,400.0
+Beyoğlu,Firuzağa Mah.,22,38500.0,483.33333333333337
+Başakşehir,Ziya Gökalp Mah.,24,38000.0,333.3333333333333
+Adalar,Burgazada Mah.,13,37500.0,416.6666666666667
+Kartal,Orhantepe Mah.,10,37500.0,345.6140350877193
+Maltepe,Altayçeşme Mah.,20,37500.0,340.90909090909093
+Sultanbeyli,Adil Mah.,4,37000.0,206.86864014801108
+Kadıköy,Dumlupınar Mah.,3,37000.0,665.7407407407408
+Beşiktaş,Konaklar Mah.,8,37000.0,484.8484848484849
+Esenler,15 Temmuz Mah.,4,37000.0,401.0416666666667
+Zeytinburnu,Maltepe Mah.,7,36999.0,528.5571428571428
+Küçükçekmece,Sultan Murat Mah.,3,36750.0,229.6875
+Beylikdüzü,Sahil Mah.,18,36000.0,245.0
+Beyoğlu,Hacımimi Mah.,4,36000.0,536.5629420084865
+Üsküdar,Bahçelievler Mah.,10,35500.0,297.83549783549785
+Maltepe,İdealtepe Mah.,20,35250.0,377.5
+Beykoz,Kanlıca Mah.,8,35000.0,350.0
+Şişli,Bozkurt Mah.,22,35000.0,324.56140350877195
+Adalar,Maden Mah.,17,35000.0,400.0
+Bahçelievler,Yenibosna Merkez Mah.,16,35000.0,333.3926031294452
+Üsküdar,Sultantepe Mah.,5,35000.0,425.0
+Üsküdar,Aziz Mahmut Hüdayi Mah.,20,35000.0,453.33333333333337
+Ümraniye,Finanskent Mah.,6,35000.0,489.81900452488685
+Beyoğlu,Yahya Kahya Mah.,3,35000.0,269.2307692307692
+Maltepe,Küçükyalı Mah.,22,35000.0,292.7350427350427
+Maltepe,Başıbüyük Mah.,7,35000.0,463.91752577319585
+Pendik,Yayalar Mah.,3,35000.0,250.0
+Beylikdüzü,Cumhuriyet Mah.,9,35000.0,256.8493150684931
+Şişli,19 Mayıs Mah.,26,35000.0,366.07142857142856
+Beşiktaş,Sinanpaşa Mah.,8,35000.0,393.75
+Beşiktaş,Muradiye Mah.,11,35000.0,490.0
+Şişli,Ergenekon Mah.,15,35000.0,375.0
+Maltepe,Altıntepe Mah.,42,34500.0,311.86868686868684
+Bakırköy,Zuhuratbaba Mah.,20,34000.0,291.9871794871795
+Kağıthane,Merkez Mah.,49,34000.0,463.6363636363636
+Zeytinburnu,Merkezefendi Mah.,14,33500.0,318.1818181818182
+Pendik,Dumlupınar Mah.,9,33000.0,280.70175438596493
+Beyoğlu,Kuloğlu Mah.,21,33000.0,457.14285714285717
+Ümraniye,Esenevler Mah.,3,33000.0,311.7647058823529
+Üsküdar,Güzeltepe Mah.,13,33000.0,242.85714285714286
+Şişli,Duatepe Mah.,8,33000.0,325.0
+Beşiktaş,Türkali Mah.,23,32500.0,350.0
+Eyüpsultan,Mithatpaşa Mah.,9,32500.0,436.3636363636364
+Sarıyer,Cumhuriyet Mah.,20,32500.0,216.80376028202116
+Üsküdar,Kısıklı Mah.,3,32500.0,566.6666666666666
+Pendik,Batı Mah.,6,32500.0,329.5238095238095
+Ümraniye,Madenler Mah.,8,32500.0,356.4655172413793
+Şile,Çavuş Mah.,10,32500.0,257.14285714285717
+Ataşehir,Örnek Mah.,12,32250.0,453.2828282828283
+Kartal,Esentepe Mah.,3,32000.0,421.05263157894734
+Beyoğlu,Kocatepe Mah.,10,32000.0,393.8181818181818
+Kadıköy,Hasanpaşa Mah.,7,32000.0,290.90909090909093
+Maltepe,Feyzullah Mah.,12,31250.0,314.14473684210526
+Beşiktaş,Cihannüma Mah.,13,31000.0,336.8421052631579
+Ümraniye,Çamlık Mah.,12,31000.0,326.66666666666663
+Tuzla,Postane Mah.,5,31000.0,295.23809523809524
+Beşiktaş,Mecidiye Mah.,20,31000.0,382.3076923076923
+Sancaktepe,Eyüp Sultan Mah.,4,30750.0,255.43478260869566
+Gaziosmanpaşa,Mevlana Mah.,3,30500.0,244.0
+Başakşehir,Bahçeşehir 1. Kısım Mah.,17,30000.0,263.1578947368421
+Üsküdar,Selami Ali Mah.,7,30000.0,326.0869565217391
+Bakırköy,Zeytinlik Mah.,4,30000.0,227.1825396825397
+Gaziosmanpaşa,Karadeniz Mah.,36,30000.0,301.3157894736842
+Ataşehir,İçerenköy Mah.,31,30000.0,272.72727272727275
+Bağcılar,Güneşli Mah.,7,30000.0,260.8695652173913
+Şişli,Feriköy Mah.,29,30000.0,352.94117647058823
+Ümraniye,Atakent Mah.,3,30000.0,272.72727272727275
+Maltepe,Yalı Mah.,13,30000.0,311.7647058823529
+Üsküdar,Mimar Sinan Mah.,7,30000.0,241.3793103448276
+Eyüpsultan,Alibeyköy Mah.,9,30000.0,250.0
+Beykoz,Çubuklu Mah.,23,30000.0,243.75
+Sarıyer,Reşitpaşa Mah.,12,30000.0,289.9159663865546
+Büyükçekmece,Mimar Sinan Merkez Mah.,5,30000.0,194.44444444444446
+Beyoğlu,Sütlüce Mah.,5,30000.0,327.10280373831773
+Beyoğlu,Örnektepe Mah.,4,29975.0,299.75
+Pendik,Fevzi Çakmak Mah.,7,29750.0,288.3333333333333
+Kartal,Yalı Mah.,3,29500.0,453.84615384615387
+Şile,Balibey Mah.,9,29000.0,288.8888888888889
+Şişli,Halide Edip Adıvar Mah.,22,29000.0,296.7032967032967
+Tuzla,Yayla Mah.,6,28975.0,271.4891304347826
+Kartal,Yakacık Yeni Mah.,6,28500.0,363.2478632478632
+Pendik,Kaynarca Mah.,8,28500.0,264.14141414141415
+Pendik,Çınardere Mah.,5,28500.0,277.77777777777777
+Maltepe,Bağlarbaşı Mah.,18,28250.0,410.7142857142857
+Çekmeköy,Taşdelen Mah.,6,28250.0,289.9944720840243
+Pendik,Bahçelievler Mah.,3,28000.0,278.2608695652174
+Eyüpsultan,Güzeltepe Mah.,17,28000.0,300.0
+Üsküdar,Ferah Mah.,4,28000.0,269.1666666666667
+Üsküdar,Salacak Mah.,11,28000.0,340.0
+Pendik,Yenişehir Mah.,24,28000.0,283.44262295081967
+Üsküdar,Cumhuriyet Mah.,15,28000.0,281.25
+Kartal,Cumhuriyet Mah.,9,28000.0,299.06542056074767
+Çekmeköy,Sultançiftliği Mah.,11,28000.0,284.61538461538464
+Kadıköy,Osmanağa Mah.,34,28000.0,467.8571428571429
+Ümraniye,Yukarı Dudullu Mah.,3,28000.0,373.3333333333333
+Sultanbeyli,Mimar Sinan Mah.,3,28000.0,193.10344827586206
+Beykoz,Kavacık Mah.,74,28000.0,240.0
+Kartal,Atalar Mah.,5,28000.0,320.0
+Çekmeköy,Soğukpınar Mah.,4,27750.0,248.75
+Kağıthane,Hürriyet Mah.,18,27500.0,251.25
+Zeytinburnu,Nuripaşa Mah.,4,27500.0,202.08333333333334
+Beyoğlu,Kaptanpaşa Mah.,3,27500.0,200.0
+Üsküdar,Ünalan Mah.,16,27500.0,381.8181818181818
+Üsküdar,Burhaniye Mah.,6,27000.0,208.0128205128205
+Beyoğlu,Piri Paşa Mah.,3,27000.0,270.0
+Maltepe,Aydınevler Mah.,24,27000.0,318.0147058823529
+Güngören,Abdurrahman Nafiz Gürman Mah.,15,27000.0,222.22222222222223
+Gaziosmanpaşa,Yeni Mahalle Mah.,5,27000.0,207.69230769230768
+Üsküdar,Murat Reis Mah.,23,27000.0,307.6923076923077
+Kadıköy,Eğitim Mah.,4,27000.0,274.4871794871795
+Başakşehir,Bahçeşehir 2. Kısım Mah.,29,27000.0,250.0
+Küçükçekmece,Atakent Mah.,40,26750.0,308.6080586080586
+Eyüpsultan,Düğmeciler Mah.,4,26750.0,236.66666666666666
+Üsküdar,Küçük Çamlıca Mah.,6,26500.0,288.33333333333337
+Üsküdar,Küplüce Mah.,3,26500.0,166.66666666666666
+Şişli,İzzet Paşa Mah.,6,26500.0,272.36842105263156
+Eyüpsultan,Emniyettepe Mah.,30,26000.0,329.16666666666663
+Eyüpsultan,Silahtarağa Mah.,5,26000.0,268.75
+Kağıthane,Talatpaşa Mah.,27,26000.0,311.7647058823529
+Kadıköy,Acıbadem Mah.,11,26000.0,285.7142857142857
+Beşiktaş,Abbasağa Mah.,12,26000.0,351.1111111111111
+Beyoğlu,Katip Mustafa Çelebi Mah.,19,26000.0,571.4285714285714
+Ümraniye,Armağanevler Mah.,11,26000.0,262.10526315789474
+Bakırköy,Osmaniye Mah.,7,26000.0,255.55555555555554
+Esenyurt,Esenkent Mah.,3,26000.0,277.77777777777777
+Pendik,Güzelyalı Mah.,8,25750.0,167.14285714285714
+Ümraniye,Necip Fazıl Mah.,9,25500.0,252.08333333333334
+Kağıthane,Nurtepe Mah.,7,25500.0,268.42105263157896
+Başakşehir,Başak Mah.,5,25500.0,283.7837837837838
+Büyükçekmece,Pınartepe Mah.,10,25500.0,188.88888888888889
+Eyüpsultan,Merkez Mah.,10,25500.0,256.969696969697
+Küçükçekmece,Halkalı Merkez Mah.,16,25499.5,248.33333333333331
+Büyükçekmece,Atatürk Mah.,11,25000.0,155.55555555555554
+Sancaktepe,Abdurrahmangazi Mah.,12,25000.0,283.60215053763443
+Şişli,Paşa Mah.,21,25000.0,315.7894736842105
+Beyoğlu,Sururi Mehmet Efendi Mah.,4,25000.0,358.974358974359
+Güngören,Gençosman Mah.,15,25000.0,222.22222222222223
+Pendik,Doğu Mah.,5,25000.0,237.5
+Beyoğlu,Çatma Mescit Mah.,7,25000.0,357.14285714285717
+Güngören,Mareşal Çakmak Mah.,3,25000.0,200.0
+Beylikdüzü,Kavaklı Mah.,65,25000.0,188.46153846153845
+Maltepe,Girne Mah.,7,25000.0,228.0
+Beylikdüzü,Dereağzı Mah.,10,25000.0,195.23809523809524
+Büyükçekmece,Mimaroba Mah.,9,25000.0,212.5
+Eyüpsultan,Karadolap Mah.,19,25000.0,275.0
+Kağıthane,Çeliktepe Mah.,55,25000.0,269.2307692307692
+Şişli,İnönü Mah.,37,25000.0,350.0
+Kağıthane,Seyrantepe Mah.,60,25000.0,332.89473684210526
+Kağıthane,Ortabayır Mah.,48,25000.0,272.11538461538464
+Kağıthane,Mehmet Akif Ersoy Mah.,3,25000.0,357.14285714285717
+Kağıthane,Gürsel Mah.,30,25000.0,278.8888888888889
+Kartal,Karlıktepe Mah.,7,25000.0,263.1578947368421
+Ataşehir,Ferhatpaşa Mah.,3,25000.0,181.8181818181818
+Beykoz,İncirköy Mah.,4,25000.0,230.76923076923077
+Üsküdar,Bulgurlu Mah.,23,25000.0,300.0
+Fatih,Ali Kuşçu Mah.,5,25000.0,277.77777777777777
+Avcılar,Tahtakale Mah.,11,25000.0,220.125786163522
+Bahçelievler,Siyavuşpaşa Mah.,32,25000.0,213.04347826086956
+Bahçelievler,Çobançeşme Mah.,5,25000.0,175.0
+Bakırköy,Kartaltepe Mah.,25,25000.0,263.1578947368421
+Ataşehir,İnönü Mah.,28,25000.0,360.77481840193707
+Eyüpsultan,Sakarya Mah.,3,25000.0,240.0
+Ataşehir,Fetih Mah.,3,25000.0,200.0
+Beylikdüzü,Adnan Kahveci Mah.,35,25000.0,185.1851851851852
+Ümraniye,Namık Kemal Mah.,11,25000.0,268.75
+Şişli,Mecidiyeköy Mah.,111,25000.0,325.0
+Üsküdar,İcadiye Mah.,7,25000.0,317.6470588235294
+Çekmeköy,Merkez Mah.,10,25000.0,270.83333333333337
+Fatih,Topkapı Mah.,5,25000.0,261.53846153846155
+Çekmeköy,Ekşioğlu Mah.,5,25000.0,268.75
+Zeytinburnu,Gökalp Mah.,13,25000.0,307.6923076923077
+Eyüpsultan,İslambey Mah.,13,25000.0,210.08403361344537
+Başakşehir,Başakşehir Mah.,16,25000.0,306.4935064935065
+Beykoz,Göztepe Mah.,12,25000.0,204.24242424242425
+Beykoz,Rüzgarlıbahçe Mah.,9,25000.0,294.11764705882354
+Kartal,Hürriyet Mah.,23,25000.0,223.8095238095238
+Çekmeköy,Mehmet Akif Mah.,14,24750.0,258.6618876941458
+Kağıthane,Çağlayan Mah.,44,24750.0,271.65775401069516
+Ümraniye,İstiklal Mah.,12,24500.0,251.63398692810458
+Kartal,Yakacık Çarşı Mah.,5,24500.0,214.7058823529412
+Kartal,Orta Mah.,3,24250.0,283.3333333333333
+Sarıyer,Fatih Sultan Mehmet Mah.,4,24000.0,219.5187165775401
+Küçükçekmece,Yeni Mahalle Mah.,4,24000.0,273.9819004524887
+Büyükçekmece,Çakmaklı Mah.,8,24000.0,267.4418604651163
+Çekmeköy,Mimar Sinan Mah.,8,24000.0,259.3567251461988
+Pendik,Esenler Mah.,3,24000.0,177.77777777777777
+Pendik,Güllü Bağlar Mah.,6,24000.0,252.27272727272725
+Şişli,Gülbahar Mah.,69,24000.0,266.6666666666667
+Pendik,Sapan Bağları Mah.,5,24000.0,209.0909090909091
+Fatih,Akşemsettin Mah.,9,24000.0,261.53846153846155
+Güngören,Merkez Mah.,10,24000.0,212.04545454545456
+Ataşehir,Kayışdağı Mah.,44,23875.0,394.00921658986175
+Beykoz,Fatih Mah.,6,23750.0,235.85858585858585
+Ümraniye,Atatürk Mah.,8,23750.0,256.6666666666667
+Beylikdüzü,Barış Mah.,18,23750.0,168.52678571428572
+Sancaktepe,Emek Mah.,6,23650.0,325.4901960784314
+Üsküdar,Mehmet Akif Ersoy Mah.,4,23500.0,188.14102564102564
+Bağcılar,Mahmutbey Mah.,15,23500.0,286.6666666666667
+Fatih,Yavuz Sultan Selim Mah.,6,23500.0,318.25396825396825
+Beykoz,Paşabahçe Mah.,11,23500.0,285.7142857142857
+Pendik,Kurtköy Mah.,3,23500.0,328.57142857142856
+Maltepe,Zümrütevler Mah.,23,23500.0,208.33333333333334
+Maltepe,Fındıklı Mah.,29,23500.0,276.9230769230769
+Esenyurt,Koza Mah.,20,23250.0,212.54901960784315
+Esenyurt,Cumhuriyet Mah.,18,23250.0,179.28571428571428
+Kartal,Cevizli Mah.,8,23250.0,315.0
+Gaziosmanpaşa,Karlıtepe Mah.,4,23000.0,257.66666666666663
+Üsküdar,Zeynep Kamil Mah.,27,23000.0,255.55555555555554
+Şişli,Yayla Mah.,13,23000.0,250.0
+Ataşehir,Esatpaşa Mah.,6,23000.0,243.05555555555554
+Bayrampaşa,İsmet Paşa Mah.,4,23000.0,314.02714932126696
+Başakşehir,Kayabaşı Mah.,43,23000.0,266.6666666666667
+Bakırköy,Cevizlik Mah.,7,23000.0,257.14285714285717
+Şişli,Kuştepe Mah.,39,23000.0,353.3333333333333
+Tuzla,Şifa Mah.,7,23000.0,223.52941176470588
+Beyoğlu,Halıcıoğlu Mah.,8,22750.0,275.6787330316742
+Üsküdar,Valide-i Atik Mah.,10,22750.0,264.4886363636364
+Beyoğlu,Hüseyinağa Mah.,10,22500.0,547.7272727272727
+Beylikdüzü,Büyükşehir Mah.,8,22500.0,223.8095238095238
+Sancaktepe,Osmangazi Mah.,4,22500.0,276.47058823529414
+Eyüpsultan,Çırçır Mah.,8,22500.0,248.125
+Bayrampaşa,Kartaltepe Mah.,7,22500.0,227.27272727272728
+Bayrampaşa,Orta Mah.,8,22500.0,172.25274725274724
+Sarıyer,Kocataş Mah.,4,22500.0,215.27777777777777
+Kadıköy,Rasimpaşa Mah.,17,22500.0,368.42105263157896
+Gaziosmanpaşa,Bağlarbaşı Mah.,6,22500.0,210.9090909090909
+Tuzla,Aydınlı Mah.,7,22500.0,222.22222222222223
+Güngören,Haznedar Mah.,3,22500.0,187.5
+Büyükçekmece,Kumburgaz Mah.,8,22250.0,250.0
+Sancaktepe,Meclis Mah.,6,22125.0,166.73062865497076
+Ümraniye,Altınşehir Mah.,3,22000.0,165.2173913043478
+Zeytinburnu,Telsiz Mah.,9,22000.0,250.0
+Beyoğlu,Şehit Muhtar Mah.,11,22000.0,340.0
+Çekmeköy,Çatalmeşe Mah.,7,22000.0,218.75
+Ataşehir,Mustafa Kemal Mah.,3,22000.0,253.33333333333334
+Eyüpsultan,Akşemsettin Mah.,19,22000.0,222.22222222222223
+Eyüpsultan,Yeşilpınar Mah.,7,22000.0,227.77777777777777
+Beyoğlu,Hacıahmet Mah.,15,22000.0,425.0
+Beykoz,Çiğdem Mah.,5,22000.0,226.66666666666666
+Beykoz,Çamlıbahçe Mah.,8,22000.0,186.14718614718615
+Beykoz,Yalıköy Mah.,7,22000.0,220.0
+Beykoz,Tokatköy Mah.,3,22000.0,320.0
+Bahçelievler,Cumhuriyet Mah.,9,22000.0,246.15384615384616
+Bahçelievler,Kocasinan Merkez Mah.,15,22000.0,216.66666666666666
+Kartal,Uğur Mumcu Mah.,10,22000.0,197.68518518518516
+Küçükçekmece,Fatih Mah.,18,21750.0,194.76190476190476
+Tuzla,Mimar Sinan Mah.,12,21500.0,217.8030303030303
+Güngören,Akıncılar Mah.,8,21500.0,191.66666666666666
+Kağıthane,Gültepe Mah.,14,21250.0,271.6599190283401
+Silivri,Yeni Mah.,27,21000.0,211.53846153846155
+Pendik,Fatih Mah.,5,21000.0,190.9090909090909
+Ümraniye,Çakmak Mah.,7,21000.0,226.66666666666666
+Beykoz,Gümüşsuyu Mah.,9,21000.0,230.0
+Arnavutköy,Hadımköy Mah.,8,21000.0,182.35930735930737
+Küçükçekmece,İstasyon Mah.,11,21000.0,257.14285714285717
+Fatih,Molla Gürani Mah.,14,21000.0,221.11111111111111
+Beylikdüzü,Yakuplu Mah.,20,21000.0,231.28342245989305
+Pendik,Çamçeşme Mah.,4,21000.0,156.4102564102564
+Güngören,Güneştepe Mah.,3,21000.0,160.0
+Beyoğlu,Kalyoncu Kulluğu Mah.,18,21000.0,464.77272727272725
+Gaziosmanpaşa,Yıldıztabya Mah.,6,21000.0,247.5
+Gaziosmanpaşa,Merkez Mah.,14,20750.0,210.72874493927125
+Bahçelievler,Soğanlı Mah.,30,20500.0,225.54347826086956
+Zeytinburnu,Beştelsiz Mah.,8,20500.0,224.5
+Kağıthane,Yahya Kemal Mah.,24,20499.5,248.52941176470588
+Beyoğlu,Küçük Piyale Mah.,3,20000.0,235.2941176470588
+Fatih,Haseki Sultan Mah.,17,20000.0,250.0
+Küçükçekmece,Beşyol Mah.,5,20000.0,210.52631578947367
+Küçükçekmece,Yeşilova Mah.,29,20000.0,200.0
+Avcılar,Merkez Mah.,28,20000.0,218.25396825396825
+Ümraniye,Ihlamurkuyu Mah.,3,20000.0,190.47619047619048
+Kağıthane,Yeşilce Mah.,11,20000.0,235.2941176470588
+Sarıyer,Pınar Mah.,9,20000.0,285.7142857142857
+Küçükçekmece,İnönü Mah.,15,20000.0,298.2456140350877
+Kağıthane,Sultan Selim Mah.,57,20000.0,235.2941176470588
+Gaziosmanpaşa,Fevzi Çakmak Mah.,3,20000.0,222.22222222222223
+Tuzla,Orta Mah.,3,20000.0,222.22222222222223
+Esenler,Birlik Mah.,5,20000.0,210.52631578947367
+Beykoz,Merkez Mah.,9,20000.0,250.0
+Bağcılar,15 Temmuz Mah.,23,20000.0,200.0
+Ümraniye,Yamanevler Mah.,5,20000.0,211.76470588235293
+Kağıthane,Harmantepe Mah.,31,20000.0,229.00763358778627
+Esenler,Menderes Mah.,8,20000.0,178.32538420773716
+Bahçelievler,Zafer Mah.,12,20000.0,221.8253968253968
+Fatih,Cerrahpaşa Mah.,20,20000.0,222.87581699346407
+Üsküdar,Ahmediye Mah.,8,20000.0,235.55555555555554
+Ümraniye,Elmalıkent Mah.,3,20000.0,169.23076923076923
+Fatih,İskenderpaşa Mah.,7,20000.0,250.0
+Küçükçekmece,Kartaltepe Mah.,5,20000.0,200.0
+Esenyurt,Gökevler Mah.,9,20000.0,185.1851851851852
+Bakırköy,Yenimahalle Mah.,3,20000.0,250.0
+Zeytinburnu,Sümer Mah.,21,20000.0,200.0
+Fatih,Şehremini Mah.,41,20000.0,222.22222222222223
+Zeytinburnu,Çırpıcı Mah.,7,20000.0,230.0
+Güngören,Güven Mah.,6,20000.0,186.48325358851673
+Bağcılar,Yavuz Selim Mah.,5,20000.0,200.0
+Sancaktepe,Fatih Mah.,10,20000.0,154.1958041958042
+Bayrampaşa,Altıntepsi Mah.,7,20000.0,222.22222222222223
+Küçükçekmece,Cumhuriyet Mah.,27,20000.0,179.31034482758622
+Büyükçekmece,Güzelce Mah.,4,20000.0,126.6025641025641
+Beyoğlu,Bülbül Mah.,3,20000.0,476.1904761904762
+Küçükçekmece,Cennet Mah.,19,20000.0,181.8181818181818
+Sultangazi,İsmetpaşa Mah.,4,19800.0,163.92857142857144
+Beykoz,Yeni Mahalle Mah.,10,19500.0,173.03030303030303
+Küçükçekmece,Gültepe Mah.,24,19500.0,218.38235294117646
+Bayrampaşa,Muratpaşa Mah.,5,19300.0,200.0
+Bağcılar,Yenimahalle Mah.,4,19250.0,180.6818181818182
+Bağcılar,Göztepe Mah.,6,19250.0,170.0
+Büyükçekmece,Fatih Mah.,16,19250.0,149.20634920634922
+Bağcılar,Merkez Mah.,12,19000.0,200.0
+Fatih,Aksaray Mah.,13,19000.0,235.2941176470588
+Şişli,Eskişehir Mah.,33,19000.0,257.14285714285717
+Güngören,Sanayi Mah.,4,19000.0,173.33333333333331
+Güngören,Tozkoparan Mah.,8,19000.0,207.14285714285714
+Beyoğlu,Kamer Hatun Mah.,11,19000.0,500.0
+Esenyurt,Barbaros Hayrettin Paşa Mah.,18,19000.0,179.04761904761904
+Bahçelievler,Şirinevler Mah.,22,18500.0,165.0
+Silivri,Selimpaşa Mah.,14,18500.0,176.47058823529412
+Gaziosmanpaşa,Barbaros Hayrettinpaşa Mah.,4,18500.0,218.89952153110048
+Esenler,Nine Hatun Mah.,9,18500.0,175.0
+Beylikdüzü,Gürpınar Mah.,16,18500.0,178.23529411764707
+Fatih,Hırka-i Şerif Mah.,8,18000.0,251.9230769230769
+Esenler,Fevzi Çakmak Mah.,9,18000.0,192.30769230769232
+Pendik,Kavakpınar Mah.,7,18000.0,180.0
+Kağıthane,Şirintepe Mah.,27,18000.0,237.5
+Kağıthane,Telsizler Mah.,27,18000.0,253.84615384615384
+Esenyurt,Orhan Gazi Mah.,7,18000.0,170.0
+Bağcılar,Çınar Mah.,4,18000.0,162.0
+Esenyurt,Akevler Mah.,23,18000.0,173.91304347826087
+Avcılar,Gümüşpala Mah.,20,18000.0,172.61904761904762
+Sarıyer,Bahçeköy Merkez Mah.,9,18000.0,222.22222222222223
+Fatih,Balat Mah.,8,18000.0,277.5401069518717
+Arnavutköy,Arnavutköy Merkez Mah.,4,18000.0,179.11764705882354
+Bayrampaşa,Yenidoğan Mah.,7,18000.0,233.33333333333334
+Silivri,Alibey Mah.,5,18000.0,153.84615384615384
+Silivri,Mimar Sinan Mah.,14,18000.0,167.53246753246754
+Küçükçekmece,Tevfik Bey Mah.,8,18000.0,167.73809523809524
+Avcılar,Cihangir Mah.,58,17750.0,191.15384615384616
+Arnavutköy,Atatürk Mah.,4,17500.0,155.3030303030303
+Bağcılar,Kazım Karabekir Mah.,4,17500.0,175.83333333333331
+Küçükçekmece,Fevzi Çakmak Mah.,10,17500.0,178.03030303030303
+Fatih,Ayvansaray Mah.,20,17500.0,468.57142857142856
+Avcılar,Denizköşkler Mah.,43,17500.0,175.0
+Fatih,Koca Mustafapaşa Mah.,36,17000.0,225.83333333333331
+Fatih,Silivrikapı Mah.,23,17000.0,231.70731707317074
+Çekmeköy,Aydınlar Mah.,4,17000.0,246.81372549019608
+Fatih,Seyyid Ömer Mah.,45,17000.0,230.76923076923077
+Gaziosmanpaşa,Sarıgöl Mah.,4,16500.0,201.8796992481203
+Esenyurt,Turgut Özal Mah.,6,16500.0,181.3793103448276
+Beykoz,Ortaçeşme Mah.,8,16250.0,167.91666666666669
+Arnavutköy,İslambey Mah.,7,16000.0,187.5
+Arnavutköy,Anadolu Mah.,9,16000.0,175.0
+Esenyurt,İnönü Mah.,5,16000.0,188.23529411764707
+Bağcılar,100. Yıl Mah.,9,16000.0,198.19819819819818
+Fatih,Derviş Ali Mah.,3,16000.0,246.15384615384616
+Bağcılar,Demirkapı Mah.,13,16000.0,160.0
+Bağcılar,Yıldıztepe Mah.,13,16000.0,156.25
+Avcılar,Firuzköy Mah.,10,16000.0,161.45833333333331
+Avcılar,Ambarlı Mah.,19,16000.0,147.05882352941177
+Çekmeköy,Cumhuriyet Mah.,4,16000.0,202.75735294117646
+Bayrampaşa,Cevatpaşa Mah.,10,16000.0,176.85406698564594
+Zeytinburnu,Veliefendi Mah.,9,16000.0,164.7058823529412
+Esenyurt,Ardıçlı Mah.,3,16000.0,153.84615384615384
+Esenler,Tuna Mah.,7,16000.0,175.0
+Sultangazi,Cebeci Mah.,7,16000.0,188.23529411764707
+Esenler,Turgut Reis Mah.,5,16000.0,125.92592592592592
+Fatih,Sümbül Efendi Mah.,26,16000.0,218.25396825396825
+Arnavutköy,Hastane Mah.,3,15500.0,172.22222222222223
+Fatih,Mevlanakapı Mah.,20,15500.0,205.88235294117646
+Küçükçekmece,Kemalpaşa Mah.,3,15500.0,172.22222222222223
+Esenler,Fatih Mah.,11,15500.0,157.89473684210526
+Esenyurt,Bağlarçeşme Mah.,4,15500.0,122.08333333333334
+Esenler,Oruçreis Mah.,14,15250.0,156.25
+Silivri,Alipaşa Mah.,4,15250.0,168.51285189718482
+Bağcılar,Fatih Mah.,6,15000.0,134.84848484848487
+Esenyurt,Hürriyet Mah.,7,15000.0,138.46153846153845
+Esenler,Kemer Mah.,13,15000.0,155.0
+Esenyurt,Güzelyurt Mah.,20,15000.0,150.0
+Esenler,Kazım Karabekir Mah.,7,15000.0,161.53846153846155
+Esenyurt,Mehmet Akif Ersoy Mah.,19,15000.0,170.0
+Esenyurt,Piri Reis Mah.,17,15000.0,185.71428571428572
+Esenyurt,Selahaddin Eyyubi Mah.,8,15000.0,137.74703557312253
+Beyoğlu,Yenişehir Mah.,11,15000.0,214.28571428571428
+Esenyurt,Yeşilkent Mah.,26,15000.0,164.8148148148148
+Sancaktepe,Yenidoğan Mah.,3,15000.0,176.47058823529412
+Bağcılar,Fevzi Çakmak Mah.,7,15000.0,147.05882352941177
+Esenyurt,Akçaburgaz Mah.,13,15000.0,155.55555555555554
+Avcılar,Mustafa Kemal Paşa Mah.,24,15000.0,161.25
+Esenyurt,Zafer Mah.,23,15000.0,200.0
+Bağcılar,Kirazlı Mah.,9,15000.0,153.33333333333334
+Bağcılar,Sancaktepe Mah.,5,15000.0,153.84615384615384
+Fatih,Yedikule Mah.,7,15000.0,188.88888888888889
+Silivri,Piri Mehmet Paşa Mah.,5,15000.0,169.23076923076923
+Sultangazi,Sultançiftliği Mah.,3,15000.0,164.7058823529412
+Bağcılar,İnönü Mah.,8,15000.0,174.7159090909091
+Esenyurt,Saadetdere Mah.,8,14750.0,144.57070707070707
+Başakşehir,Güvercintepe Mah.,10,14500.0,152.4767801857585
+Küçükçekmece,Kanarya Mah.,16,14500.0,150.37593984962405
+Esenyurt,Talatpaşa Mah.,12,14000.0,135.9886201991465
+Esenyurt,Mehterçeşme Mah.,29,14000.0,160.0
+Küçükçekmece,Mehmet Akif Mah.,9,14000.0,170.0
+Zeytinburnu,Seyitnizam Mah.,26,14000.0,148.91304347826087
+Esenyurt,Sultaniye Mah.,4,14000.0,167.70833333333331
+Gaziosmanpaşa,Kazım Karabekir Mah.,3,14000.0,150.0
+Silivri,Gümüşyaka Mah.,3,14000.0,133.33333333333334
+Esenyurt,Örnek Mah.,3,14000.0,116.66666666666667
+Esenyurt,Çınar Mah.,3,14000.0,155.55555555555554
+Başakşehir,Altınşehir Mah.,10,13500.0,138.8888888888889
+Beyoğlu,Çukur Mah.,4,13450.0,386.07142857142856
+Avcılar,Yeşilkent Mah.,4,13250.0,104.34782608695653
+Bahçelievler,Hürriyet Mah.,5,13000.0,185.71428571428572
+Esenyurt,İncirtepe Mah.,6,13000.0,130.1169590643275
+Bahçelievler,Fevzi Çakmak Mah.,3,13000.0,185.71428571428572
+Esenyurt,Necip Fazıl Kısakürek Mah.,9,13000.0,104.0
+Sultangazi,Zübeyde Hanım Mah.,3,13000.0,110.71428571428571
+Esenyurt,Süleymaniye Mah.,7,13000.0,144.44444444444446
+Esenyurt,Üçevler Mah.,15,12500.0,123.07692307692308
+Avcılar,Üniversite Mah.,12,12000.0,145.95959595959596
+Bağcılar,Kemalpaşa Mah.,3,12000.0,120.37037037037037
+Esenyurt,Fatih Mah.,6,11500.0,121.80555555555556
+Esenyurt,Pınar Mah.,7,11000.0,146.66666666666666
+Küçükçekmece,Atatürk Mah.,5,10500.0,105.0
+Esenyurt,Balıkyolu Mah.,7,10000.0,116.66666666666667
+Esenyurt,Atatürk Mah.,5,10000.0,90.9090909090909
+Esenyurt,Şehitler Mah.,4,10000.0,91.26984126984127

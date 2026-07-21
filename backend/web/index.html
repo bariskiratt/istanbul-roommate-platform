@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>İstanbul Bütçe Isı Haritası</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🏙️</text></svg>" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        :root {
+            --bg: #f7f8fa; --panel: #ffffff; --text: #1a1d23; --muted: #6b7280;
+            --border: #e5e7eb; --accent: #2563eb;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #14161a; --panel: #1c1f26; --text: #e8eaed; --muted: #9aa3b2;
+                --border: #2c313a; --accent: #60a5fa;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; background: var(--bg); color: var(--text);
+            font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        header { padding: 20px 24px 12px; }
+        h1 { margin: 0 0 4px; font-size: 20px; font-weight: 650; }
+        .sub { color: var(--muted); font-size: 13px; }
+        .controls {
+            display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+            padding: 16px 24px; background: var(--panel);
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+        }
+        .budget-value { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+        input[type=range] { width: min(360px, 60vw); accent-color: var(--accent); }
+        .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-left: auto; font-size: 13px; }
+        .legend span { display: flex; align-items: center; gap: 6px; }
+        .swatch { width: 13px; height: 13px; border-radius: 3px; flex: none; }
+        .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+        #map { height: calc(100vh - 190px); min-height: 420px; width: 100%; }
+
+        /* --- Sekmeler --- */
+        .tabs { display: flex; gap: 4px; padding: 12px 24px 0; }
+        .tab {
+            padding: 8px 16px; border: 1px solid var(--border); border-bottom: none;
+            border-radius: 8px 8px 0 0; background: transparent; color: var(--muted);
+            font: inherit; font-size: 14px; cursor: pointer;
+        }
+        .tab[aria-selected="true"] {
+            background: var(--panel); color: var(--text); font-weight: 600;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* --- Adil fiyat formu --- */
+        #estimate-panel { padding: 20px 24px 40px; max-width: 780px; }
+        .form-grid {
+            display: grid; gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { font-size: 13px; color: var(--muted); }
+        .field select, .field input[type=number] {
+            padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px;
+            background: var(--panel); color: var(--text); font: inherit; font-size: 14px;
+        }
+        button.primary {
+            margin-top: 18px; padding: 11px 22px; border: none; border-radius: 8px;
+            background: var(--accent); color: #fff; font: inherit; font-weight: 600;
+            font-size: 15px; cursor: pointer;
+        }
+        button.primary:disabled { opacity: .55; cursor: default; }
+        #result {
+            margin-top: 22px; padding: 18px 20px; border: 1px solid var(--border);
+            border-radius: 10px; background: var(--panel); display: none;
+        }
+        #result.show { display: block; }
+        .band { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+        .band small { font-size: 14px; font-weight: 400; color: var(--muted); }
+        .verdict { margin-top: 12px; padding: 10px 14px; border-radius: 7px; font-size: 14px; }
+        .verdict.fair  { background: #2ecc7122; border: 1px solid #2ecc7166; }
+        .verdict.above { background: #e74c3c22; border: 1px solid #e74c3c66; }
+        .verdict.below { background: #f1c40f22; border: 1px solid #f1c40f66; }
+        .note { margin-top: 12px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+        #status {
+            padding: 8px 24px; font-size: 13px; color: var(--muted); min-height: 32px;
+        }
+        #status.error { color: #dc2626; }
+        .leaflet-popup-content { margin: 12px 14px; font: 14px/1.5 system-ui, sans-serif; }
+        .popup-title { font-weight: 650; margin-bottom: 2px; }
+        .popup-dist { color: #6b7280; font-size: 12px; margin-bottom: 8px; }
+        .popup-price { font-size: 17px; font-weight: 650; }
+        .popup-alt {
+            margin-top: 10px; width: 100%; padding: 8px 10px; border: none;
+            border-radius: 6px; background: var(--accent); color: #fff;
+            font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+
+        /* --- Alternatif öneri paneli (harita üstünde kayan kart) --- */
+        #alt-panel {
+            position: absolute; top: 12px; right: 12px; z-index: 1000;
+            width: 320px; max-width: calc(100% - 24px);
+            max-height: calc(100% - 24px); overflow-y: auto;
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.18);
+            padding: 16px 18px; display: none;
+        }
+        #alt-panel.show { display: block; }
+        #alt-panel h3 { margin: 0 0 2px; font-size: 15px; }
+        #alt-panel .close {
+            position: absolute; top: 12px; right: 14px; border: none;
+            background: none; color: var(--muted); font-size: 20px; cursor: pointer;
+            line-height: 1;
+        }
+        .alt-item {
+            padding: 10px 0; border-top: 1px solid var(--border); cursor: pointer;
+        }
+        .alt-item:hover { opacity: .8; }
+        .alt-name { font-weight: 600; font-size: 14px; }
+        .alt-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .alt-price { font-weight: 650; }
+        .alt-save { color: #16a34a; }
+        .hop-badge {
+            display: inline-block; padding: 1px 7px; border-radius: 10px;
+            background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+        }
+        .leaflet-marker-icon.alt-pin {
+            border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.3);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>İstanbul Bütçe Isı Haritası</h1>
+        <div class="sub">Aylık kira bütçeni seç, hangi mahallelerin sana uygun olduğunu gör.</div>
+    </header>
+
+    <div class="tabs" role="tablist">
+        <button class="tab" id="tab-map" role="tab" aria-selected="true"
+                aria-controls="map-panel">🗺️ Bütçe Haritası</button>
+        <button class="tab" id="tab-estimate" role="tab" aria-selected="false"
+                aria-controls="estimate-panel">💰 Adil Fiyat Tahmini</button>
+    </div>
+
+    <div class="panel active" id="map-panel" role="tabpanel">
+        <div class="controls">
+            <label for="budget">
+                <div class="budget-value"><span id="budget-label">25.000</span> TL</div>
+            </label>
+            <input type="range" id="budget" min="5000" max="150000" step="1000" value="25000"
+                   aria-label="Aylık bütçe" />
+            <div class="legend" id="legend"></div>
+        </div>
+        <div id="status">Yükleniyor…</div>
+        <div style="position:relative">
+            <div id="map"></div>
+            <div id="alt-panel">
+                <button class="close" id="alt-close" aria-label="Kapat">×</button>
+                <div id="alt-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" id="estimate-panel" role="tabpanel">
+        <p class="sub" style="margin:0 0 18px">
+            İlanın özelliklerini gir, modelin öngördüğü adil kira aralığını gör.
+        </p>
+        <form id="estimate-form">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="f-district">İlçe</label>
+                    <select id="f-district" required></select>
+                </div>
+                <div class="field">
+                    <label for="f-neighborhood">Mahalle</label>
+                    <select id="f-neighborhood" required></select>
+                </div>
+                <div class="field">
+                    <label for="f-room">Oda sayısı</label>
+                    <input type="number" id="f-room" min="1" max="11" value="2" required />
+                </div>
+                <div class="field">
+                    <label for="f-living">Salon sayısı</label>
+                    <input type="number" id="f-living" min="0" max="5" value="1" required />
+                </div>
+                <div class="field">
+                    <label for="f-area">Alan (m²)</label>
+                    <input type="number" id="f-area" min="20" max="1000" value="90" required />
+                </div>
+                <div class="field">
+                    <label for="f-age">Bina yaşı</label>
+                    <input type="number" id="f-age" min="0" max="100" value="15" required />
+                </div>
+                <div class="field">
+                    <label for="f-floor">Bulunduğu kat</label>
+                    <input type="number" id="f-floor" min="-3" max="30" value="3" required />
+                </div>
+                <div class="field">
+                    <label for="f-asking">İstenen kira (opsiyonel)</label>
+                    <input type="number" id="f-asking" min="1" placeholder="örn. 30000" />
+                </div>
+            </div>
+            <button type="submit" class="primary" id="estimate-btn">Adil Fiyatı Hesapla</button>
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <script>
+    (function () {
+        "use strict";
+
+        // API ile aynı origin'den servis ediliyorsa boş bırak; ayrı portta
+        // çalıştırıyorsan "http://127.0.0.1:8000" yaz.
+        var API = "";
+
+        var STATUS_STYLES = {
+            safe:       { label: "Bütçene Uygun",  color: "#2ecc71" },
+            borderline: { label: "Sınırda",        color: "#f1c40f" },
+            expensive:  { label: "Bütçeni Aşıyor", color: "#e74c3c" },
+            nodata:     { label: "Veri Yok",       color: "#95a5a6" }
+        };
+        var ORDER = ["safe", "borderline", "expensive", "nodata"];
+
+        var slider = document.getElementById("budget");
+        var budgetLabel = document.getElementById("budget-label");
+        var statusEl = document.getElementById("status");
+        var legendEl = document.getElementById("legend");
+
+        var map = L.map("map").setView([41.02, 28.95], 10);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap katkıcıları",
+            maxZoom: 18
+        }).addTo(map);
+
+        // id -> Leaflet layer. Bütçe değişince geometriyi yeniden çizmek yerine
+        // yalnızca bu katmanların stilini güncelliyoruz.
+        var layersById = [];
+        var statuses = [];
+        var inflight = null;   // süresi geçmiş yanıtları yok saymak için
+        var requestSeq = 0;
+
+        var fmt = new Intl.NumberFormat("tr-TR");
+
+        function setStatus(text, isError) {
+            statusEl.textContent = text;
+            statusEl.classList.toggle("error", !!isError);
+        }
+
+        function styleFor(status) {
+            return {
+                fillColor: (STATUS_STYLES[status] || STATUS_STYLES.nodata).color,
+                fillOpacity: status === "nodata" ? 0.25 : 0.65,
+                weight: 1,
+                color: "#ffffff",
+                opacity: 0.6
+            };
+        }
+
+        function popupHtml(props, status) {
+            var price = props.avg_price == null
+                ? "Yeterli ilan verisi yok"
+                : fmt.format(Math.round(props.avg_price)) + " TL / ay";
+            var html = '<div class="popup-title">' + (props.neighborhood || "Bilinmeyen") + " Mah.</div>"
+                 + '<div class="popup-dist">' + (props.district || "") + "</div>"
+                 + '<div class="popup-price">' + price + "</div>"
+                 + '<div class="popup-dist" style="margin:6px 0 0">'
+                 + (STATUS_STYLES[status] || STATUS_STYLES.nodata).label + "</div>";
+            // Yalnızca fiyatı bilinen mahalleler için alternatif önerisi anlamlı.
+            if (props.avg_price != null) {
+                html += '<button class="popup-alt" data-id="' + props.id + '">'
+                     + "🚇 Yakın uygun alternatifler</button>";
+            }
+            return html;
+        }
+
+        function renderLegend(summary) {
+            legendEl.innerHTML = ORDER.map(function (key) {
+                var s = STATUS_STYLES[key];
+                var n = summary && summary[key] != null
+                    ? ' <span class="count">' + summary[key] + "</span>" : "";
+                return '<span><i class="swatch" style="background:' + s.color + '"></i>'
+                     + s.label + n + "</span>";
+            }).join("");
+        }
+
+        function applyStatuses(list, summary) {
+            statuses = list;
+            for (var i = 0; i < layersById.length; i++) {
+                var layer = layersById[i];
+                if (layer) layer.setStyle(styleFor(list[i]));
+            }
+            renderLegend(summary);
+        }
+
+        function fetchHeatmap(budget) {
+            var seq = ++requestSeq;
+            if (inflight) inflight.abort();
+            inflight = new AbortController();
+
+            return fetch(API + "/api/heatmap?budget=" + budget, { signal: inflight.signal })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("API " + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    // Yarış durumu: yalnızca en son isteğin yanıtını uygula.
+                    if (seq !== requestSeq) return;
+                    applyStatuses(data.statuses, data.summary);
+                    setStatus("Veri bulunan " + (data.summary.safe + data.summary.borderline
+                        + data.summary.expensive) + " mahalleden "
+                        + data.summary.safe + " tanesi bütçene uygun.");
+                })
+                .catch(function (err) {
+                    if (err.name === "AbortError") return;
+                    setStatus("Isı haritası alınamadı: " + err.message
+                        + " (API çalışıyor mu?)", true);
+                });
+        }
+
+        // Slider sürüklenirken her piksel için istek atmamak adına gecikme koyuyoruz.
+        var debounceTimer = null;
+        slider.addEventListener("input", function () {
+            budgetLabel.textContent = fmt.format(+slider.value);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                fetchHeatmap(+slider.value);
+            }, 120);
+        });
+
+        renderLegend(null);
+        budgetLabel.textContent = fmt.format(+slider.value);
+
+        // Geometri bütçeden bağımsız: yalnızca bir kez indirilir.
+        setStatus("Mahalle sınırları yükleniyor…");
+        fetch(API + "/api/geojson")
+            .then(function (r) {
+                if (!r.ok) throw new Error("API " + r.status);
+                return r.json();
+            })
+            .then(function (geojson) {
+                L.geoJSON(geojson, {
+                    style: function () { return styleFor("nodata"); },
+                    onEachFeature: function (feature, layer) {
+                        var id = feature.properties.id;
+                        layersById[id] = layer;
+                        layer.bindPopup(function () {
+                            return popupHtml(feature.properties, statuses[id] || "nodata");
+                        });
+                    }
+                }).addTo(map);
+                return fetchHeatmap(+slider.value);
+            })
+            .catch(function (err) {
+                setStatus("Harita verisi yüklenemedi: " + err.message
+                    + ". Sunucuyu 'python main.py' ile başlat.", true);
+            });
+
+        // ---------------------------------------------------------------
+        // Alternatif semt önerileri (Modül 3)
+        // ---------------------------------------------------------------
+        var altPanel = document.getElementById("alt-panel");
+        var altBody = document.getElementById("alt-body");
+        var altMarkers = [];
+
+        function clearAltMarkers() {
+            altMarkers.forEach(function (m) { map.removeLayer(m); });
+            altMarkers = [];
+        }
+
+        function closeAlt() {
+            altPanel.classList.remove("show");
+            clearAltMarkers();
+        }
+        document.getElementById("alt-close").addEventListener("click", closeAlt);
+
+        function pin(color) {
+            return L.divIcon({
+                className: "alt-pin",
+                html: '<div style="width:14px;height:14px;border-radius:50%;'
+                    + 'background:' + color + '"></div>',
+                iconSize: [14, 14]
+            });
+        }
+
+        function showAlternatives(data) {
+            clearAltMarkers();
+            var t = data.target;
+
+            if (!data.reachable) {
+                altBody.innerHTML = '<h3>' + t.name + " Mah.</h3>"
+                    + '<div class="alt-meta">' + (t.message || "Öneri üretilemedi.")
+                    + "</div>";
+                altPanel.classList.add("show");
+                return;
+            }
+
+            var recs = data.recommendations;
+            var head = '<h3>' + t.name + " Mah. yakını</h3>"
+                + '<div class="alt-meta">Bütçe: ' + fmt.format(data.budget)
+                + " TL · raylı sistemle ulaşılabilir " + recs.length
+                + " uygun mahalle</div>";
+
+            if (!recs.length) {
+                altBody.innerHTML = head + '<div class="alt-item" style="cursor:default">'
+                    + "Bu bütçeyle ağ üzerinde uygun alternatif bulunamadı. "
+                    + "Bütçeyi artırmayı dene.</div>";
+                altPanel.classList.add("show");
+                return;
+            }
+
+            // Hedefi vurgula (mor), önerileri yeşil pinle.
+            altMarkers.push(L.marker([t.lat, t.lon], { icon: pin("#7c3aed") })
+                .bindTooltip(t.name + " (hedef)").addTo(map));
+
+            altBody.innerHTML = head + recs.map(function (r, i) {
+                var save = r.saving != null && r.saving > 0
+                    ? ' · <span class="alt-save">' + fmt.format(r.saving) + " TL ucuz</span>"
+                    : "";
+                return '<div class="alt-item" data-lat="' + r.lat + '" data-lon="' + r.lon
+                    + '" data-id="' + r.id + '">'
+                    + '<div class="alt-name">' + (i + 1) + ". " + r.name + " Mah."
+                    + ' <span class="hop-badge">' + r.network_cost + " durak</span></div>"
+                    + '<div class="alt-meta"><span class="alt-price">'
+                    + fmt.format(Math.round(r.price)) + " TL</span>"
+                    + (r.district ? " · " + r.district : "") + save + "</div></div>";
+            }).join("");
+
+            recs.forEach(function (r) {
+                altMarkers.push(L.marker([r.lat, r.lon], { icon: pin("#16a34a") })
+                    .bindTooltip(r.name + " · " + fmt.format(Math.round(r.price)) + " TL")
+                    .addTo(map));
+            });
+
+            altPanel.classList.add("show");
+
+            // Listeye tıkla → haritada o mahalleye uç.
+            altBody.querySelectorAll(".alt-item[data-lat]").forEach(function (el) {
+                el.addEventListener("click", function () {
+                    map.flyTo([+el.dataset.lat, +el.dataset.lon], 14);
+                });
+            });
+        }
+
+        function fetchAlternatives(id) {
+            setStatus("Alternatifler hesaplanıyor…");
+            fetch(API + "/api/alternatives?neighborhood_id=" + id
+                + "&budget=" + (+slider.value))
+                .then(function (r) {
+                    return r.json().then(function (d) {
+                        if (!r.ok) throw new Error(
+                            typeof d.detail === "string" ? d.detail : "API " + r.status);
+                        return d;
+                    });
+                })
+                .then(function (data) {
+                    showAlternatives(data);
+                    setStatus("");
+                    map.closePopup();
+                })
+                .catch(function (err) {
+                    setStatus("Alternatifler alınamadı: " + err.message, true);
+                });
+        }
+
+        // Popup içeriği dinamik olduğu için tıklamayı harita üzerinden delege et.
+        map.getContainer().addEventListener("click", function (e) {
+            var btn = e.target.closest && e.target.closest(".popup-alt");
+            if (btn) fetchAlternatives(+btn.dataset.id);
+        });
+
+        // ---------------------------------------------------------------
+        // Sekmeler
+        // ---------------------------------------------------------------
+        var tabs = [
+            { btn: document.getElementById("tab-map"), panel: document.getElementById("map-panel") },
+            { btn: document.getElementById("tab-estimate"), panel: document.getElementById("estimate-panel") }
+        ];
+        tabs.forEach(function (t) {
+            t.btn.addEventListener("click", function () {
+                tabs.forEach(function (o) {
+                    var on = o === t;
+                    o.btn.setAttribute("aria-selected", on ? "true" : "false");
+                    o.panel.classList.toggle("active", on);
+                });
+                // Leaflet gizliyken boyut hesaplayamıyor; görünür olunca düzelt.
+                if (t.panel.id === "map-panel") map.invalidateSize();
+            });
+        });
+
+        // ---------------------------------------------------------------
+        // Adil fiyat tahmini
+        // ---------------------------------------------------------------
+        var districtSel = document.getElementById("f-district");
+        var neighSel = document.getElementById("f-neighborhood");
+        var form = document.getElementById("estimate-form");
+        var estimateBtn = document.getElementById("estimate-btn");
+        var resultEl = document.getElementById("result");
+        var locations = {};
+
+        function fillNeighborhoods() {
+            var list = locations[districtSel.value] || [];
+            neighSel.innerHTML = list
+                .map(function (n) { return '<option>' + n + "</option>"; })
+                .join("");
+        }
+
+        fetch(API + "/api/locations")
+            .then(function (r) {
+                if (!r.ok) throw new Error("API " + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                locations = data;
+                districtSel.innerHTML = Object.keys(data)
+                    .map(function (d) { return '<option>' + d + "</option>"; })
+                    .join("");
+                fillNeighborhoods();
+            })
+            .catch(function () {
+                estimateBtn.disabled = true;
+                resultEl.className = "show";
+                resultEl.innerHTML = '<div class="note">Model yüklü değil. '
+                    + "Önce <code>python train_model.py</code> çalıştır, "
+                    + "sonra sunucuyu yeniden başlat.</div>";
+            });
+
+        districtSel.addEventListener("change", fillNeighborhoods);
+
+        var VERDICTS = {
+            fair:  "✅ Bu fiyat adil aralıkta.",
+            above: "⚠️ Bu fiyat adil aralığın üzerinde.",
+            below: "💡 Bu fiyat adil aralığın altında."
+        };
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var asking = document.getElementById("f-asking").value;
+            var body = {
+                district: districtSel.value,
+                neighborhood: neighSel.value,
+                room: +document.getElementById("f-room").value,
+                living_room: +document.getElementById("f-living").value,
+                area: +document.getElementById("f-area").value,
+                age: +document.getElementById("f-age").value,
+                floor: +document.getElementById("f-floor").value
+            };
+            if (asking) body.asking_price = +asking;
+
+            estimateBtn.disabled = true;
+            estimateBtn.textContent = "Hesaplanıyor…";
+
+            fetch(API + "/api/estimate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            })
+                .then(function (r) {
+                    return r.json().then(function (d) {
+                        if (!r.ok) throw new Error(d.detail
+                            ? (typeof d.detail === "string" ? d.detail : "Geçersiz girdi")
+                            : "API " + r.status);
+                        return d;
+                    });
+                })
+                .then(function (d) {
+                    var html = '<div class="band">' + fmt.format(d.fair_low) + " – "
+                        + fmt.format(d.fair_high) + " TL <small>/ ay</small></div>"
+                        + '<div class="note" style="margin-top:4px">Orta tahmin: <strong>'
+                        + fmt.format(d.fair_mid) + " TL</strong></div>";
+
+                    if (d.verdict) {
+                        var sign = d.deviation_pct > 0 ? "+" : "";
+                        html += '<div class="verdict ' + d.verdict + '">'
+                            + VERDICTS[d.verdict] + " İstenen "
+                            + fmt.format(d.asking_price) + " TL, orta tahminden "
+                            + sign + d.deviation_pct + "% farklı.</div>";
+                    }
+
+                    html += '<div class="note">Modelin geçmiş ilanlardaki medyan sapması '
+                        + "%" + d.median_error_pct + ". Bu bir tahmindir, ekspertiz değildir.";
+                    if (!d.known_neighborhood) {
+                        html += " Bu mahalle eğitim verisinde yok; tahmin ilçe geneline dayanıyor.";
+                    }
+                    html += "</div>";
+
+                    resultEl.className = "show";
+                    resultEl.innerHTML = html;
+                })
+                .catch(function (err) {
+                    resultEl.className = "show";
+                    resultEl.innerHTML = '<div class="note" style="color:#dc2626">'
+                        + "Tahmin alınamadı: " + err.message + "</div>";
+                })
+                .finally(function () {
+                    estimateBtn.disabled = false;
+                    estimateBtn.textContent = "Adil Fiyatı Hesapla";
+                });
+        });
+    })();
+    </script>
+</body>
+</html>

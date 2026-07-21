@@ -1,0 +1,27 @@
+# ---- Python (backend) ----
+backend/venv/
+backend/**/__pycache__/
+**/*.py[cod]
+backend/data/raw/transit_overpass_raw.json
+
+# Eğitilmiş model (~6 MB) — 'python -m scripts.train_model' ile üretilir
+backend/models/*.joblib
+
+# ---- Node (frontend) ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ---- Ortam / sırlar ----
+.env
+.env.*
+!.env.example
+
+# ---- Editör / OS ----
+.DS_Store
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Eski backend-only reponun local klonu (eski geçmişin yedeği)
+istanbul-real-estate-heatmap/
