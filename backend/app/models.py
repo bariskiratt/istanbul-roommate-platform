@@ -2,10 +2,64 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class User(Base):
+    """Kayıtlı kullanıcı. E-posta + şifre ile kayıt, OTP ile doğrulama."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(200))
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Profil (onboarding adımları)
+    name: Mapped[str] = mapped_column(String(80), default="")
+    gender: Mapped[str | None] = mapped_column(String(30))
+    birth_year: Mapped[int | None] = mapped_column(Integer)
+    university: Mapped[str | None] = mapped_column(String(80))
+    department: Mapped[str | None] = mapped_column(String(80))
+    year: Mapped[int | None] = mapped_column(Integer)
+    budget_min: Mapped[int | None] = mapped_column(Integer)
+    budget_max: Mapped[int | None] = mapped_column(Integer)
+    smoking: Mapped[bool | None] = mapped_column(Boolean)
+    pets: Mapped[bool | None] = mapped_column(Boolean)
+    alcohol: Mapped[bool | None] = mapped_column(Boolean)
+    sleep_schedule: Mapped[str | None] = mapped_column(String(10))
+    preferred_districts: Mapped[list] = mapped_column(JSON, default=list)
+    bio: Mapped[str] = mapped_column(Text, default="")
+    photos: Mapped[list] = mapped_column(JSON, default=list)
+
+    # Tek kullanımlık giriş kodu (hash'lenmiş; e-posta servisi bağlanana kadar
+    # dev modda API yanıtında döner)
+    otp_hash: Mapped[str | None] = mapped_column(String(64))
+    otp_expires: Mapped[datetime | None] = mapped_column(DateTime)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    listings: Mapped[list["Listing"]] = relationship(back_populates="owner")
+
+
+class AuthToken(Base):
+    """Opak Bearer token (hash'i saklanır). Çıkışta silinir."""
+
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    user: Mapped[User] = relationship()
 
 
 class Listing(Base):
@@ -18,6 +72,10 @@ class Listing(Base):
     __tablename__ = "listings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Anonim ilanlar (auth öncesi dönemden veya girişsiz) owner_id=None taşır.
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True
+    )
     type: Mapped[str] = mapped_column(String(20), index=True)
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
@@ -35,6 +93,10 @@ class Listing(Base):
     budget_max: Mapped[int | None] = mapped_column(Integer)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    owner: Mapped[User | None] = relationship(back_populates="listings")
+
+    @property
+    def owner_name(self) -> str | None:
+        return self.owner.name if self.owner else None

@@ -1,24 +1,56 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
-import { currentUser, mockListings, mockMatches } from "@/data/mockData";
+import { currentUser, mockMatches } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchListings } from "@/lib/api";
+
+const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch-me";
 
 const Profile = () => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user: me } = useAuth();
   const navigate = useNavigate();
-  const user = currentUser;
-  const myListings = mockListings.filter(l => l.userId === "user-1");
+
+  // Girişliyse gerçek profil; değilse AuthGate zaten kapatıyor ama render
+  // için mock iskelet kalır.
+  const user = me
+    ? {
+        name: me.name || "İsimsiz",
+        university: me.university ?? "—",
+        department: me.department ?? "—",
+        year: me.year ?? 0,
+        preferredDistrict: me.preferred_districts.join(", ") || "—",
+        budgetMin: me.budget_min ?? 0,
+        budgetMax: me.budget_max ?? 0,
+        smoking: me.smoking ?? false,
+        pets: me.pets ?? false,
+        alcohol: me.alcohol ?? false,
+        sleepSchedule: (me.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
+        bio: me.bio,
+        photos: me.photos.length > 0 ? me.photos : [placeholderAvatar],
+      }
+    : currentUser;
+
+  const { data: myListings = [] } = useQuery({
+    queryKey: ["listings", "mine"],
+    queryFn: () => fetchListings({ mine: true }),
+    enabled: isLoggedIn && me !== null,
+  });
+
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
   const [bioExpanded, setBioExpanded] = useState(false);
 
   const matchCount = mockMatches.length;
   const listingCount = myListings.length;
+  const memberSince = me
+    ? new Date(me.created_at).toLocaleDateString("tr-TR", { month: "short", year: "numeric" })
+    : "Şub 2025";
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -102,7 +134,7 @@ const Profile = () => {
           {[
             { label: "İlanlarım", value: listingCount.toString() },
             { label: "Eşleşmeler", value: matchCount.toString() },
-            { label: "Üyelik", value: "Şub 2025" },
+            { label: "Üyelik", value: memberSince },
           ].map((stat, i) => (
             <div key={stat.label} className={`text-center py-3 ${i < 2 ? "border-r border-border" : ""}`}>
               <p className="text-lg font-bold text-foreground">{stat.value}</p>
@@ -167,7 +199,7 @@ const Profile = () => {
                 transition={{ delay: i * 0.1 }}
                 className="card-listing overflow-hidden flex"
               >
-                <img src={listing.photos[0]} alt="" className="w-28 h-28 object-cover" />
+                <img src={listing.photos[0] ?? placeholderAvatar} alt="" className="w-28 h-28 object-cover" />
                 <div className="p-4 flex-1">
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
@@ -175,12 +207,16 @@ const Profile = () => {
                     }`}>
                       {listing.type === "ev_ilani" ? "🏠 Ev" : "👤 Kişisel"}
                     </span>
-                    {listing.isActive && (
+                    {listing.is_active && (
                       <span className="text-[10px] px-2.5 py-1 rounded-full bg-accent/15 text-foreground font-medium">Aktif</span>
                     )}
                   </div>
                   <p className="font-bold text-sm text-foreground mt-1.5 truncate">{listing.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{listing.district} • {listing.rent?.toLocaleString("tr-TR")} ₺</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {listing.district} • {listing.type === "ev_ilani"
+                      ? `${listing.rent?.toLocaleString("tr-TR")} ₺`
+                      : `${listing.budget_min?.toLocaleString("tr-TR")}–${listing.budget_max?.toLocaleString("tr-TR")} ₺`}
+                  </p>
                 </div>
               </motion.div>
             )) : (
@@ -204,7 +240,7 @@ const Profile = () => {
             className="space-y-0"
           >
             {[
-              { icon: "📸", label: "Instagram", value: "@ali_yilmaz" },
+              { icon: "✉️", label: "E-posta", value: me?.email ?? "@ali_yilmaz" },
               { icon: "🎓", label: "Üniversite ve Bölüm", value: `${user.university} · ${user.department}` },
               { icon: "📍", label: "Tercih edilen semt", value: user.preferredDistrict },
               { icon: "💰", label: "Bütçe aralığı", value: `${user.budgetMin.toLocaleString("tr-TR")} — ${user.budgetMax.toLocaleString("tr-TR")} ₺/ay` },

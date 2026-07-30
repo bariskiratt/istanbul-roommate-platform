@@ -28,6 +28,21 @@ def init_db() -> None:
     from app import models  # noqa: F401 — tabloların Base'e kaydolması için
 
     Base.metadata.create_all(engine)
+    _migrate(engine)
+
+
+def _migrate(target) -> None:
+    """create_all mevcut tabloya kolon eklemez; küçük şema farklarını burada
+    kapatıyoruz. (Alembic bu proje ölçeği için fazla.)"""
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(target).get_columns("listings")}
+    if "owner_id" not in columns:
+        with target.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE listings ADD COLUMN owner_id INTEGER "
+                     "REFERENCES users(id)")
+            )
 
 
 def get_db():

@@ -8,24 +8,29 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
-async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`);
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(
-      (detail && typeof detail.detail === "string" && detail.detail) ||
-        `İstek başarısız (${res.status})`,
-    );
-  }
-  return res.json();
+// ---- Token saklama ----
+
+const TOKEN_KEY = "roommatch_token";
+
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function postJSON<T>(path: string, body: unknown): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...authHeaders(),
+      ...init?.headers,
+    },
   });
+  if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(
@@ -35,6 +40,11 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
   }
   return data as T;
 }
+
+const getJSON = <T>(path: string) => request<T>(path);
+
+const postJSON = <T>(path: string, body: unknown) =>
+  request<T>(path, { method: "POST", body: JSON.stringify(body) });
 
 // ---- Adil fiyat tahmini ----
 
@@ -142,10 +152,84 @@ export const createListing = (payload: ListingPayload) =>
 export const fetchListings = (params?: {
   type?: ListingPayload["type"];
   district?: string;
+  mine?: boolean;
 }) => {
   const query = new URLSearchParams();
   if (params?.type) query.set("type", params.type);
   if (params?.district) query.set("district", params.district);
+  if (params?.mine) query.set("mine", "true");
   const qs = query.toString();
   return getJSON<ApiListing[]>(`/api/listings${qs ? `?${qs}` : ""}`);
 };
+
+// ---- Kimlik doğrulama ----
+// E-posta servisi bağlı olmadığı için OTP kodu dev modda yanıttaki
+// dev_code alanında gelir; arayüz bunu kullanıcıya gösterir.
+
+export interface ApiUser {
+  id: number;
+  email: string;
+  verified: boolean;
+  name: string;
+  gender: string | null;
+  birth_year: number | null;
+  university: string | null;
+  department: string | null;
+  year: number | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  smoking: boolean | null;
+  pets: boolean | null;
+  alcohol: boolean | null;
+  sleep_schedule: string | null;
+  preferred_districts: string[];
+  bio: string;
+  photos: string[];
+  created_at: string;
+}
+
+export interface UserUpdate {
+  name?: string;
+  gender?: string;
+  birth_year?: number;
+  university?: string;
+  department?: string;
+  year?: number;
+  budget_min?: number;
+  budget_max?: number;
+  smoking?: boolean;
+  pets?: boolean;
+  alcohol?: boolean;
+  sleep_schedule?: string;
+  preferred_districts?: string[];
+  bio?: string;
+  photos?: string[];
+}
+
+export const registerUser = (email: string, password: string) =>
+  postJSON<{ detail: string; dev_code?: string }>("/api/auth/register", {
+    email,
+    password,
+  });
+
+export const requestOtp = (email: string) =>
+  postJSON<{ detail: string; dev_code?: string }>("/api/auth/request-otp", {
+    email,
+  });
+
+export const verifyOtp = (email: string, code: string) =>
+  postJSON<{ token: string; user: ApiUser }>("/api/auth/verify-otp", {
+    email,
+    code,
+  });
+
+export const fetchMe = () => getJSON<ApiUser>("/api/auth/me");
+
+export const updateMe = (payload: UserUpdate) =>
+  request<ApiUser>("/api/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const logoutApi = () =>
+  request<void>("/api/auth/logout", { method: "POST" });

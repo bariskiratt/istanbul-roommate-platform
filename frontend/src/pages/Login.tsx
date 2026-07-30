@@ -1,27 +1,47 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Home, Mail } from "lucide-react";
+import { Home, Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { requestOtp, verifyOtp } from "@/lib/api";
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@")) {
       toast.error("Geçerli bir e-posta adresi girin");
       return;
     }
-    toast.success("Giriş kodu e-postanıza gönderildi!");
-    // Simulate OTP success — login and redirect
-    setTimeout(() => {
-      login();
-      navigate("/swipe");
-    }, 1000);
+    setBusy(true);
+    try {
+      if (!codeSent) {
+        const res = await requestOtp(email);
+        setCodeSent(true);
+        // E-posta servisi bağlanana kadar kod dev modda yanıtla gelir.
+        if (res.dev_code) {
+          toast.info(`Giriş kodun: ${res.dev_code}`, { duration: 20000 });
+        } else {
+          toast.success("Giriş kodu e-postana gönderildi!");
+        }
+      } else {
+        const { token, user } = await verifyOtp(email, code);
+        login(token, user);
+        toast.success(`Hoş geldin${user.name ? `, ${user.name}` : ""}!`);
+        navigate("/swipe");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bir şeyler ters gitti");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -56,12 +76,41 @@ const Login = () => {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="öğrenci@üniversite.edu.tr"
-                className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                disabled={codeSent}
+                className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all disabled:opacity-60"
               />
             </div>
-            <Button type="submit" className="w-full h-14 bg-primary text-primary-foreground rounded-2xl font-bold text-base">
-              Giriş Kodu Gönder
+            {codeSent && (
+              <div className="relative">
+                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={code}
+                  onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="6 haneli kod"
+                  autoFocus
+                  className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-[0.3em] font-bold"
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              disabled={busy || (codeSent && code.length !== 6)}
+              className="w-full h-14 bg-primary text-primary-foreground rounded-2xl font-bold text-base disabled:opacity-50"
+            >
+              {busy ? "Bekleyin..." : codeSent ? "Giriş Yap" : "Giriş Kodu Gönder"}
             </Button>
+            {codeSent && (
+              <button
+                type="button"
+                onClick={() => { setCodeSent(false); setCode(""); }}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Farklı e-posta kullan
+              </button>
+            )}
           </form>
 
           <div className="text-center">

@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
+import { registerUser, verifyOtp, updateMe } from "@/lib/api";
 
 const steps = ["E-posta", "OTP", "Kişisel", "Üniversite", "Bütçe", "Yaşam Tarzı", "Fotoğraf"];
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, setUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [name, setName] = useState("");
@@ -72,12 +75,57 @@ const Onboarding = () => {
     }
   };
 
-  const next = () => {
-    if (currentStep === steps.length - 1) {
-      login();
-      navigate("/swipe");
-    } else {
+  const next = async () => {
+    try {
+      setBusy(true);
+
+      // Adım 0 → 1: hesabı oluştur, doğrulama kodunu iste
+      if (currentStep === 0) {
+        const res = await registerUser(email, password);
+        // E-posta servisi bağlanana kadar kod dev modda yanıtla gelir.
+        if (res.dev_code) {
+          toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
+        }
+      }
+
+      // Adım 1 → 2: kodu doğrula, oturumu başlat
+      if (currentStep === 1) {
+        const { token, user } = await verifyOtp(email, otp.join(""));
+        login(token, user);
+      }
+
+      // Son adım: profili kaydet
+      if (currentStep === steps.length - 1) {
+        const me = await updateMe({
+          name,
+          gender,
+          birth_year: Number(birthYear),
+          university,
+          department,
+          year: Number(year),
+          budget_min: budget[0],
+          budget_max: budget[1],
+          smoking: lifestyle.smoking,
+          alcohol: lifestyle.alcohol,
+          pets: lifestyle.pets,
+          sleep_schedule: lifestyle.sleep,
+          preferred_districts: district,
+          photos,
+        });
+        setUser(me);
+        toast.success("Profilin hazır! 🎉");
+        navigate("/swipe");
+        return;
+      }
+
       setCurrentStep(s => s + 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Bir şeyler ters gitti";
+      toast.error(message);
+      // Kayıtlı e-posta ile tekrar denenmişse girişe yönlendir
+      if (message.includes("zaten kayıtlı")) navigate("/login");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -479,10 +527,10 @@ const Onboarding = () => {
       <div className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
         <Button
           onClick={next}
-          disabled={!canProceed()}
+          disabled={!canProceed() || busy}
           className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg disabled:opacity-40"
         >
-          {currentStep === steps.length - 1 ? "Başla" : "Devam Et"}
+          {busy ? "Bekleyin..." : currentStep === steps.length - 1 ? "Başla" : "Devam Et"}
           <ArrowRight className="w-5 h-5 ml-2" />
         </Button>
       </div>

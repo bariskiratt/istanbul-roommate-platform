@@ -9,6 +9,7 @@ import {
   Cigarette, Dog, X, Plus, ImagePlus, FileText
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import FairPriceCheck from "@/components/FairPriceCheck";
 import { createListing } from "@/lib/api";
 
@@ -16,6 +17,7 @@ type ListingType = "ev_ilani" | "kisisel_ilan" | null;
 
 const CreateListing = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Step 0: type selection, then form
   const [listingType, setListingType] = useState<ListingType>(null);
@@ -88,6 +90,7 @@ const CreateListing = () => {
             }
           : { budget_min: budget[0], budget_max: budget[1] }),
       });
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
       toast({
         title: "İlan Oluşturuldu! 🎉",
         description: `"${title}" başarıyla yayınlandı.`,

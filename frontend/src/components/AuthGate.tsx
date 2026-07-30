@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface AuthGateProps {
   show: boolean;
@@ -11,18 +10,11 @@ interface AuthGateProps {
 
 const AuthGate = ({ show, onClose }: AuthGateProps) => {
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const handleNavigate = (path: string) => {
     // Close modal first, then navigate — prevents loops
     if (onClose) onClose();
     setTimeout(() => navigate(path), 10);
-  };
-
-  const handleDemo = () => {
-    login();
-    if (onClose) onClose();
-    setTimeout(() => navigate("/swipe"), 10);
   };
 
   return (
@@ -75,13 +67,6 @@ const AuthGate = ({ show, onClose }: AuthGateProps) => {
             <p className="text-[11px] text-muted-foreground">
               Kayıt tamamen ücretsiz · .edu.tr gerekli
             </p>
-
-            <button
-              onClick={handleDemo}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Demo olarak dene →
-            </button>
           </motion.div>
         </motion.div>
       )}

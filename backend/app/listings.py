@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.auth import get_optional_user
 from app.db import get_db
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
@@ -56,11 +57,19 @@ class ListingOut(ListingIn):
     id: int
     is_active: bool
     created_at: datetime
+    owner_id: int | None = None
+    owner_name: str | None = None
 
 
 @router.post("", status_code=201, response_model=ListingOut)
-def create_listing(payload: ListingIn, db: Session = Depends(get_db)):
-    row = models.Listing(**payload.model_dump())
+def create_listing(
+    payload: ListingIn,
+    db: Session = Depends(get_db),
+    user: models.User | None = Depends(get_optional_user),
+):
+    row = models.Listing(
+        **payload.model_dump(), owner_id=user.id if user else None
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -71,7 +80,9 @@ def create_listing(payload: ListingIn, db: Session = Depends(get_db)):
 def list_listings(
     listing_type: ListingType | None = Query(None, alias="type"),
     district: str | None = Query(None, max_length=40),
+    mine: bool = Query(False, description="Sadece kendi ilanlarım (giriş ister)"),
     db: Session = Depends(get_db),
+    user: models.User | None = Depends(get_optional_user),
 ):
     """Aktif ilanlar, en yeni önce."""
     stmt = (
@@ -79,6 +90,10 @@ def list_listings(
         .where(models.Listing.is_active)
         .order_by(models.Listing.created_at.desc(), models.Listing.id.desc())
     )
+    if mine:
+        if user is None:
+            raise HTTPException(status_code=401, detail="Giriş yapman gerekiyor.")
+        stmt = stmt.where(models.Listing.owner_id == user.id)
     if listing_type is not None:
         stmt = stmt.where(models.Listing.type == listing_type)
     if district is not None:
@@ -95,10 +110,20 @@ def get_listing(listing_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{listing_id}", status_code=204)
-def deactivate_listing(listing_id: int, db: Session = Depends(get_db)):
-    """Kalıcı silme yerine pasife çeker (geri alınabilir)."""
+def deactivate_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    user: models.User | None = Depends(get_optional_user),
+):
+    """Kalıcı silme yerine pasife çeker (geri alınabilir).
+
+    Sahipli ilanı yalnızca sahibi kapatabilir; auth öncesi anonim ilanlar
+    (owner_id=None) serbesttir.
+    """
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active:
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+    if row.owner_id is not None and (user is None or user.id != row.owner_id):
+        raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
     row.is_active = False
     db.commit()
