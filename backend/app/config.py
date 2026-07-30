@@ -24,3 +24,6 @@ MARKET_VALUES_CSV = PROCESSED_DIR / "neighborhood_market_values.csv"
 
 # Eğitilmiş model
 MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
+
+# Uygulama veritabanı (ilanlar; ileride kullanıcı/eşleşme/mesaj)
+DB_PATH = DATA_DIR / "app.db"

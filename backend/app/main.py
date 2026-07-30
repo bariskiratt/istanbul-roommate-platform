@@ -18,7 +18,9 @@ from app.config import (
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
 )
+from app.db import init_db
 from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
+from app.listings import router as listings_router
 from app.pricing import BOUNDS, build_features
 from app.transit import TRANSIT_PATH, AccessibilityIndex, TransitNetwork
 
@@ -50,6 +52,7 @@ STATE: dict = {}
 async def lifespan(_app: FastAPI):
     """Ağır veriyi süreç başına bir kez yükler ve indeksler."""
     print("🚀 Veriler yükleniyor...")
+    init_db()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 
@@ -107,6 +110,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="İstanbul Emlak Isı Haritası", lifespan=lifespan)
+app.include_router(listings_router)
 
 # Yanıtlar büyük GeoJSON içerdiği için sıkıştırma kritik (~4 MB -> ~700 KB).
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -152,6 +156,7 @@ async def index():
             "/api/locations",
             "/api/estimate",
             "/api/alternatives",
+            "/api/listings",
         ],
     }
 

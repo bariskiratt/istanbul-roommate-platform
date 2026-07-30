@@ -1,125 +1,62 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, MapPin, Home, MessageCircle, X, ChevronLeft, ChevronRight, SlidersHorizontal, Star, GraduationCap, DollarSign, BedDouble, Building, Sofa, DoorOpen, Users, Cigarette, Dog, Ban } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Zap, MapPin, Home, MessageCircle, X, ChevronLeft, ChevronRight, SlidersHorizontal, BedDouble, DollarSign, RefreshCw } from "lucide-react";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import LifestyleTag from "@/components/LifestyleTag";
 import FilterModal, { type ListingFilters, defaultFilters } from "@/components/FilterModal";
+import { fetchListings, type ApiListing } from "@/lib/api";
 
 const filters = ["Tümü", "Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "1+1", "2+1", "3+1"];
 
-const mockListings = [
-  {
-    id: "l1",
-    title: "Kadıköy Moda'da Ferah 2+1",
-    district: "Kadıköy",
-    roomType: "2+1",
-    price: 8500,
-    photo: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop",
-    photos: [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=600&h=400&fit=crop",
-    ],
-    tags: ["Sigara içilmez", "Hayvan dostu"],
-    university: "Boğaziçi Ü.",
-    rating: 4.8,
-    owner: {
-      name: "Elif Demir",
-      photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-      university: "Boğaziçi Üniversitesi",
-      department: "Psikoloji",
-      bio: "Kitap kurdu, sabahçı biri. Sessiz ve huzurlu bir ev ortamı arıyorum.",
-      budget: "6.000 — 9.000 ₺",
-      smoking: false, pets: true, alcohol: false, sleep: "erken" as const,
-    },
-    features: { floor: 3, furnished: true, elevator: true, rooms: "2+1" },
-    rules: { smoking: false, pets: true, guests: true },
-  },
-  {
-    id: "l2",
-    title: "Beşiktaş'ta Deniz Manzaralı 1+1",
-    district: "Beşiktaş",
-    roomType: "1+1",
-    price: 7000,
-    photo: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop",
-    photos: [
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop",
-    ],
-    tags: ["Sigara içilmez"],
-    university: "İTÜ",
-    rating: 4.9,
-    owner: {
-      name: "Mehmet Kaya",
-      photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face",
-      university: "İTÜ",
-      department: "Elektrik Mühendisliği",
-      bio: "Müzikle ilgileniyorum, gitar çalıyorum.",
-      budget: "4.000 — 6.000 ₺",
-      smoking: false, pets: false, alcohol: true, sleep: "gece" as const,
-    },
-    features: { floor: 5, furnished: false, elevator: true, rooms: "1+1" },
-    rules: { smoking: false, pets: false, guests: true },
-  },
-  {
-    id: "l3",
-    title: "Üsküdar Merkez'de Geniş 3+1",
-    district: "Üsküdar",
-    roomType: "3+1",
-    price: 5500,
-    photo: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&h=400&fit=crop",
-    photos: [
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=600&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop",
-    ],
-    tags: ["Hayvan dostu", "Erken yatarım"],
-    university: "Marmara Ü.",
-    rating: 4.7,
-    owner: {
-      name: "Zeynep Arslan",
-      photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-      university: "Marmara Üniversitesi",
-      department: "Hukuk",
-      bio: "Staj dönemindeyim, sakin bir ev ortamı tercih ediyorum.",
-      budget: "5.000 — 7.500 ₺",
-      smoking: false, pets: false, alcohol: false, sleep: "erken" as const,
-    },
-    features: { floor: 2, furnished: true, elevator: false, rooms: "3+1" },
-    rules: { smoking: false, pets: true, guests: false },
-  },
-];
+const priceLabel = (l: ApiListing) =>
+  l.type === "ev_ilani"
+    ? `${(l.rent ?? 0).toLocaleString("tr-TR")} ₺`
+    : `${(l.budget_min ?? 0).toLocaleString("tr-TR")}–${(l.budget_max ?? 0).toLocaleString("tr-TR")} ₺`;
 
-type ListingType = typeof mockListings[number];
+const listingTags = (l: ApiListing): string[] => {
+  const tags: string[] = [];
+  if (l.smoking_allowed === false) tags.push("Sigara içilmez");
+  if (l.pets_allowed) tags.push("Hayvan dostu");
+  return tags;
+};
 
-const matchesModalFilters = (l: ListingType, f: ListingFilters): boolean => {
-  // Bu sayfadaki ilanların hepsi ev ilanı
-  if (f.listingType === "Kişisel İlan") return false;
-  if (l.price < f.priceRange[0] || l.price > f.priceRange[1]) return false;
-  if (f.rooms > 0 && parseInt(l.roomType) < f.rooms) return false;
-  if (f.features.includes("Eşyalı") && !l.features.furnished) return false;
-  if (f.features.includes("Asansörlü") && !l.features.elevator) return false;
-  if (f.lifestyle.includes("Sigara İçmez") && l.rules.smoking) return false;
-  if (f.lifestyle.includes("Hayvan Dostu") && !l.rules.pets) return false;
+const matchesModalFilters = (l: ApiListing, f: ListingFilters): boolean => {
+  if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
+  if (f.listingType === "Kişisel İlan" && l.type !== "kisisel_ilan") return false;
+
+  const [min, max] = f.priceRange;
+  if (l.type === "ev_ilani") {
+    if (l.rent !== undefined && (l.rent < min || l.rent > max)) return false;
+  } else if (l.budget_min !== undefined && l.budget_max !== undefined) {
+    if (l.budget_max < min || l.budget_min > max) return false;
+  }
+
+  if (f.rooms > 0 && (!l.room_count || parseInt(l.room_count) < f.rooms)) return false;
+  if (f.lifestyle.includes("Sigara İçmez") && l.smoking_allowed !== false) return false;
+  if (f.lifestyle.includes("Hayvan Dostu") && !l.pets_allowed) return false;
+
   return true;
 };
 
 const Listings = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("Tümü");
-  const [selectedListing, setSelectedListing] = useState<ListingType | null>(null);
+  const [selectedListing, setSelectedListing] = useState<ApiListing | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [modalFilters, setModalFilters] = useState<ListingFilters>(defaultFilters);
 
-  const filtered = mockListings.filter(l => {
+  const { data: listings, isLoading, isError, refetch } = useQuery({
+    queryKey: ["listings"],
+    queryFn: () => fetchListings(),
+  });
+
+  const filtered = (listings ?? []).filter(l => {
     if (!matchesModalFilters(l, modalFilters)) return false;
     if (activeFilter === "Tümü") return true;
-    return l.district === activeFilter || l.roomType === activeFilter;
+    return l.district === activeFilter || l.room_count === activeFilter;
   });
 
   return (
@@ -135,12 +72,12 @@ const Listings = () => {
 
       <div className="px-6 pt-4 pb-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-foreground">Öne Çıkan Evler</h1>
+          <h1 className="text-2xl font-bold text-foreground">İlanlar</h1>
           <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary flex items-center gap-1">
-            <Zap className="w-3 h-3" /> Premium İlanlar
+            <Zap className="w-3 h-3" /> Canlı
           </span>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">Premium üyeler tarafından paylaşılan evler</p>
+        <p className="text-sm text-muted-foreground mt-1">Topluluğun paylaştığı ev ve kişisel ilanlar</p>
       </div>
 
       {/* Filter row */}
@@ -164,13 +101,26 @@ const Listings = () => {
 
       {/* Listings — 2 col grid desktop, 1 col mobile */}
       <div className="px-6 flex-1">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16 text-sm text-muted-foreground">İlanlar yükleniyor…</div>
+        ) : isError ? (
+          <div className="text-center py-16 space-y-3">
+            <p className="font-semibold text-foreground">İlanlar yüklenemedi.</p>
+            <p className="text-sm text-muted-foreground">Backend çalışıyor mu? (127.0.0.1:8000)</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="rounded-full">
+              <RefreshCw className="w-3.5 h-3.5 mr-2" /> Tekrar dene
+            </Button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mx-auto">
               <Home className="w-10 h-10 text-muted-foreground" />
             </div>
-            <p className="font-semibold text-foreground">Henüz öne çıkan ilan yok.</p>
-            <p className="text-sm text-muted-foreground">Premium üye olarak ilanını buraya ekle.</p>
+            <p className="font-semibold text-foreground">Henüz ilan yok.</p>
+            <p className="text-sm text-muted-foreground">İlk ilanı sen oluştur!</p>
+            <Button size="sm" onClick={() => navigate("/create-listing")} className="rounded-full">
+              İlan Oluştur
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -181,31 +131,41 @@ const Listings = () => {
                 className="card-listing overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
                 style={{ maxHeight: 320 }}
               >
-                <div className="h-[180px] overflow-hidden rounded-t-xl">
-                  <img
-                    src={listing.photo}
-                    alt={listing.title}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="h-[180px] overflow-hidden rounded-t-xl bg-muted">
+                  {listing.photos[0] ? (
+                    <img
+                      src={listing.photos[0]}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Home className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 space-y-2">
                   <h3 className="font-bold text-[15px] text-foreground truncate">{listing.title}</h3>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {listing.district}</span>
+                    {listing.room_count && (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1"><Home className="w-3 h-3" /> {listing.room_count}</span>
+                      </>
+                    )}
                     <span>·</span>
-                    <span className="flex items-center gap-1"><Home className="w-3 h-3" /> {listing.roomType}</span>
-                    <span>·</span>
-                    <span className="font-bold text-accent">{listing.price.toLocaleString("tr-TR")} ₺</span>
+                    <span className="font-bold text-accent">{priceLabel(listing)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex gap-1.5">
-                      {listing.tags.slice(0, 2).map(tag => (
+                      {listingTags(listing).slice(0, 2).map(tag => (
                         <span key={tag} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
                           {tag}
                         </span>
                       ))}
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
-                        🎓 {listing.university}
+                        {listing.type === "ev_ilani" ? "🏠 Ev İlanı" : "👤 Kişisel"}
                       </span>
                     </div>
                     <button
@@ -244,11 +204,13 @@ const Listings = () => {
 };
 
 /* ─── Detail Modal ─── */
-const ListingDetailModal = ({ listing, onClose }: { listing: ListingType | null; onClose: () => void }) => {
+const ListingDetailModal = ({ listing, onClose }: { listing: ApiListing | null; onClose: () => void }) => {
   const navigate = useNavigate();
   const [photoIndex, setPhotoIndex] = useState(0);
 
   if (!listing) return null;
+
+  const isHouse = listing.type === "ev_ilani";
 
   return (
     <AnimatePresence>
@@ -271,48 +233,50 @@ const ListingDetailModal = ({ listing, onClose }: { listing: ListingType | null;
           </div>
 
           {/* Photo gallery */}
-          <div className="px-4 -mt-4">
-            <div className="relative h-[260px] rounded-xl overflow-hidden">
-              <img
-                src={listing.photos[photoIndex]}
-                alt={listing.title}
-                className="w-full h-full object-cover"
-              />
-              {listing.photos.length > 1 && (
-                <>
+          {listing.photos.length > 0 && (
+            <div className="px-4 -mt-4">
+              <div className="relative h-[260px] rounded-xl overflow-hidden">
+                <img
+                  src={listing.photos[photoIndex]}
+                  alt={listing.title}
+                  className="w-full h-full object-cover"
+                />
+                {listing.photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setPhotoIndex(i => Math.max(0, i - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setPhotoIndex(i => Math.min(listing.photos.length - 1, i + 1))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {listing.photos.map((_, i) => (
+                        <div key={i} className={`w-2 h-2 rounded-full ${i === photoIndex ? "bg-white" : "bg-white/50"}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Thumbnails */}
+              <div className="flex gap-2 mt-2 overflow-x-auto">
+                {listing.photos.map((p, i) => (
                   <button
-                    onClick={() => setPhotoIndex(i => Math.max(0, i - 1))}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center"
+                    key={i}
+                    onClick={() => setPhotoIndex(i)}
+                    className={`w-16 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === photoIndex ? "border-primary" : "border-transparent opacity-60"}`}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <img src={p} alt="" className="w-full h-full object-cover" />
                   </button>
-                  <button
-                    onClick={() => setPhotoIndex(i => Math.min(listing.photos.length - 1, i + 1))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {listing.photos.map((_, i) => (
-                      <div key={i} className={`w-2 h-2 rounded-full ${i === photoIndex ? "bg-white" : "bg-white/50"}`} />
-                    ))}
-                  </div>
-                </>
-              )}
+                ))}
+              </div>
             </div>
-            {/* Thumbnails */}
-            <div className="flex gap-2 mt-2 overflow-x-auto">
-              {listing.photos.map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPhotoIndex(i)}
-                  className={`w-16 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === photoIndex ? "border-primary" : "border-transparent opacity-60"}`}
-                >
-                  <img src={p} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Info */}
           <div className="p-5 space-y-4">
@@ -320,75 +284,49 @@ const ListingDetailModal = ({ listing, onClose }: { listing: ListingType | null;
               <h2 className="text-xl font-bold text-foreground">{listing.title}</h2>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {listing.district}</span>
+                {listing.room_count && (
+                  <>
+                    <span>·</span>
+                    <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {listing.room_count}</span>
+                  </>
+                )}
                 <span>·</span>
-                <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {listing.roomType}</span>
-                <span>·</span>
-                <span className="font-bold text-accent text-base">{listing.price.toLocaleString("tr-TR")} ₺/ay</span>
-              </div>
-              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                <Star className="w-3 h-3 fill-primary text-primary" />
-                <span className="font-semibold text-foreground">{listing.rating}</span>
+                <span className="font-bold text-accent text-base">{priceLabel(listing)}{isHouse ? "/ay" : ""}</span>
               </div>
             </div>
 
             <hr className="border-border" />
 
-            {/* Owner */}
+            {/* Description */}
             <div>
-              <h3 className="text-sm font-bold text-foreground mb-3">İlan Sahibi</h3>
-              <div className="flex items-center gap-3 mb-3">
-                <img src={listing.owner.photo} alt={listing.owner.name} className="w-12 h-12 rounded-full object-cover" />
-                <div>
-                  <p className="font-semibold text-foreground text-sm">{listing.owner.name}</p>
-                  <p className="text-xs text-muted-foreground">{listing.owner.university} · {listing.owner.department}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                <LifestyleTag type="smoking" value={listing.owner.smoking} />
-                <LifestyleTag type="pets" value={listing.owner.pets} />
-                <LifestyleTag type="alcohol" value={listing.owner.alcohol} />
-                <LifestyleTag type="sleep" value={listing.owner.sleep} />
-              </div>
-              <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-sm font-bold text-foreground mb-2">Açıklama</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{listing.description}</p>
+            </div>
+
+            {!isHouse && (
+              <div className="flex items-center gap-2">
                 <DollarSign className="w-3.5 h-3.5 text-accent" />
-                <span className="text-xs font-semibold text-foreground">{listing.owner.budget}</span>
+                <span className="text-xs font-semibold text-foreground">Bütçe: {priceLabel(listing)}</span>
               </div>
-              <p className="text-xs text-muted-foreground italic">"{listing.owner.bio}"</p>
-            </div>
+            )}
 
-            <hr className="border-border" />
-
-            {/* Features */}
-            <div>
-              <h3 className="text-sm font-bold text-foreground mb-3">Ev Özellikleri</h3>
-              <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <BedDouble className="w-4 h-4" /> <span>{listing.features.rooms}</span>
+            {/* Kurallar (ev ilanı) */}
+            {isHouse && (
+              <>
+                <hr className="border-border" />
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground mb-2">Kurallar</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-medium ${listing.smoking_allowed ? "bg-accent/15 text-foreground" : "bg-muted text-muted-foreground"}`}>
+                      {listing.smoking_allowed ? "🚬 Sigara serbest" : "🚭 Sigara yasak"}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-medium ${listing.pets_allowed ? "bg-accent/15 text-foreground" : "bg-muted text-muted-foreground"}`}>
+                      {listing.pets_allowed ? "🐾 Hayvan serbest" : "🚫 Hayvan yasak"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Building className="w-4 h-4" /> <span>{listing.features.floor}. kat</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Sofa className="w-4 h-4" /> <span>{listing.features.furnished ? "Eşyalı" : "Eşyasız"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <DoorOpen className="w-4 h-4" /> <span>{listing.features.elevator ? "Asansörlü" : "Asansörsüz"}</span>
-                </div>
-              </div>
-
-              <h4 className="text-xs font-semibold text-foreground mt-4 mb-2">Kurallar</h4>
-              <div className="flex flex-wrap gap-2">
-                <span className={`px-3 py-1 rounded-full text-[11px] font-medium ${listing.rules.smoking ? "bg-accent/15 text-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {listing.rules.smoking ? "🚬 Sigara serbest" : "🚭 Sigara yasak"}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-[11px] font-medium ${listing.rules.pets ? "bg-accent/15 text-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {listing.rules.pets ? "🐾 Hayvan serbest" : "🚫 Hayvan yasak"}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-[11px] font-medium ${listing.rules.guests ? "bg-accent/15 text-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {listing.rules.guests ? "👥 Misafir serbest" : "🚫 Misafir yasak"}
-                </span>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* CTA */}
             <Button

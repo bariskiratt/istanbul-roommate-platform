@@ -96,5 +96,7 @@ frontend/       React/Vite roommate arayüzü
 
 - Model tahminleri ekspertiz değildir; veri dönemi CSV'de belirtilmemiştir.
 - Ulaşım yalnızca raylı sistem (metrobüs/otobüs/vapur hariç).
-- Roommate arayüzünün eşleşme/sohbet/profil kısımları hâlâ sahte veriyle çalışır;
-  bu birleştirmede backend'e bağlanan kısım fiyat modeli ve haritadır.
+- Eşleşme/sohbet/profil kısımları hâlâ sahte veriyle çalışır. **İlanlar ise
+  gerçektir:** İlan Oluştur formu `POST /api/listings` ile SQLite'a yazar;
+  Evler sayfası ve kaydırma destesi bu kayıtları okur (auth henüz yok,
+  ilanlar anonimdir).

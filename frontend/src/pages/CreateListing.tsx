@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import FairPriceCheck from "@/components/FairPriceCheck";
+import { createListing } from "@/lib/api";
 
 type ListingType = "ev_ilani" | "kisisel_ilan" | null;
 
@@ -34,6 +35,8 @@ const CreateListing = () => {
 
   // Kişisel ilan fields
   const [budget, setBudget] = useState([4000, 8000]);
+
+  const [submitting, setSubmitting] = useState(false);
 
   const isHouse = listingType === "ev_ilani";
 
@@ -67,12 +70,38 @@ const CreateListing = () => {
     return false;
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "İlan Oluşturuldu! 🎉",
-      description: `"${title}" başarıyla yayınlandı.`,
-    });
-    navigate("/profile");
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await createListing({
+        type: listingType!,
+        title,
+        description,
+        district,
+        photos,
+        ...(isHouse
+          ? {
+              rent: Number(rent),
+              room_count: roomCount,
+              smoking_allowed: smokingAllowed,
+              pets_allowed: petsAllowed,
+            }
+          : { budget_min: budget[0], budget_max: budget[1] }),
+      });
+      toast({
+        title: "İlan Oluşturuldu! 🎉",
+        description: `"${title}" başarıyla yayınlandı.`,
+      });
+      navigate("/listings");
+    } catch (err) {
+      toast({
+        title: "İlan yayınlanamadı",
+        description: err instanceof Error ? err.message : "Sunucuya ulaşılamadı.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const next = () => {
@@ -413,10 +442,10 @@ const CreateListing = () => {
       <div className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
         <Button
           onClick={next}
-          disabled={!canProceed()}
+          disabled={!canProceed() || submitting}
           className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg disabled:opacity-40"
         >
-          {currentStep === totalSteps - 1 ? "İlanı Yayınla 🚀" : "Devam Et"}
+          {submitting ? "Yayınlanıyor..." : currentStep === totalSteps - 1 ? "İlanı Yayınla 🚀" : "Devam Et"}
           <ArrowRight className="w-5 h-5 ml-2" />
         </Button>
       </div>

@@ -27,3 +27,6 @@ resume.tex
 
 # Overpass ham yanıt önbelleği (transit_stations.json bundan üretilir)
 data/raw/transit_overpass_raw.json
+
+# Uygulama veritabanı (yerelde üretilir)
+data/app.db

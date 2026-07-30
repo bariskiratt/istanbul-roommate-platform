@@ -111,3 +111,41 @@ export const fetchAlternatives = (neighborhoodId: number, budget: number) =>
   getJSON<AlternativesResponse>(
     `/api/alternatives?neighborhood_id=${neighborhoodId}&budget=${budget}`,
   );
+
+// ---- İlanlar ----
+
+export interface ListingPayload {
+  type: "ev_ilani" | "kisisel_ilan";
+  title: string;
+  description: string;
+  district: string;
+  photos: string[];
+  // Ev ilanı
+  rent?: number;
+  room_count?: string;
+  smoking_allowed?: boolean;
+  pets_allowed?: boolean;
+  // Kişisel ilan
+  budget_min?: number;
+  budget_max?: number;
+}
+
+export interface ApiListing extends ListingPayload {
+  id: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const createListing = (payload: ListingPayload) =>
+  postJSON<ApiListing>("/api/listings", payload);
+
+export const fetchListings = (params?: {
+  type?: ListingPayload["type"];
+  district?: string;
+}) => {
+  const query = new URLSearchParams();
+  if (params?.type) query.set("type", params.type);
+  if (params?.district) query.set("district", params.district);
+  const qs = query.toString();
+  return getJSON<ApiListing[]>(`/api/listings${qs ? `?${qs}` : ""}`);
+};

@@ -1,7 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchListings, type ApiListing } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { SlidersHorizontal, X, Heart, Zap, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
-import { mockListings, type Listing } from "@/data/mockData";
+import { mockListings, type Listing, type UserProfile } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
@@ -38,6 +40,48 @@ const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
   return true;
 };
 
+// API ilanlarının henüz sahibi yok (auth sonraki dilim); kart altındaki
+// profil şeridi için nötr bir yer tutucu kullanılır.
+const anonUser: UserProfile = {
+  id: "anon",
+  name: "İlan Sahibi",
+  gender: "belirtmek_istemiyorum",
+  birthYear: 2000,
+  university: "",
+  department: "",
+  year: 0,
+  budgetMin: 0,
+  budgetMax: 0,
+  smoking: false,
+  pets: false,
+  alcohol: false,
+  sleepSchedule: "esnek",
+  preferredDistrict: "",
+  bio: "",
+  photos: ["https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch"],
+  weeklySupermatchUsed: false,
+  supermatchRemaining: 0,
+};
+
+const toDeckListing = (a: ApiListing): Listing => ({
+  id: `api-${a.id}`,
+  userId: "anon",
+  type: a.type,
+  title: a.title,
+  description: a.description,
+  rent: a.rent ?? undefined,
+  budgetMin: a.budget_min ?? undefined,
+  budgetMax: a.budget_max ?? undefined,
+  district: a.district,
+  roomCount: a.room_count ?? undefined,
+  smokingAllowed: a.smoking_allowed ?? undefined,
+  petsAllowed: a.pets_allowed ?? undefined,
+  photos: a.photos.length > 0 ? a.photos : anonUser.photos,
+  isActive: a.is_active,
+  createdAt: a.created_at,
+  user: anonUser,
+});
+
 const SwipeScreen = () => {
   const { isLoggedIn } = useAuth();
   const [cards, setCards] = useState<Listing[]>([...mockListings].reverse());
@@ -46,8 +90,24 @@ const SwipeScreen = () => {
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const { data: apiListings } = useQuery({
+    queryKey: ["listings"],
+    queryFn: () => fetchListings(),
+    staleTime: 60_000,
+  });
+
+  // Gerçek ilanlar destenin en üstüne; mock profiller demoyu dolu tutmak için arkada.
+  const allListings = useMemo(
+    () => [...(apiListings ?? []).map(toDeckListing), ...mockListings],
+    [apiListings],
+  );
+
+  useEffect(() => {
+    setCards([...allListings].reverse());
+  }, [allListings]);
+
   const applyFilters = (f: ListingFilters) => {
-    setCards(mockListings.filter(l => matchesFilters(l, f)).reverse());
+    setCards(allListings.filter(l => matchesFilters(l, f)).reverse());
   };
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
