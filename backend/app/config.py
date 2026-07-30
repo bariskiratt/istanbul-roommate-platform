@@ -13,7 +13,6 @@ DATA_DIR = BASE_DIR / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 MODELS_DIR = BASE_DIR / "models"
-WEB_DIR = BASE_DIR / "web"
 
 # Ham veri
 LISTINGS_CSV = RAW_DIR / "istanbulApartmentForRent.csv"
@@ -25,6 +24,3 @@ MARKET_VALUES_CSV = PROCESSED_DIR / "neighborhood_market_values.csv"
 
 # Eğitilmiş model
 MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
-
-# Arayüz
-INDEX_HTML = WEB_DIR / "index.html"

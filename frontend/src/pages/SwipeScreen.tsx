@@ -7,8 +7,36 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
-import FilterModal from "@/components/FilterModal";
+import FilterModal, { type ListingFilters } from "@/components/FilterModal";
 import { useAuth } from "@/contexts/AuthContext";
+
+const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
+  if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
+  if (f.listingType === "Kişisel İlan" && l.type !== "kisisel_ilan") return false;
+
+  // Ev ilanında kira, kişisel ilanda bütçe aralığı kesişimi
+  const [min, max] = f.priceRange;
+  if (l.type === "ev_ilani") {
+    if (l.rent !== undefined && (l.rent < min || l.rent > max)) return false;
+  } else if (l.budgetMin !== undefined && l.budgetMax !== undefined) {
+    if (l.budgetMax < min || l.budgetMin > max) return false;
+  }
+
+  if (f.rooms > 0 && (!l.roomCount || parseInt(l.roomCount) < f.rooms)) return false;
+
+  if (f.gender === "Kadın" && l.user.gender !== "kadın") return false;
+  if (f.gender === "Erkek" && l.user.gender !== "erkek") return false;
+
+  for (const chip of f.lifestyle) {
+    if (chip === "Sigara İçmez" && (l.type === "ev_ilani" ? l.smokingAllowed !== false : l.user.smoking)) return false;
+    if (chip === "Hayvan Dostu" && (l.type === "ev_ilani" ? !l.petsAllowed : !l.user.pets)) return false;
+    if (chip === "Alkol Kullanmaz" && l.user.alcohol) return false;
+    if (chip === "Erken Kalkar" && l.user.sleepSchedule !== "erken") return false;
+    if (chip === "Gece Kuşu" && l.user.sleepSchedule !== "gece") return false;
+  }
+
+  return true;
+};
 
 const SwipeScreen = () => {
   const { isLoggedIn } = useAuth();
@@ -17,6 +45,10 @@ const SwipeScreen = () => {
   const [superMatchLeft, setSuperMatchLeft] = useState(1);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+
+  const applyFilters = (f: ListingFilters) => {
+    setCards(mockListings.filter(l => matchesFilters(l, f)).reverse());
+  };
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
     setSwipeDirection(direction);
@@ -111,7 +143,7 @@ const SwipeScreen = () => {
       )}
 
       <AuthGate show={!isLoggedIn} onClose={() => {}} />
-      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} />
+      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} onApply={applyFilters} />
       <BottomNav />
     </div>
   );

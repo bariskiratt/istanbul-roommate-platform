@@ -47,7 +47,7 @@ durumda olan kısım **Modül 2 — Bütçe Isı Haritası**'dır:
 | ✅ | Veri temizleme boru hattı (`scripts/build_market_values.py`) |
 | ✅ | Mahalle bazlı piyasa değerleri (`data/processed/`) |
 | ✅ | FastAPI ısı haritası servisi (`app/`) |
-| ✅ | Leaflet tabanlı interaktif harita (`web/index.html`) |
+| ✅ | Leaflet tabanlı interaktif harita (React arayüzü: `frontend/src/pages/Explore.tsx`) |
 | ✅ | Adil fiyat tahmin modeli (`app/pricing.py`, `scripts/train_model.py`) |
 | ✅ | Alternatif semt önerileri (Modül 3) — `app/transit.py` |
 | ⬜ | Ev arkadaşı eşleştirme |
@@ -72,8 +72,9 @@ data/
   raw/                      dokunulmamış kaynak veri
   processed/                üretilen veri
 models/                     eğitilmiş model (git'e dâhil değil)
-web/index.html              arayüz
 ```
+
+Arayüz monorepo kökündeki `frontend/` React uygulamasındadır; bu servis yalnızca API sunar.
 
 Yollar `app/config.py` içinde `__file__` üzerinden çözülür; betikler hangi
 dizinden çalıştırılırsa çalıştırılsın veriyi bulur.

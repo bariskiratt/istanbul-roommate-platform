@@ -3,9 +3,32 @@ import { X, Minus, Plus, ShowerHead, Zap, Dog, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
+export interface ListingFilters {
+  listingType: string;
+  priceRange: [number, number];
+  rooms: number;
+  people: number;
+  bathrooms: number;
+  lifestyle: string[];
+  features: string[];
+  gender: string;
+}
+
+export const defaultFilters: ListingFilters = {
+  listingType: "Hepsi",
+  priceRange: [1000, 30000],
+  rooms: 0,
+  people: 0,
+  bathrooms: 0,
+  lifestyle: [],
+  features: [],
+  gender: "Hepsi",
+};
+
 interface FilterModalProps {
   open: boolean;
   onClose: () => void;
+  onApply?: (filters: ListingFilters) => void;
 }
 
 const priceDistribution = [3,5,8,12,18,25,30,35,40,38,32,28,24,20,16,14,12,10,8,6,5,4,3,2,2,1,1,1,1,1];
@@ -21,7 +44,7 @@ const recommendedFilters = [
   { icon: Wifi, label: "İnternet Dahil" },
 ];
 
-const FilterModal = ({ open, onClose }: FilterModalProps) => {
+const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
   const [listingType, setListingType] = useState("Hepsi");
   const [priceRange, setPriceRange] = useState([1000, 30000]);
   const [rooms, setRooms] = useState(0);
@@ -41,6 +64,22 @@ const FilterModal = ({ open, onClose }: FilterModalProps) => {
     setRooms(0); setPeople(0); setBathrooms(0);
     setSelectedLifestyle([]); setSelectedFeatures([]);
     setGender("Hepsi"); setSelectedRecommended([]);
+    onApply?.(defaultFilters);
+  };
+
+  const applyFilters = () => {
+    onApply?.({
+      listingType,
+      priceRange: [priceRange[0], priceRange[1]],
+      rooms,
+      people,
+      bathrooms,
+      // Önerilen filtrelerden çip karşılığı olanlar aynı havuzda değerlendirilir.
+      lifestyle: [...new Set([...selectedLifestyle, ...selectedRecommended])],
+      features: selectedFeatures,
+      gender,
+    });
+    onClose();
   };
 
   const maxBar = Math.max(...priceDistribution);
@@ -271,10 +310,10 @@ const FilterModal = ({ open, onClose }: FilterModalProps) => {
                 Temizle
               </button>
               <Button
-                onClick={onClose}
+                onClick={applyFilters}
                 className="rounded-full bg-foreground text-background hover:bg-foreground/90 px-6 h-11 text-sm font-bold"
               >
-                47 ilan göster
+                İlanları göster
               </Button>
             </div>
           </motion.div>

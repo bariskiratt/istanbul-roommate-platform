@@ -1,6 +1,7 @@
 """İstanbul bütçe ısı haritası API'si."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 
 import joblib
@@ -9,11 +10,10 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.config import (
-    INDEX_HTML,
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
@@ -68,6 +68,14 @@ async def lifespan(_app: FastAPI):
     # Adil fiyat modeli opsiyonel: yoksa harita yine de çalışsın.
     if MODEL_PATH.exists():
         STATE["model"] = joblib.load(MODEL_PATH)
+        # /api/locations yanıtı sabit; her istekte CSV okumamak için burada kur.
+        known = set(STATE["model"]["categories"]["neighborhood"])
+        grouped: dict[str, list[str]] = {}
+        for row in df.itertuples(index=False):
+            neighborhood = str(row.neighborhood).strip()
+            if neighborhood in known:
+                grouped.setdefault(str(row.district).strip(), []).append(neighborhood)
+        STATE["locations"] = {d: sorted(set(n)) for d, n in sorted(grouped.items())}
         print(f"✅ Adil fiyat modeli yüklendi "
               f"(medyan sapma %{STATE['model']['served_medape']:.1f}).")
     else:
@@ -102,20 +110,29 @@ app = FastAPI(title="İstanbul Emlak Isı Haritası", lifespan=lifespan)
 
 # Yanıtlar büyük GeoJSON içerdiği için sıkıştırma kritik (~4 MB -> ~700 KB).
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+# Geliştirme için yerel origin'ler; yayında CORS_ORIGINS ile geçersiz kılınır
+# (virgülle ayrılmış liste, örn. "https://app.example.com,https://example.com").
+_DEFAULT_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    # Vite dev sunucusu (frontend/): React roommate uygulaması
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+
+_env_origins = os.getenv("CORS_ORIGINS", "").strip()
+
 app.add_middleware(
     CORSMiddleware,
-    # Geliştirme için yerel origin'ler. Yayına alırken kendi alan adınla değiştir.
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        # Vite dev sunucusu (frontend/): React roommate uygulaması
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ],
+    allow_origins=(
+        [o.strip() for o in _env_origins.split(",") if o.strip()]
+        if _env_origins
+        else _DEFAULT_ORIGINS
+    ),
     # POST /api/estimate için OPTIONS+POST de gerekiyor.
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -124,7 +141,19 @@ app.add_middleware(
 
 @app.get("/")
 async def index():
-    return FileResponse(INDEX_HTML)
+    """Kök adres: API tanıtımı. Asıl arayüz React uygulamasında (frontend/)."""
+    return {
+        "name": app.title,
+        "docs": "/docs",
+        "endpoints": [
+            "/api/geojson",
+            "/api/heatmap",
+            "/api/legend",
+            "/api/locations",
+            "/api/estimate",
+            "/api/alternatives",
+        ],
+    }
 
 
 @app.get("/api/geojson")
@@ -159,17 +188,11 @@ async def get_legend():
 @app.get("/api/locations")
 async def get_locations():
     """Formu doldurmak için modelin tanıdığı ilçe -> mahalle listesi."""
-    model = _require_model()
-    df = pd.read_csv(MARKET_VALUES_CSV)
-    known = set(model["categories"]["neighborhood"])
-
-    grouped: dict[str, list[str]] = {}
-    for row in df.itertuples(index=False):
-        neighborhood = str(row.neighborhood).strip()
-        if neighborhood in known:
-            grouped.setdefault(str(row.district).strip(), []).append(neighborhood)
-
-    return {d: sorted(set(n)) for d, n in sorted(grouped.items())}
+    _require_model()
+    return JSONResponse(
+        STATE["locations"],
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 def _require_model():

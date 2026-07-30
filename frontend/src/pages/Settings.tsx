@@ -2,15 +2,17 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Lock, User, LogOut, ChevronRight } from "lucide-react";
 import BottomNav from "@/components/layout/BottomNav";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Settings = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const items = [
     { icon: User, label: "Hesap Bilgileri", action: () => toast("Bu sayfa yakında geliyor") },
     { icon: Bell, label: "Bildirim Ayarları", action: () => toast("Bu sayfa yakında geliyor") },
     { icon: Lock, label: "Gizlilik ve Güvenlik", action: () => navigate("/safety") },
-    { icon: LogOut, label: "Çıkış Yap", action: () => { toast("Çıkış yapıldı"); navigate("/"); }, destructive: true },
+    { icon: LogOut, label: "Çıkış Yap", action: () => { logout(); toast("Çıkış yapıldı"); navigate("/"); }, destructive: true },
   ];
 
   return (

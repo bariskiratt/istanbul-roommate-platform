@@ -6,7 +6,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import LifestyleTag from "@/components/LifestyleTag";
-import FilterModal from "@/components/FilterModal";
+import FilterModal, { type ListingFilters, defaultFilters } from "@/components/FilterModal";
 
 const filters = ["Tümü", "Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "1+1", "2+1", "3+1"];
 
@@ -97,13 +97,27 @@ const mockListings = [
 
 type ListingType = typeof mockListings[number];
 
+const matchesModalFilters = (l: ListingType, f: ListingFilters): boolean => {
+  // Bu sayfadaki ilanların hepsi ev ilanı
+  if (f.listingType === "Kişisel İlan") return false;
+  if (l.price < f.priceRange[0] || l.price > f.priceRange[1]) return false;
+  if (f.rooms > 0 && parseInt(l.roomType) < f.rooms) return false;
+  if (f.features.includes("Eşyalı") && !l.features.furnished) return false;
+  if (f.features.includes("Asansörlü") && !l.features.elevator) return false;
+  if (f.lifestyle.includes("Sigara İçmez") && l.rules.smoking) return false;
+  if (f.lifestyle.includes("Hayvan Dostu") && !l.rules.pets) return false;
+  return true;
+};
+
 const Listings = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("Tümü");
   const [selectedListing, setSelectedListing] = useState<ListingType | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [modalFilters, setModalFilters] = useState<ListingFilters>(defaultFilters);
 
   const filtered = mockListings.filter(l => {
+    if (!matchesModalFilters(l, modalFilters)) return false;
     if (activeFilter === "Tümü") return true;
     return l.district === activeFilter || l.roomType === activeFilter;
   });
@@ -222,7 +236,7 @@ const Listings = () => {
       <ListingDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} />
 
       {/* Filter Modal */}
-      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} />
+      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} onApply={setModalFilters} />
 
       <BottomNav />
     </div>
