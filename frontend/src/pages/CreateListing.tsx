@@ -258,10 +258,10 @@ const CreateListing = () => {
               {isHouse && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Aylık Kira (₺)</label>
+                    <label className="text-sm font-medium text-foreground">Ev Arkadaşından İstediğin Aylık Kira (₺)</label>
                     <Input
                       type="number"
-                      placeholder="Aylık kira (₺)"
+                      placeholder="Oda payı — ör. toplam kiranın oda başına düşeni"
                       value={rent}
                       onChange={e => setRent(e.target.value)}
                       className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"

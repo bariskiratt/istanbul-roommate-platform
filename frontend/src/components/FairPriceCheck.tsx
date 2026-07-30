@@ -26,10 +26,17 @@ function parseRooms(roomCount?: string): { room: number; living: number } {
 }
 
 const verdictStyles = {
-  fair: { cls: "bg-green-500/10 border-green-500/40 text-foreground", icon: Check, label: "Bu kira adil aralıkta." },
-  above: { cls: "bg-red-500/10 border-red-500/40 text-foreground", icon: TrendingUp, label: "Bu kira adil aralığın üzerinde." },
-  below: { cls: "bg-yellow-500/10 border-yellow-500/40 text-foreground", icon: TrendingDown, label: "Bu kira adil aralığın altında." },
+  fair: { cls: "bg-green-500/10 border-green-500/40 text-foreground", icon: Check, label: "Bu oda payı adil aralıkta." },
+  above: { cls: "bg-red-500/10 border-red-500/40 text-foreground", icon: TrendingUp, label: "Bu oda payı adil aralığın üzerinde." },
+  below: { cls: "bg-yellow-500/10 border-yellow-500/40 text-foreground", icon: TrendingDown, label: "Bu oda payı adil aralığın altında." },
 } as const;
+
+// "2026-01" -> "Oca 2026"
+const fmtPeriod = (p: string) => {
+  const [y, m] = p.split("-").map(Number);
+  if (!y || !m) return p;
+  return new Date(y, m - 1, 1).toLocaleDateString("tr-TR", { month: "short", year: "numeric" });
+};
 
 /**
  * Adil fiyat danışmanı: ilçe + birkaç ek özellikten, backend'deki ML modelini
@@ -82,6 +89,8 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
         age: Number(age),
         floor: Number(floor),
         asking_price: askingPrice && askingPrice > 0 ? askingPrice : undefined,
+        // Ev arkadaşı ilanı: istenen kira tek odanın payı, kıyas oda bazında
+        basis: "room",
       });
       setResult(res);
     } catch (e) {
@@ -151,13 +160,24 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
 
       {result && (
         <div className="space-y-3 pt-1">
+          {/* Oda payı — ev arkadaşından istenecek adil kira */}
           <div className="text-center">
-            <div className="text-2xl font-bold tabular-nums">
-              {fmt.format(result.fair_low)} – {fmt.format(result.fair_high)} ₺
+            <div className="text-2xl font-bold tabular-nums text-primary">
+              {fmt.format(result.room_low)} – {fmt.format(result.room_high)} ₺
             </div>
             <div className="text-xs text-muted-foreground">
-              Adil aylık kira aralığı · orta tahmin {fmt.format(result.fair_mid)} ₺
+              Ev arkadaşından isteyeceğin adil oda payı · orta{" "}
+              {fmt.format(result.room_mid)} ₺
+              {result.room_share > 1 && ` · ${result.room_share} odalı, kira ${result.room_share}'e bölüşülür`}
             </div>
+          </div>
+
+          {/* Dairenin tamamı — referans */}
+          <div className="text-center text-xs text-muted-foreground">
+            Dairenin tamamı için adil aralık:{" "}
+            <span className="font-semibold text-foreground tabular-nums">
+              {fmt.format(result.fair_low)} – {fmt.format(result.fair_high)} ₺
+            </span>
           </div>
 
           {result.verdict && (() => {
@@ -168,8 +188,8 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
               <div className={`rounded-xl border px-3 py-2.5 text-sm flex items-start gap-2 ${v.cls}`}>
                 <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>
-                  {v.label} İstenen {fmt.format(result.asking_price ?? 0)} ₺, orta tahminden{" "}
-                  {sign}
+                  {v.label} İstenen {fmt.format(result.asking_price ?? 0)} ₺, oda payı orta
+                  tahmininden {sign}
                   {result.deviation_pct}% farklı.
                 </span>
               </div>
@@ -177,8 +197,9 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
           })()}
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Modelin geçmiş ilanlardaki medyan sapması %{result.median_error_pct}. Bu bir
-            tahmindir, ekspertiz değildir.
+            {fmtPeriod(result.data_period)} piyasa verisi, TÜFE ile {fmtPeriod(result.indexed_to)}{" "}
+            düzeyine endekslendi (×{result.index_factor.toFixed(3)}). Modelin medyan sapması
+            %{result.median_error_pct}. Bu bir tahmindir, ekspertiz değildir.
             {!result.known_neighborhood &&
               " Bu mahalle eğitim verisinde yok; tahmin ilçe geneline dayanıyor."}
           </p>

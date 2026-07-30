@@ -3,6 +3,7 @@
 import json
 import os
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import joblib
 import numpy as np
@@ -21,6 +22,7 @@ from app.config import (
 from app.auth import router as auth_router
 from app.db import init_db
 from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
+from app.indexing import DATA_PERIOD, rent_index
 from app.listings import router as listings_router
 from app.swipes import router as swipes_router
 from app.pricing import BOUNDS, build_features
@@ -45,6 +47,9 @@ class EstimateRequest(BaseModel):
     floor: int = Field(..., ge=BOUNDS["floor"][0], le=BOUNDS["floor"][1])
     # Opsiyonel: verilirse tahmini bantla karşılaştırıp yorum döneriz.
     asking_price: float | None = Field(None, gt=0)
+    # "flat": istenen fiyat tüm dairenin kirası; "room": tek odanın payı
+    # (ev arkadaşı ilanlarında oda kiraya verilir, kıyas oda payıyla yapılır).
+    basis: Literal["flat", "room"] = "flat"
 
 # Sunucu açılışında doldurulur.
 STATE: dict = {}
@@ -242,6 +247,15 @@ async def estimate(payload: EstimateRequest):
     # Çeyreklik modelleri bağımsız eğitildiği için nadiren sıra bozulabilir.
     low, mid, high = sorted(band.values())
 
+    # Model eğitim dönemi liralarıyla konuşur; TÜFE ile bugüne endeksle.
+    factor, indexed_to = rent_index()
+    low, mid, high = low * factor, mid * factor, high * factor
+
+    # Ev arkadaşı senaryosu: dairenin kirası oda başına bölüşülür (yatak odası
+    # sayısı kadar kişi). 1+1/1+0'da bölüşme olmaz, pay = tüm kira.
+    share = max(payload.room, 1)
+    room_low, room_mid, room_high = low / share, mid / share, high / share
+
     # Eğitimde görülmemiş mahalle: tahmin ilçe geneline dayanır, bunu söylemeliyiz.
     known_neighborhood = (
         payload.neighborhood.strip() in set(model["categories"]["neighborhood"])
@@ -251,16 +265,30 @@ async def estimate(payload: EstimateRequest):
         "fair_low": round(low),
         "fair_mid": round(mid),
         "fair_high": round(high),
+        "room_low": round(room_low),
+        "room_mid": round(room_mid),
+        "room_high": round(room_high),
+        "room_share": share,
         "median_error_pct": round(model["served_medape"], 1),
         "known_neighborhood": known_neighborhood,
+        "index_factor": round(factor, 4),
+        "data_period": DATA_PERIOD,
+        "indexed_to": indexed_to,
+        "basis": payload.basis,
     }
 
     if payload.asking_price is not None:
         asking = payload.asking_price
-        deviation = (asking - mid) / mid * 100
-        if asking < low:
+        # Oda bazında kıyas: istenen fiyat tek odanın payıyla karşılaştırılır.
+        c_low, c_mid, c_high = (
+            (room_low, room_mid, room_high)
+            if payload.basis == "room"
+            else (low, mid, high)
+        )
+        deviation = (asking - c_mid) / c_mid * 100
+        if asking < c_low:
             verdict = "below"
-        elif asking > high:
+        elif asking > c_high:
             verdict = "above"
         else:
             verdict = "fair"

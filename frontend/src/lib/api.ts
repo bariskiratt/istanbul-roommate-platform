@@ -57,14 +57,26 @@ export interface EstimateRequest {
   age: number;
   floor: number;
   asking_price?: number;
+  /** "room": istenen fiyat tek odanın payı (ev arkadaşı senaryosu). */
+  basis?: "flat" | "room";
 }
 
 export interface EstimateResponse {
   fair_low: number;
   fair_mid: number;
   fair_high: number;
+  /** Oda başına adil pay (daire kirası / yatak odası sayısı) */
+  room_low: number;
+  room_mid: number;
+  room_high: number;
+  room_share: number;
   median_error_pct: number;
   known_neighborhood: boolean;
+  /** TÜFE endeksleme bilgisi */
+  index_factor: number;
+  data_period: string;
+  indexed_to: string;
+  basis: "flat" | "room";
   asking_price?: number;
   verdict?: "below" | "fair" | "above";
   deviation_pct?: number;

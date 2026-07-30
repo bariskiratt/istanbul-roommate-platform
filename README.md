@@ -69,7 +69,11 @@ Ayrıntılar `backend/README.md` içinde. Özet:
 
 - **Adil fiyat (Modül 1):** hedef `log(kira)`; LightGBM çeyreklik regresyonu
   (q25/q50/q75) ile nokta değil **aralık** verir. 5-kat CV medyan sapma
-  **%15.1** (mahalle-medyanı referansı %25).
+  **%15.1** (mahalle-medyanı referansı %25). Çıktılar TÜİK aylık TÜFE ile
+  eğitim döneminden (2026-01) bugüne **endekslenir** (`app/indexing.py`;
+  yeni ay açıklandığında tabloya bir satır eklenir). Ev arkadaşı senaryosu
+  için daire kirasının yanında **oda payı** bandı da döner (kira / yatak
+  odası sayısı); İlan Oluştur'daki danışman kıyası oda payı üzerinden yapar.
 - **Bütçe ısı haritası (Modül 2):** 968 mahalle sınırı; Türkçe-duyarlı adres
   eşleştirmesiyle fiyat verisine bağlanır. İstek başına ~600 B (geometri ayrı,
   bir kez indirilir).
