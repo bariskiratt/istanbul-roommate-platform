@@ -71,6 +71,8 @@ class MatchOut(BaseModel):
     listing_id: int | None
     listing_title: str | None
     created_at: datetime
+    last_message: str | None = None
+    last_message_at: datetime | None = None
 
 
 # ---- yardımcılar ----
@@ -218,13 +220,27 @@ def my_matches(
         )
         .order_by(models.Match.created_at.desc(), models.Match.id.desc())
     ).all()
-    return [
-        {
-            "id": m.id,
-            "other_user": m.user_b if m.user_a_id == user.id else m.user_a,
-            "listing_id": m.listing_id,
-            "listing_title": m.listing.title if m.listing else None,
-            "created_at": m.created_at,
-        }
-        for m in rows
-    ]
+
+    def _last_message(match_id: int) -> models.Message | None:
+        return db.scalar(
+            select(models.Message)
+            .where(models.Message.match_id == match_id)
+            .order_by(models.Message.created_at.desc(), models.Message.id.desc())
+            .limit(1)
+        )
+
+    result = []
+    for m in rows:
+        last = _last_message(m.id)
+        result.append(
+            {
+                "id": m.id,
+                "other_user": m.user_b if m.user_a_id == user.id else m.user_a,
+                "listing_id": m.listing_id,
+                "listing_title": m.listing.title if m.listing else None,
+                "created_at": m.created_at,
+                "last_message": last.content if last else None,
+                "last_message_at": last.created_at if last else None,
+            }
+        )
+    return result

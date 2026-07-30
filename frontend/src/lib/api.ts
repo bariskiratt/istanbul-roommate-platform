@@ -284,6 +284,8 @@ export interface Match {
   listing_id: number | null;
   listing_title: string | null;
   created_at: string;
+  last_message: string | null;
+  last_message_at: string | null;
 }
 
 export const postSwipe = (listingId: number, direction: "like" | "pass") =>
@@ -296,3 +298,19 @@ export const respondToLike = (swipeId: number, accept: boolean) =>
   postJSON<SwipeResult>(`/api/swipes/${swipeId}/respond`, { accept });
 
 export const fetchMatches = () => getJSON<Match[]>("/api/matches");
+
+// ---- Mesajlaşma ----
+
+export interface ChatMessage {
+  id: number;
+  match_id: number;
+  sender_id: number;
+  content: string;
+  created_at: string;
+}
+
+export const fetchMessages = (matchId: number) =>
+  getJSON<ChatMessage[]>(`/api/matches/${matchId}/messages`);
+
+export const sendMessage = (matchId: number, content: string) =>
+  postJSON<ChatMessage>(`/api/matches/${matchId}/messages`, { content });

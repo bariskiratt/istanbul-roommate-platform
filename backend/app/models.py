@@ -152,3 +152,18 @@ class Match(Base):
     user_a: Mapped[User] = relationship(foreign_keys=[user_a_id])
     user_b: Mapped[User] = relationship(foreign_keys=[user_b_id])
     listing: Mapped["Listing | None"] = relationship()
+
+
+class Message(Base):
+    """Eşleşme içindeki tek mesaj."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    match: Mapped[Match] = relationship()
+    sender: Mapped[User] = relationship()
