@@ -96,10 +96,11 @@ frontend/       React/Vite roommate arayüzü
 
 - Model tahminleri ekspertiz değildir; veri dönemi CSV'de belirtilmemiştir.
 - Ulaşım yalnızca raylı sistem (metrobüs/otobüs/vapur hariç).
-- Eşleşme/sohbet kısımları hâlâ sahte veriyle çalışır. **İlanlar ve hesaplar
-  gerçektir:** kayıt/giriş e-posta + OTP ile çalışır (`/api/auth`), İlan
-  Oluştur formu `POST /api/listings` ile SQLite'a yazar, profil sayfası
-  gerçek kullanıcıyı ve kendi ilanlarını gösterir.
+- Sohbet hâlâ sahte veriyle çalışır. **İlanlar, hesaplar ve eşleşme
+  gerçektir:** kayıt/giriş e-posta + OTP ile (`/api/auth`), ilanlar SQLite'a
+  yazılır (`/api/listings`), kaydırma kararları kaydedilir ve karşılıklı
+  beğeni eşleşme üretir (`/api/swipes`, `/api/matches`); Beğeniler sayfası
+  ilanını beğenenleri gösterir, kabul edersen eşleşirsiniz.
 - E-posta servisi bağlı değil: OTP kodu geliştirme modunda API yanıtındaki
   `dev_code` alanında döner ve arayüzde toast olarak gösterilir
   (`DEV_OTP=0` ile kapatılır).

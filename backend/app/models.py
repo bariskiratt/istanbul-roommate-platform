@@ -2,7 +2,16 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -100,3 +109,46 @@ class Listing(Base):
     @property
     def owner_name(self) -> str | None:
         return self.owner.name if self.owner else None
+
+
+class Swipe(Base):
+    """Bir kullanıcının bir ilana verdiği karar (beğen/geç).
+
+    Aynı ilana ikinci kez karar verilirse kayıt güncellenir (upsert).
+    `responded`: ilan sahibi Beğeniler ekranında bu beğeniyi işledi mi.
+    """
+
+    __tablename__ = "swipes"
+    __table_args__ = (UniqueConstraint("swiper_id", "listing_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    swiper_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), index=True)
+    direction: Mapped[str] = mapped_column(String(10))  # like | pass
+    responded: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    swiper: Mapped[User] = relationship()
+    listing: Mapped["Listing"] = relationship()
+
+
+class Match(Base):
+    """İki kullanıcı arasındaki eşleşme (çift başına tek kayıt).
+
+    user_a_id < user_b_id olacak şekilde normalize edilir; böylece
+    UniqueConstraint çift yönlü tekrarı engeller.
+    """
+
+    __tablename__ = "matches"
+    __table_args__ = (UniqueConstraint("user_a_id", "user_b_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_a_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_b_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # Eşleşmeyi tetikleyen ilan (bağlam için; ilan kapansa da eşleşme yaşar)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    user_a: Mapped[User] = relationship(foreign_keys=[user_a_id])
+    user_b: Mapped[User] = relationship(foreign_keys=[user_b_id])
+    listing: Mapped["Listing | None"] = relationship()

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchListings, type ApiListing } from "@/lib/api";
+import { toast } from "sonner";
+import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { SlidersHorizontal, X, Heart, Zap, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
 import { mockListings, type Listing, type UserProfile } from "@/data/mockData";
@@ -111,12 +112,26 @@ const SwipeScreen = () => {
   };
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
+    // Gerçek (API'den gelen) ilanlarda karar sunucuya yazılır; mock kartlar
+    // yalnızca demo malzemesi olduğundan atlanır.
+    const card = cards[cards.length - 1];
+    if (card && isLoggedIn && card.id.startsWith("api-")) {
+      postSwipe(Number(card.id.slice(4)), direction === "right" ? "like" : "pass")
+        .then(res => {
+          if (res.matched) {
+            toast.success("Eşleştiniz! 🎉", {
+              description: "Eşleşmeni Beğeniler sayfasında görebilirsin.",
+            });
+          }
+        })
+        .catch(() => {}); // kart zaten kaydı; sessizce geç
+    }
     setSwipeDirection(direction);
     setTimeout(() => {
       setCards(prev => prev.slice(0, -1));
       setSwipeDirection(null);
     }, 300);
-  }, [isLoggedIn]);
+  }, [isLoggedIn, cards]);
 
   const handleSuperMatch = () => {
     if (superMatchLeft > 0) {

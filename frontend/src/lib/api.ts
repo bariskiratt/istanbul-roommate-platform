@@ -233,3 +233,54 @@ export const updateMe = (payload: UserUpdate) =>
 
 export const logoutApi = () =>
   request<void>("/api/auth/logout", { method: "POST" });
+
+// ---- Swipe ve eşleşme ----
+
+export interface PublicUser {
+  id: number;
+  name: string;
+  university: string | null;
+  department: string | null;
+  year: number | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  smoking: boolean | null;
+  pets: boolean | null;
+  alcohol: boolean | null;
+  sleep_schedule: string | null;
+  preferred_districts: string[];
+  bio: string;
+  photos: string[];
+}
+
+export interface SwipeResult {
+  matched: boolean;
+  match_id: number | null;
+}
+
+export interface ReceivedLike {
+  swipe_id: number;
+  user: PublicUser;
+  listing_id: number;
+  listing_title: string;
+  created_at: string;
+}
+
+export interface Match {
+  id: number;
+  other_user: PublicUser;
+  listing_id: number | null;
+  listing_title: string | null;
+  created_at: string;
+}
+
+export const postSwipe = (listingId: number, direction: "like" | "pass") =>
+  postJSON<SwipeResult>("/api/swipes", { listing_id: listingId, direction });
+
+export const fetchReceivedLikes = () =>
+  getJSON<ReceivedLike[]>("/api/swipes/received");
+
+export const respondToLike = (swipeId: number, accept: boolean) =>
+  postJSON<SwipeResult>(`/api/swipes/${swipeId}/respond`, { accept });
+
+export const fetchMatches = () => getJSON<Match[]>("/api/matches");

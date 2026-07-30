@@ -1,37 +1,82 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { X, Check, Heart, GraduationCap, MapPin, DollarSign, Search, Home } from "lucide-react";
-import { mockSwipeNotifications, currentUser, type SwipeNotification } from "@/data/mockData";
+import { toast } from "sonner";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+
+const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
+
+// API beğenisini kart bileşeninin beklediği görünüme çevirir
+const toLikeCard = (r: ReceivedLike) => ({
+  id: String(r.swipe_id),
+  swipeId: r.swipe_id,
+  listingTitle: r.listing_title,
+  user: {
+    name: r.user.name || "İsimsiz",
+    university: r.user.university ?? "—",
+    department: r.user.department ?? "—",
+    year: r.user.year ?? 0,
+    preferredDistrict: r.user.preferred_districts.join(", ") || "—",
+    budgetMin: r.user.budget_min ?? 0,
+    budgetMax: r.user.budget_max ?? 0,
+    smoking: r.user.smoking ?? false,
+    pets: r.user.pets ?? false,
+    alcohol: r.user.alcohol ?? false,
+    sleepSchedule: (r.user.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
+    bio: r.user.bio,
+    photos: r.user.photos.length > 0 ? r.user.photos : [placeholderAvatar],
+  },
+});
+
+type LikeCard = ReturnType<typeof toLikeCard>;
 
 const Matches = () => {
   const navigate = useNavigate();
-  const { isLoggedIn } = useAuth();
-  const [queue, setQueue] = useState<SwipeNotification[]>([...mockSwipeNotifications]);
-  const [matchPopup, setMatchPopup] = useState<SwipeNotification | null>(null);
+  const { isLoggedIn, user: me } = useAuth();
+  const [queue, setQueue] = useState<LikeCard[]>([]);
+  const [matchPopup, setMatchPopup] = useState<LikeCard | null>(null);
   const [confetti, setConfetti] = useState(false);
   const [swipeDir, setSwipeDir] = useState<"left" | "right" | null>(null);
 
-  const total = mockSwipeNotifications.length;
+  const { data: received = [] } = useQuery({
+    queryKey: ["received-likes"],
+    queryFn: fetchReceivedLikes,
+    enabled: isLoggedIn,
+  });
+
+  useEffect(() => {
+    setQueue(received.map(toLikeCard));
+  }, [received]);
+
+  const total = received.length;
   const remaining = queue.length;
 
   const handleDecision = useCallback((direction: "left" | "right") => {
     const current = queue[0];
     if (!current) return;
 
+    respondToLike(current.swipeId, direction === "right")
+      .then(res => {
+        if (res.matched) {
+          setMatchPopup(current);
+          setConfetti(true);
+          setTimeout(() => setConfetti(false), 2000);
+        }
+      })
+      .catch(err =>
+        toast.error(err instanceof Error ? err.message : "Cevap kaydedilemedi"),
+      );
+
     setSwipeDir(direction);
     setTimeout(() => {
-      if (direction === "right") {
-        setMatchPopup(current);
-        setConfetti(true);
-        setTimeout(() => setConfetti(false), 2000);
-      }
       setQueue(prev => prev.slice(1));
       setSwipeDir(null);
     }, 300);
@@ -161,7 +206,7 @@ const Matches = () => {
                   initial={{ x: -40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src={currentUser.photos[0]}
+                  src={me?.photos[0] ?? placeholderAvatar}
                   alt=""
                   className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
                 />
@@ -244,7 +289,7 @@ const Matches = () => {
 
 /* Draggable profile card */
 interface ProfileCardProps {
-  notification: SwipeNotification;
+  notification: LikeCard;
   onSwipe: (dir: "left" | "right") => void;
   direction: "left" | "right" | null;
 }
