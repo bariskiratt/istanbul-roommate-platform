@@ -21,11 +21,37 @@ from app.indexing import rent_index
 
 DEMO_DOMAIN = "demo.roommatch.tr"  # demo hesaplar bu alan adından tanınır
 
-FIRST_NAMES = [
-    "Elif", "Zeynep", "Defne", "Azra", "Ecrin", "Selin", "Melis", "İrem",
-    "Ceren", "Buse", "Mert", "Emir", "Kerem", "Arda", "Deniz", "Ege",
-    "Baran", "Can", "Kaan", "Umut",
+# (ad, cinsiyet) — portre fotoğrafı cinsiyetle tutarlı seçilir
+PEOPLE = [
+    ("Elif", "kadın"), ("Zeynep", "kadın"), ("Defne", "kadın"),
+    ("Azra", "kadın"), ("Ecrin", "kadın"), ("Selin", "kadın"),
+    ("Melis", "kadın"), ("İrem", "kadın"), ("Ceren", "kadın"),
+    ("Buse", "kadın"), ("Mert", "erkek"), ("Emir", "erkek"),
+    ("Kerem", "erkek"), ("Arda", "erkek"), ("Deniz", "erkek"),
+    ("Ege", "erkek"), ("Baran", "erkek"), ("Can", "erkek"),
+    ("Kaan", "erkek"), ("Umut", "erkek"),
 ]
+
+def _portrait(gender: str, idx: int) -> str:
+    """randomuser.me portreleri: cinsiyete uygun, sabit (0-99 arası)."""
+    kind = "women" if gender == "kadın" else "men"
+    return f"https://randomuser.me/api/portraits/{kind}/{(idx * 7 + 3) % 99}.jpg"
+
+# Ev ilanları için elle seçilmiş iç mekân fotoğrafları (Unsplash, stabil id'ler)
+HOME_PHOTOS = [
+    "photo-1502672260266-1c1ef2d93688",  # salon, aydınlık
+    "photo-1522708323590-d24dbb6b0267",  # modern oturma odası
+    "photo-1560448204-e02f11c3d0e2",     # stüdyo daire
+    "photo-1493809842364-78817add7ffb",  # salon, kanepe
+    "photo-1484154218962-a197022b5858",  # mutfak-salon
+    "photo-1586023492125-27b2c045efd7",  # oturma odası, bitkili
+    "photo-1512918728675-ed5a9ecdebfd",  # yatak odası
+    "photo-1554995207-c18c203602cb",     # salon, minimal
+]
+
+def _home_photo(seed: int) -> str:
+    pid = HOME_PHOTOS[seed % len(HOME_PHOTOS)]
+    return f"https://images.unsplash.com/{pid}?w=640&h=480&fit=crop"
 UNIVERSITIES = [
     "Boğaziçi Üniversitesi", "İTÜ", "Marmara Üniversitesi", "Yıldız Teknik",
     "İstanbul Üniversitesi", "Koç Üniversitesi", "Sabancı Üniversitesi",
@@ -126,7 +152,7 @@ def seed(force: bool = False) -> None:
 
     # --- 20 demo kullanıcı ---
     users: list[models.User] = []
-    for i, name in enumerate(FIRST_NAMES):
+    for i, (name, gender) in enumerate(PEOPLE):
         row = market.sample(1).iloc[0]
         budget_mid = row["avg_price"] * factor / random.choice([2, 2, 3])
         b_min = int(round(budget_mid * 0.8, -2))
@@ -136,7 +162,7 @@ def seed(force: bool = False) -> None:
             password_hash=_hash_password("Demo1234!"),
             verified=True,
             name=name,
-            gender=random.choice(["kadın", "erkek", "belirtmek_istemiyorum"]),
+            gender=gender,
             birth_year=random.randint(1999, 2006),
             university=random.choice(UNIVERSITIES),
             department=random.choice(DEPARTMENTS),
@@ -149,7 +175,7 @@ def seed(force: bool = False) -> None:
             sleep_schedule=random.choice(["erken", "gece", "esnek"]),
             preferred_districts=[str(row["district"])],
             bio=random.choice(BIOS),
-            photos=[f"https://i.pravatar.cc/400?u=roommatch-demo-{i + 1}"],
+            photos=[_portrait(gender, i)],
         )
         db.add(user)
         users.append(user)
@@ -183,8 +209,7 @@ def seed(force: bool = False) -> None:
                 smoking_allowed=random.random() < 0.2,
                 pets_allowed=random.random() < 0.45,
                 photos=[
-                    f"https://picsum.photos/seed/roommatch-{i}-{k}/640/480"
-                    for k in range(random.randint(1, 3))
+                    _home_photo(i + k) for k in range(random.randint(1, 3))
                 ],
             )
         else:
