@@ -76,9 +76,16 @@ const Profile = () => {
       <AppHeader
         title="Profil"
         rightAction={
-          <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <Settings className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {me && (
+              <button onClick={() => navigate("/profile/edit")} className="text-xs font-medium text-primary flex items-center gap-1 px-3 py-2 rounded-full hover:bg-primary/5 transition-colors">
+                Düzenle <Edit className="w-3 h-3" />
+              </button>
+            )}
+            <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
         }
       />
 

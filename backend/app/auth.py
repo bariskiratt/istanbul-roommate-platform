@@ -29,7 +29,26 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
 
 OTP_TTL = timedelta(minutes=10)
+TOKEN_TTL = timedelta(days=30)
 _SCRYPT_PARAMS = {"n": 2**14, "r": 8, "p": 1}
+
+# Basit bellek-içi hız limiti: (uç, e-posta) başına pencere içi istek sayısı.
+# Tek süreçli dağıtım için yeterli; restart'ta sıfırlanır.
+RATE_LIMIT = 5
+RATE_WINDOW = timedelta(minutes=15)
+_RATE_BUCKETS: dict[tuple[str, str], list[datetime]] = {}
+
+
+def _rate_limit(action: str, email: str) -> None:
+    now = datetime.now(timezone.utc)
+    bucket = _RATE_BUCKETS.setdefault((action, email), [])
+    bucket[:] = [t for t in bucket if now - t < RATE_WINDOW]
+    if len(bucket) >= RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="Çok fazla deneme yapıldı. 15 dakika sonra tekrar dene.",
+        )
+    bucket.append(now)
 
 
 # ---- kripto yardımcıları ----
@@ -174,7 +193,19 @@ def get_optional_user(
             models.AuthToken.token_hash == _sha256(credentials.credentials)
         )
     )
-    return row.user if row else None
+    if row is None:
+        return None
+
+    # Token yaşlandıysa geçersiz say ve temizle (30 gün)
+    created = row.created_at
+    if created is not None and created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    if created is not None and datetime.now(timezone.utc) - created > TOKEN_TTL:
+        db.delete(row)
+        db.commit()
+        return None
+
+    return row.user
 
 
 def get_current_user(
@@ -189,6 +220,7 @@ def get_current_user(
 
 @router.post("/register", status_code=201)
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
+    _rate_limit("register", payload.email)
     existing = db.scalar(
         select(models.User).where(models.User.email == payload.email)
     )
@@ -209,6 +241,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 
 @router.post("/request-otp")
 def request_otp(payload: EmailIn, db: Session = Depends(get_db)):
+    _rate_limit("request-otp", payload.email)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if user is None:
         raise HTTPException(
@@ -230,6 +263,7 @@ def _issue_token(db: Session, user: models.User) -> str:
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     """E-posta + şifre ile giriş (OTP'siz)."""
+    _rate_limit("login", payload.email)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if (
         user is None
@@ -250,6 +284,8 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
 
 @router.post("/verify-otp", response_model=TokenOut)
 def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
+    # 6 haneli kodun kaba kuvvetle denenmesini engeller (5 deneme / 15 dk)
+    _rate_limit("verify-otp", payload.email)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if user is None or user.otp_hash is None:
         raise HTTPException(status_code=400, detail="Önce kod iste.")

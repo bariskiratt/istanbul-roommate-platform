@@ -1,7 +1,23 @@
-# RoomMatch backend — FastAPI + adil fiyat modeli
-# Model dosyası git'te olmadığı için imaj derlenirken eğitilir (~1 dk);
-# eğitim verisi (data/) repoda hazır.
+# RoomMatch backend — çok aşamalı derleme.
+# 1) builder: eğitim bağımlılıklarıyla (sklearn/xgboost) model eğitilir.
+# 2) runtime: yalnız servis bağımlılıkları + eğitilmiş model — imaj ~400 MB
+#    daha küçük ve requirements değişmedikçe katman önbellekten gelir.
 
+FROM python:3.12-slim AS builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+COPY . .
+RUN python -m scripts.train_model
+
+# ---- runtime ----
 FROM python:3.12-slim
 
 # LightGBM'in OpenMP çalışma zamanı
@@ -15,9 +31,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-
-# Adil fiyat modelini üret (models/fair_price_model.joblib)
-RUN python -m scripts.train_model
+COPY --from=builder /app/models/fair_price_model.joblib models/
 
 ENV HOST=0.0.0.0
 EXPOSE 8000

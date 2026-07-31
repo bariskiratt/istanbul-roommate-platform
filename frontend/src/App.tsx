@@ -13,6 +13,7 @@ import Matches from "./pages/Matches";
 import Messages from "./pages/Messages";
 import ChatScreen from "./pages/ChatScreen";
 import Profile from "./pages/Profile";
+import ProfileEdit from "./pages/ProfileEdit";
 import CreateListing from "./pages/CreateListing";
 import Listings from "./pages/Listings";
 import Explore from "./pages/Explore";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/chat/:matchId" element={<ChatScreen />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/edit" element={<ProfileEdit />} />
             <Route path="/create-listing" element={<CreateListing />} />
             <Route path="/listings" element={<Listings />} />
             <Route path="/explore" element={<Explore />} />

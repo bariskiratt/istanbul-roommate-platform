@@ -177,6 +177,40 @@ def test_password_login_requires_verified(client):
     assert res.status_code == 403
 
 
+def test_otp_brute_force_rate_limited(client):
+    client.post("/api/auth/register", json=REGISTER)
+    # 5 deneme hakkı; 6. istek 429 almalı (kod kaba kuvvetle denenemez)
+    for _ in range(5):
+        res = client.post(
+            "/api/auth/verify-otp",
+            json={"email": REGISTER["email"], "code": "000000"},
+        )
+        assert res.status_code in (400, 200)
+    res = client.post(
+        "/api/auth/verify-otp",
+        json={"email": REGISTER["email"], "code": "000000"},
+    )
+    assert res.status_code == 429
+
+
+def test_expired_token_rejected(client, monkeypatch):
+    from datetime import timedelta
+
+    from app import auth as auth_module
+
+    token, _ = _register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+
+    # TTL'i sıfıra indir: aynı token artık geçersiz sayılmalı ve silinmeli
+    monkeypatch.setattr(auth_module, "TOKEN_TTL", timedelta(seconds=-1))
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+    # TTL normale dönse bile token silindiği için geçersiz kalır
+    monkeypatch.setattr(auth_module, "TOKEN_TTL", timedelta(days=30))
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+
 def test_logout_invalidates_token(client):
     token, _ = _register_and_login(client)
     headers = {"Authorization": f"Bearer {token}"}

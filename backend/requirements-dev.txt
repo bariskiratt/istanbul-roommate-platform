@@ -1,0 +1,11 @@
+# Eğitim + test bağımlılıkları (çalışma zamanına ek).
+# Docker'da yalnız builder aşamasında kurulur; nihai imaja girmez.
+-r requirements.txt
+
+# Model eğitimi (scripts/train_model.py — CV karşılaştırması)
+scikit-learn>=1.4
+xgboost>=2.0
+
+# Testler
+pytest>=8.0
+httpx>=0.27        # FastAPI TestClient

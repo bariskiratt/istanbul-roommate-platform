@@ -130,6 +130,32 @@ def test_empty_message_rejected(client):
     ).status_code == 422
 
 
+def test_pagination_limit_and_after_id(client):
+    ali, ayse, match_id = _matched_pair(client)
+    for i in range(5):
+        client.post(
+            f"/api/matches/{match_id}/messages",
+            headers=ali["headers"],
+            json={"content": f"mesaj {i}"},
+        )
+
+    # limit: son 2 mesaj, kronolojik sırada
+    msgs = client.get(
+        f"/api/matches/{match_id}/messages",
+        params={"limit": 2},
+        headers=ayse["headers"],
+    ).json()
+    assert [m["content"] for m in msgs] == ["mesaj 3", "mesaj 4"]
+
+    # after_id: yalnız yeni mesajlar
+    msgs = client.get(
+        f"/api/matches/{match_id}/messages",
+        params={"after_id": msgs[0]["id"]},
+        headers=ayse["headers"],
+    ).json()
+    assert [m["content"] for m in msgs] == ["mesaj 4"]
+
+
 def test_matches_include_last_message(client):
     ali, ayse, match_id = _matched_pair(client)
     matches = client.get("/api/matches", headers=ali["headers"]).json()
