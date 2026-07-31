@@ -1,25 +1,9 @@
-# RoomMatch backend — çok aşamalı derleme.
-# 1) builder: eğitim bağımlılıklarıyla (sklearn/xgboost) model eğitilir.
-# 2) runtime: yalnız servis bağımlılıkları + eğitilmiş model — imaj ~400 MB
-#    daha küçük ve requirements değişmedikçe katman önbellekten gelir.
+# RoomMatch backend.
+# Tek aşama: --fast eğitimi yalnızca runtime bağımlılıklarını kullanır
+# (pandas, numpy, lightgbm, scikit-learn), bu yüzden ikinci bir pip kurulumuna
+# ve xgboost'un ~300 MB'lık nvidia bağımlılığına gerek yok. Bağımlılık katmanı
+# requirements.txt değişmedikçe önbellekten gelir; derleme birkaç dakika sürer.
 
-FROM python:3.12-slim AS builder
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements-dev.txt
-
-COPY . .
-# --fast: CV karşılaştırması yerelde/CI'da koşulur; imaj derlemesinde yalnız
-# servis edilen modeller eğitilir (zayıf derleyicide ~40 dk -> ~3 dk)
-RUN python -m scripts.train_model --fast
-
-# ---- runtime ----
 FROM python:3.12-slim
 
 # LightGBM'in OpenMP çalışma zamanı
@@ -33,7 +17,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-COPY --from=builder /app/models/fair_price_model.joblib models/
+
+# --fast: 4 modelli CV karşılaştırması atlanır (o rapor içindi, yerelde
+# `python -m scripts.train_model` ile koşulur); yalnızca servis edilen
+# çeyreklik modeller eğitilir.
+RUN python -m scripts.train_model --fast
 
 ENV HOST=0.0.0.0
 # print() çıktıları tamponlanmadan Render loglarına düşsün

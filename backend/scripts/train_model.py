@@ -15,7 +15,6 @@ from sklearn.model_selection import KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
-from xgboost import XGBRegressor
 
 from app.config import MODEL_PATH
 from app.pricing import (
@@ -70,6 +69,11 @@ def make_lgbm(objective="regression", alpha=None):
 
 
 def make_xgb():
+    # Yalnızca tam CV karşılaştırmasında kullanılır; --fast modunda hiç
+    # çağrılmaz. Bu yüzden import fonksiyon içinde: Docker imajında xgboost
+    # (ve ~300 MB nvidia bağımlılığı) kurulu olmak zorunda değil.
+    from xgboost import XGBRegressor
+
     return XGBRegressor(
         n_estimators=600,
         learning_rate=0.05,
