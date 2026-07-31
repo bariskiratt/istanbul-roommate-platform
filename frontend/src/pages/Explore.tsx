@@ -23,6 +23,7 @@ const FALLBACK_COLORS: Record<StatusKey, string> = {
   safe: "#2ecc71",
   borderline: "#f1c40f",
   expensive: "#e74c3c",
+  lowdata: "#b8b1c9",
   nodata: "#95a5a6",
 };
 
@@ -149,6 +150,7 @@ const Explore = () => {
               neighborhood?: string;
               district?: string;
               avg_price?: number | null;
+              listing_count?: number | null;
             };
             layersRef.current[p.id] = layer as L.Path;
             layer.bindPopup(() => {
@@ -159,6 +161,9 @@ const Explore = () => {
               let html = `<div style="font-weight:650">${p.neighborhood || "Bilinmeyen"} Mah.</div>`;
               html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
               html += `<div style="font-size:16px;font-weight:650">${price}</div>`;
+              if (p.avg_price != null && p.listing_count != null && p.listing_count < 8) {
+                html += `<div style="color:#b48a00;font-size:11px;margin-top:4px">⚠️ Yalnızca ${p.listing_count} ilana dayanıyor — temsil gücü düşük</div>`;
+              }
               if (ALTERNATIVES_ENABLED && p.avg_price != null) {
                 html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
               }
@@ -221,7 +226,7 @@ const Explore = () => {
         />
         {summary && (
           <div className="flex flex-wrap gap-3 text-xs">
-            {(["safe", "borderline", "expensive", "nodata"] as StatusKey[]).map((k) => (
+            {(["safe", "borderline", "expensive", "lowdata", "nodata"] as StatusKey[]).map((k) => (
               <span key={k} className="flex items-center gap-1.5">
                 <i
                   className="inline-block w-3 h-3 rounded-sm"

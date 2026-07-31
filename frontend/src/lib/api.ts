@@ -91,7 +91,7 @@ export const fetchLocations = () =>
 
 // ---- Bütçe ısı haritası ----
 
-export type StatusKey = "safe" | "borderline" | "expensive" | "nodata";
+export type StatusKey = "safe" | "borderline" | "expensive" | "lowdata" | "nodata";
 
 export interface HeatmapResponse {
   budget: number;

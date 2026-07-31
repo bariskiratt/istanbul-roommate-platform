@@ -121,6 +121,10 @@ const Onboarding = () => {
       if (currentStep === 1) {
         const { token, user } = await verifyOtp(email, otp.join(""));
         login(token, user);
+        // Üniversite e-posta alan adından tespit edildiyse formu önceden doldur
+        if (user.university && !university) {
+          setUniversity(user.university);
+        }
       }
 
       // Son adım: profili kaydet

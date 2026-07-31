@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.db import get_db
 from app.emailer import send_otp_email
+from app.universities import university_from_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -230,7 +231,10 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
         )
 
     user = models.User(
-        email=payload.email, password_hash=_hash_password(payload.password)
+        email=payload.email,
+        password_hash=_hash_password(payload.password),
+        # Üniversite e-posta alan adından otomatik dolar (bilinmiyorsa boş)
+        university=university_from_email(payload.email),
     )
     code = _issue_otp(user)
     db.add(user)

@@ -17,10 +17,15 @@ from app.normalize import (
 # Bütçenin bu oranına kadar olan bölgeler "sınırda" sayılır.
 BORDERLINE_RATIO = 1.20
 
+# Bu sayının altında ilanı olan mahallenin medyanı güvenilmez (örn. Kazlıçeşme:
+# 6 lüks ilan medyanı 137.500 ₺'ye taşıyor) — normal renk yerine "Veri Az".
+MIN_LISTINGS = 8
+
 STATUS_STYLES = {
     "safe": {"label": "Bütçene Uygun", "color": "#2ecc71"},
     "borderline": {"label": "Sınırda", "color": "#f1c40f"},
     "expensive": {"label": "Bütçeni Aşıyor", "color": "#e74c3c"},
+    "lowdata": {"label": "Veri Az (güvenilmez)", "color": "#b8b1c9"},
     "nodata": {"label": "Veri Yok", "color": "#95a5a6"},
 }
 
@@ -43,13 +48,14 @@ def build_price_index(df):
         if not neighborhood:
             continue
 
-        price = float(row.avg_price)
-        exact[(district, neighborhood)] = price
-        squashed[(district, squash(row.neighborhood))] = price
+        # (fiyat, ilan sayısı) — sayı, medyanın güvenilirliğini işaretlemek için
+        entry = (float(row.avg_price), int(row.total_listings))
+        exact[(district, neighborhood)] = entry
+        squashed[(district, squash(row.neighborhood))] = entry
 
-        if neighborhood in by_name and by_name[neighborhood] != price:
+        if neighborhood in by_name and by_name[neighborhood] != entry:
             ambiguous.add(neighborhood)
-        by_name[neighborhood] = price
+        by_name[neighborhood] = entry
 
     for name in ambiguous:
         by_name.pop(name, None)
@@ -69,18 +75,21 @@ def annotate_features(geojson_data, df):
         neighborhood = norm_neighborhood(raw_neighborhood)
         district = norm_district(raw_district)
 
-        price = exact.get((district, neighborhood))
-        if price is None:
-            price = squashed.get((district, squash(raw_neighborhood)))
-        if price is None and not district:
+        entry = exact.get((district, neighborhood))
+        if entry is None:
+            entry = squashed.get((district, squash(raw_neighborhood)))
+        if entry is None and not district:
             # İlçe bilgisi yok: yalnızca tekil mahalle adlarına güveniyoruz.
-            price = by_name.get(neighborhood)
+            entry = by_name.get(neighborhood)
+
+        price, listing_count = entry if entry is not None else (None, None)
 
         props["id"] = index
         # Etiketlerde Türkçe karakterler korunur; eşleştirme normalize biçimle yapıldı.
         props["neighborhood"] = display_name(raw_neighborhood)
         props["district"] = display_name(raw_district)
         props["avg_price"] = price
+        props["listing_count"] = listing_count
 
         if price is not None:
             matched += 1
@@ -93,10 +102,12 @@ def annotate_features(geojson_data, df):
     return matched
 
 
-def classify(avg_price, user_budget):
+def classify(avg_price, user_budget, listing_count=None):
     """Tek bir mahallenin bütçeye göre durumunu döndürür."""
     if avg_price is None:
         return "nodata"
+    if listing_count is not None and listing_count < MIN_LISTINGS:
+        return "lowdata"
     if avg_price <= user_budget:
         return "safe"
     if avg_price <= user_budget * BORDERLINE_RATIO:
@@ -104,14 +115,19 @@ def classify(avg_price, user_budget):
     return "expensive"
 
 
-def build_budget_heatmap(feature_prices, user_budget):
+def build_budget_heatmap(feature_prices, user_budget, feature_counts=None):
     """Bütçeye göre kompakt bir durum listesi üretir.
 
     Geometriyi geri göndermek yerine (istek başına ~4 MB) yalnızca feature
     sırasına göre dizilmiş durum kodlarını döndürür (~10 KB). İstemci bu
     listeyi kendi tuttuğu geometriyle eşleştirip yeniden renklendirir.
     """
-    statuses = [classify(price, user_budget) for price in feature_prices]
+    if feature_counts is None:
+        feature_counts = [None] * len(feature_prices)
+    statuses = [
+        classify(price, user_budget, count)
+        for price, count in zip(feature_prices, feature_counts)
+    ]
     counts = {key: 0 for key in STATUS_STYLES}
     for status in statuses:
         counts[status] += 1

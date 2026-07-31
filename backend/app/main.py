@@ -76,6 +76,9 @@ async def lifespan(_app: FastAPI):
     STATE["prices"] = [
         f["properties"]["avg_price"] for f in geojson.get("features", [])
     ]
+    STATE["counts"] = [
+        f["properties"].get("listing_count") for f in geojson.get("features", [])
+    ]
     if total:
         print(f"✅ Hazır: {total} mahalleden {matched} tanesi fiyat verisiyle "
               f"eşleşti ({matched / total * 100:.1f}%).")
@@ -208,7 +211,7 @@ async def get_heatmap(
     """Verilen bütçe için mahalle durum listesini döndürür (kompakt)."""
     if "prices" not in STATE:
         raise HTTPException(status_code=503, detail="Veriler henüz yüklenmedi.")
-    return build_budget_heatmap(STATE["prices"], budget)
+    return build_budget_heatmap(STATE["prices"], budget, STATE.get("counts"))
 
 
 @app.get("/api/legend")
