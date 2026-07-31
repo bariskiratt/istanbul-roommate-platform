@@ -17,6 +17,10 @@ BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 # ucunu uzun süre kilitlememek için kısa tutulur.
 TIMEOUT = 6
 
+# Gönderen adı alan adıyla hizalı olmalı: "RoomMatch <noreply@evdes.tr>" gibi
+# marka/alan uyuşmazlığı spam filtrelerinde olumsuz puan alır.
+DEFAULT_SENDER_NAME = "evdes.tr"
+
 
 def email_enabled() -> bool:
     return bool(os.getenv("BREVO_API_KEY") and os.getenv("EMAIL_FROM"))
@@ -27,19 +31,30 @@ def send_otp_email(to: str, code: str) -> bool:
     if not email_enabled():
         return False
 
+    sender_name = os.getenv("EMAIL_FROM_NAME", DEFAULT_SENDER_NAME)
     payload = {
-        "sender": {"name": "RoomMatch", "email": os.environ["EMAIL_FROM"]},
+        "sender": {"name": sender_name, "email": os.environ["EMAIL_FROM"]},
         "to": [{"email": to}],
-        "subject": f"RoomMatch giriş kodun: {code}",
+        "subject": f"Giriş kodun: {code}",
+        # Düz metin karşılığı olmayan (HTML-only) postalar spam puanı alır;
+        # her iki gövde de gönderilir.
+        "textContent": (
+            f"Giriş kodun: {code}\n\n"
+            "Kod 10 dakika geçerlidir.\n"
+            "Bu isteği sen yapmadıysan bu e-postayı yok sayabilirsin.\n\n"
+            "evdes.tr"
+        ),
         "htmlContent": (
             "<div style='font-family:sans-serif;max-width:420px;margin:auto'>"
-            "<h2>RoomMatch</h2>"
+            "<h2 style='margin:0 0 16px'>evdes.tr</h2>"
             "<p>Giriş kodun:</p>"
             f"<p style='font-size:32px;font-weight:bold;letter-spacing:6px'>{code}</p>"
             "<p style='color:#666'>Kod 10 dakika geçerlidir. Bu isteği sen"
             " yapmadıysan bu e-postayı yok sayabilirsin.</p>"
             "</div>"
         ),
+        # Brevo istatistiklerinde işlemsel postaları ayırt etmek için.
+        "tags": ["otp"],
     }
     try:
         res = requests.post(

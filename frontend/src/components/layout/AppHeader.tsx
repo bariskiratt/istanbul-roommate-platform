@@ -1,13 +1,17 @@
 import { ArrowLeft, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "@/components/ThemeToggle";
+import LanguageToggle from "@/components/LanguageToggle";
 
 interface AppHeaderProps {
   title: string;
   showBack?: boolean;
   rightAction?: React.ReactNode;
+  /** Tema/dil düğmelerini gizler (dar başlıklar için). */
+  hideControls?: boolean;
 }
 
-const AppHeader = ({ title, showBack = false, rightAction }: AppHeaderProps) => {
+const AppHeader = ({ title, showBack = false, rightAction, hideControls = false }: AppHeaderProps) => {
   const navigate = useNavigate();
 
   return (
@@ -29,6 +33,12 @@ const AppHeader = ({ title, showBack = false, rightAction }: AppHeaderProps) => 
         </div>
       ) : (
         <h1 className="font-bold text-xl flex-1 text-foreground">{title}</h1>
+      )}
+      {!hideControls && (
+        <div className="flex items-center gap-1.5">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       )}
       {rightAction}
     </header>

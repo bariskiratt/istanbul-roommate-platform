@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useI18n } from "@/i18n";
 
 interface AuthGateProps {
   show: boolean;
@@ -10,6 +11,7 @@ interface AuthGateProps {
 
 const AuthGate = ({ show, onClose }: AuthGateProps) => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const handleNavigate = (path: string) => {
     // Close modal first, then navigate — prevents loops
@@ -43,30 +45,26 @@ const AuthGate = ({ show, onClose }: AuthGateProps) => {
               <Lock className="w-8 h-8 text-primary" />
             </div>
 
-            <h2 className="text-xl font-bold text-foreground">Devam etmek için giriş yap</h2>
-            <p className="text-sm text-muted-foreground">
-              RoomMatch'te ev arkadaşı bulmak için ücretsiz hesap oluştur.
-            </p>
+            <h2 className="text-xl font-bold text-foreground">{t("gate.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("gate.desc")}</p>
 
             <div className="space-y-3 pt-2">
               <Button
                 onClick={() => handleNavigate("/onboarding")}
                 className="w-full h-12 rounded-full text-sm font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground"
               >
-                Kayıt Ol
+                {t("gate.signup")}
               </Button>
               <Button
                 variant="ghost"
                 onClick={() => handleNavigate("/login")}
                 className="w-full h-12 rounded-full text-sm font-medium"
               >
-                Giriş Yap
+                {t("gate.login")}
               </Button>
             </div>
 
-            <p className="text-[11px] text-muted-foreground">
-              Kayıt tamamen ücretsiz · .edu.tr gerekli
-            </p>
+            <p className="text-[11px] text-muted-foreground">{t("gate.note")}</p>
           </motion.div>
         </motion.div>
       )}

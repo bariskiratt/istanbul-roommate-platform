@@ -6,12 +6,16 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginWithPassword, requestOtp, verifyOtp } from "@/lib/api";
 import PasswordInput from "@/components/PasswordInput";
+import ThemeToggle from "@/components/ThemeToggle";
+import LanguageToggle from "@/components/LanguageToggle";
+import { useI18n } from "@/i18n";
 
 type Mode = "password" | "otp";
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,14 +27,14 @@ const Login = () => {
 
   const finish = (token: string, user: Parameters<typeof login>[1]) => {
     login(token, user);
-    toast.success(`Hoş geldin${user.name ? `, ${user.name}` : ""}!`);
+    toast.success(t("login.greet", { name: user.name ? `, ${user.name}` : "" }));
     navigate("/swipe");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailValid) {
-      toast.error("Geçerli bir e-posta adresi girin");
+      toast.error(t("login.invalidEmail"));
       return;
     }
     setBusy(true);
@@ -43,10 +47,10 @@ const Login = () => {
         setCodeSent(true);
         // E-posta servisi bağlanana kadar kod dev modda yanıtla gelebilir.
         if (res.dev_code) {
-          toast.info(`Giriş kodun: ${res.dev_code}`, { duration: 20000 });
+          toast.info(t("login.devCode", { code: res.dev_code }), { duration: 20000 });
         } else {
-          toast.success("Giriş kodu e-postana gönderildi!", {
-            description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+          toast.success(t("login.codeSent"), {
+            description: t("login.codeSentDesc"),
             duration: 8000,
           });
         }
@@ -55,7 +59,7 @@ const Login = () => {
         finish(token, user);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bir şeyler ters gitti");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -68,12 +72,12 @@ const Login = () => {
   };
 
   const submitLabel = busy
-    ? "Bekleyin..."
+    ? t("login.busy")
     : mode === "password"
-      ? "Giriş Yap"
+      ? t("login.submitLogin")
       : codeSent
-        ? "Kodu Doğrula"
-        : "Giriş Kodu Gönder";
+        ? t("login.submitVerify")
+        : t("login.submitSendCode");
 
   const submitDisabled =
     busy ||
@@ -92,6 +96,10 @@ const Login = () => {
             </div>
             <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
           </button>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -101,19 +109,17 @@ const Login = () => {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto">
               <Home className="w-7 h-7 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-extrabold text-foreground">Tekrar hoş geldin</h1>
+            <h1 className="text-2xl font-extrabold text-foreground">{t("login.welcome")}</h1>
             <p className="text-sm text-muted-foreground">
-              {mode === "password"
-                ? "E-posta ve şifrenle giriş yap"
-                : "E-postana tek kullanımlık kod gönderelim"}
+              {t(mode === "password" ? "login.subPassword" : "login.subOtp")}
             </p>
           </div>
 
           {/* Mod seçici */}
           <div className="flex rounded-2xl border border-border overflow-hidden">
             {([
-              { key: "password", label: "Şifre ile" },
-              { key: "otp", label: "Kodla gir" },
+              { key: "password", label: t("login.tabPassword") },
+              { key: "otp", label: t("login.tabOtp") },
             ] as const).map(m => (
               <button
                 key={m.key}
@@ -137,7 +143,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="öğrenci@üniversite.edu.tr"
+                placeholder={t("login.emailPlaceholder")}
                 autoComplete="email"
                 disabled={mode === "otp" && codeSent}
                 className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all disabled:opacity-60"
@@ -148,7 +154,7 @@ const Login = () => {
               <PasswordInput
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Şifren"
+                placeholder={t("login.passwordPlaceholder")}
                 autoComplete="current-password"
                 className="h-14 text-base rounded-2xl bg-card border-border"
               />
@@ -163,7 +169,7 @@ const Login = () => {
                   maxLength={6}
                   value={code}
                   onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="6 haneli kod"
+                  placeholder={t("login.codePlaceholder")}
                   autoFocus
                   className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-[0.3em] font-bold"
                 />
@@ -184,7 +190,7 @@ const Login = () => {
                 onClick={() => { setCodeSent(false); setCode(""); }}
                 className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                Kodu tekrar gönder / e-postayı değiştir
+                {t("login.resend")}
               </button>
             )}
             {mode === "password" && (
@@ -193,16 +199,16 @@ const Login = () => {
                 onClick={() => switchMode("otp")}
                 className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                Şifreni mi unuttun? Kodla gir →
+                {t("login.forgot")}
               </button>
             )}
           </form>
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              Hesabın yok mu?{" "}
+              {t("login.noAccount")}{" "}
               <button onClick={() => navigate("/onboarding")} className="text-primary font-semibold hover:underline">
-                Kayıt ol →
+                {t("login.signupLink")}
               </button>
             </p>
           </div>

@@ -1,23 +1,26 @@
 import { Home, Heart, MessageCircle, User, Map, Building2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n";
+import type { TranslationKey } from "@/i18n/translations";
 
 // Not: /notifications kaldırıldı — Beğeniler ile birebir aynı veriyi
 // gösteriyordu. Yerine uygulama içinden erişilemeyen Bütçe Haritası girdi.
-const navItems = [
-  { icon: Home, label: "Keşfet", path: "/swipe" },
-  { icon: Heart, label: "Beğeniler", path: "/matches" },
+const navItems: { icon: typeof Home; labelKey: TranslationKey; path: string; adminOnly?: boolean }[] = [
+  { icon: Home, labelKey: "nav.discover", path: "/swipe" },
+  { icon: Heart, labelKey: "nav.likes", path: "/matches" },
   // Evler yalnızca yöneticiye görünür (adminOnly)
-  { icon: Building2, label: "Evler", path: "/listings", adminOnly: true },
-  { icon: Map, label: "Harita", path: "/explore" },
-  { icon: MessageCircle, label: "Mesajlar", path: "/messages" },
-  { icon: User, label: "Profil", path: "/profile" },
+  { icon: Building2, labelKey: "nav.houses", path: "/listings", adminOnly: true },
+  { icon: Map, labelKey: "nav.map", path: "/explore" },
+  { icon: MessageCircle, labelKey: "nav.messages", path: "/messages" },
+  { icon: User, labelKey: "nav.profile", path: "/profile" },
 ];
 
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { t } = useI18n();
   const items = navItems.filter(i => !i.adminOnly || user?.is_admin);
 
   return (
@@ -33,7 +36,7 @@ const BottomNav = () => {
               className={isActive ? "bottom-nav-item-active" : "bottom-nav-item"}
             >
               <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.8} />
-              <span className="text-[10px]">{item.label}</span>
+              <span className="text-[10px]">{t(item.labelKey)}</span>
               {isActive && (
                 <div className="w-1 h-1 rounded-full bg-primary" />
               )}

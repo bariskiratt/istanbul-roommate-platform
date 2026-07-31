@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { SlidersHorizontal, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
-import { mockListings, type Listing, type UserProfile } from "@/data/mockData";
+import { type Listing, type UserProfile } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
@@ -13,6 +13,7 @@ import AuthGate from "@/components/AuthGate";
 import FilterModal, { type ListingFilters } from "@/components/FilterModal";
 import FairPriceBadge from "@/components/FairPriceBadge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n";
 
 const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
   if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
@@ -52,7 +53,7 @@ const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
 // profil şeridi için nötr bir yer tutucu kullanılır.
 const anonUser: UserProfile = {
   id: "anon",
-  name: "İlan Sahibi",
+  name: "",
   gender: "belirtmek_istemiyorum",
   birthYear: 2000,
   university: "",
@@ -69,7 +70,7 @@ const anonUser: UserProfile = {
   photos: ["https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch"],
 };
 
-const toDeckListing = (a: ApiListing): Listing => ({
+const toDeckListing = (a: ApiListing, ownerFallback: string): Listing => ({
   id: `api-${a.id}`,
   userId: "anon",
   type: a.type,
@@ -87,13 +88,14 @@ const toDeckListing = (a: ApiListing): Listing => ({
   createdAt: a.created_at,
   user: {
     ...anonUser,
-    name: a.owner_name ?? anonUser.name,
+    name: a.owner_name ?? ownerFallback,
     university: a.owner_university ?? "",
   },
 });
 
 const SwipeScreen = () => {
   const { isLoggedIn, user: me } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [cards, setCards] = useState<Listing[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -102,24 +104,24 @@ const SwipeScreen = () => {
 
   // Deste: karar verilmemiş ilanlar (girişliyse kaydırdıkları ve kendi
   // ilanları sunucuda elenir; girişsizken tüm ilanlar gösterilir)
-  const { data: apiListings } = useQuery({
+  const { data: apiListings, isPending } = useQuery({
     queryKey: ["listings", "deck", isLoggedIn],
     queryFn: () => fetchListings({ unswiped: isLoggedIn }),
     staleTime: 60_000,
   });
 
-  // Deste gerçek ilanlardan oluşur (kendi ilanların hariç). Platformda hiç
-  // gerçek ilan yoksa arayüz ölü görünmesin diye örnek kartlar gösterilir —
-  // rozetli ve uyarılı; kararları sunucuya yazılmaz.
-  const { allListings, usingDemo } = useMemo(() => {
-    if (apiListings === undefined) return { allListings: [] as Listing[], usingDemo: false };
-    const real = apiListings
-      .filter(a => !me || a.owner_id !== me.id)
-      .map(toDeckListing);
-    return real.length > 0
-      ? { allListings: real, usingDemo: false }
-      : { allListings: mockListings, usingDemo: true };
-  }, [apiListings, me]);
+  // Deste yalnızca gerçek ilanlardan oluşur (kendi ilanların hariç).
+  // NOT: Deste boşaldığında örnek/mock ilana DÜŞÜLMEZ — mock kartların
+  // kararları sunucuya yazılamadığından her yenilemede geri gelir ve
+  // kullanıcı aynı kartları sonsuza dek kaydırır.
+  const ownerFallback = t("swipe.owner");
+  const allListings = useMemo(
+    () =>
+      (apiListings ?? [])
+        .filter(a => !me || a.owner_id !== me.id)
+        .map(a => toDeckListing(a, ownerFallback)),
+    [apiListings, me, ownerFallback],
+  );
 
   // Filtre state'te tutulur; liste yenilense de seçim kaybolmaz
   const [activeFilters, setActiveFilters] = useState<ListingFilters | null>(null);
@@ -145,9 +147,7 @@ const SwipeScreen = () => {
           queryClient.invalidateQueries({ queryKey: ["matches"] });
           queryClient.invalidateQueries({ queryKey: ["received-likes"] });
           if (res.matched) {
-            toast.success("Eşleştiniz! 🎉", {
-              description: "Eşleşmeni Beğeniler sayfasında görebilirsin.",
-            });
+            toast.success(t("swipe.matched"), { description: t("swipe.matchedDesc") });
           }
         })
         .catch(() => {}); // kart zaten kaydı; sessizce geç
@@ -157,7 +157,7 @@ const SwipeScreen = () => {
       setCards(prev => prev.slice(0, -1));
       setSwipeDirection(null);
     }, 300);
-  }, [isLoggedIn, cards]);
+  }, [isLoggedIn, cards, queryClient, t]);
 
   const currentCard = cards[cards.length - 1];
   const nextCard = cards[cards.length - 2];
@@ -178,21 +178,25 @@ const SwipeScreen = () => {
         }
       />
 
-      {usingDemo && (
-        <div className="mx-6 mt-2 rounded-xl bg-sand/40 border border-border px-4 py-2.5 text-xs text-muted-foreground text-center">
-          🧪 Henüz gerçek ilan yok — örnek ilanları görüyorsun. Bunlara verilen
-          kararlar kaydedilmez.
-        </div>
-      )}
-
       <div className="flex-1 relative flex items-center justify-center px-6 pt-2">
-        {cards.length === 0 ? (
+        {isPending ? (
+          <div className="w-full max-w-sm animate-pulse" style={{ height: '70vh' }}>
+            <div className="h-full rounded-2xl bg-muted" />
+          </div>
+        ) : cards.length === 0 ? (
           <div className="text-center space-y-4 animate-fade-in">
             <div className="w-24 h-24 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto">
               <Home className="w-12 h-12 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground">Şimdilik bu kadar!</h2>
-            <p className="text-muted-foreground text-sm max-w-[240px] mx-auto">Yeni ilanlar geldiğinde bildirim alacaksın.</p>
+            <h2 className="text-2xl font-bold text-foreground">{t("swipe.emptyTitle")}</h2>
+            <p className="text-muted-foreground text-sm max-w-[260px] mx-auto">
+              {t(activeFilters ? "swipe.emptyFiltered" : "swipe.emptyAll")}
+            </p>
+            {activeFilters && (
+              <Button variant="outline" onClick={() => setActiveFilters(null)}>
+                {t("swipe.clearFilters")}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="relative w-full max-w-sm" style={{ height: '70vh' }}>
@@ -243,6 +247,7 @@ const SwipeScreen = () => {
 /* Card content — photo-dominant with overlay */
 const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolean }) => {
   const isHouse = listing.type === "ev_ilani";
+  const { t, n } = useI18n();
 
   return (
     <div className="card-listing h-full flex flex-col">
@@ -252,29 +257,24 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
           <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
             isHouse ? "bg-lavender/80 text-foreground" : "bg-accent/80 text-accent-foreground"
           }`}>
-            {isHouse ? "🏠 Ev İlanı" : "👤 Kişisel İlan"}
+            {isHouse ? `🏠 ${t("common.houseListing")}` : `👤 ${t("common.personalListing")}`}
           </span>
         </div>
-        {!listing.id.startsWith("api-") && (
-          <div className="absolute top-4 right-4">
-            <span className="px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm bg-black/50 text-white">
-              🧪 Örnek ilan
-            </span>
-          </div>
-        )}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5 pt-16">
           <h3 className="font-bold text-xl text-white leading-tight">{listing.title}</h3>
           <div className="flex items-center gap-3 mt-2">
             <span className="flex items-center gap-1 text-white/90 text-sm"><MapPin className="w-4 h-4" />{listing.district}</span>
             <span className="font-bold text-white text-lg">
-              {isHouse ? `${listing.rent?.toLocaleString("tr-TR")} ₺` : `${listing.budgetMin?.toLocaleString("tr-TR")}–${listing.budgetMax?.toLocaleString("tr-TR")} ₺`}
+              {isHouse
+                ? `${n(listing.rent ?? 0)} ₺`
+                : `${n(listing.budgetMin ?? 0)}–${n(listing.budgetMax ?? 0)} ₺`}
             </span>
-            {isHouse && <span className="text-white/70 text-xs">/ay oda payı</span>}
+            {isHouse && <span className="text-white/70 text-xs">{t("common.roomShare")}</span>}
           </div>
           {/* Gerçek ilanlarda modelin adil fiyat kıyası */}
           {isHouse && listing.id.startsWith("api-") && (
             <div className="mt-2">
-              <FairPriceBadge listingId={Number(listing.id.slice(4))} />
+              <FairPriceBadge listingId={Number(listing.id.slice(4))} onPhoto />
             </div>
           )}
           {listing.user.university && (
@@ -315,6 +315,7 @@ interface SwipeCardDraggableProps {
 }
 
 const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direction }: SwipeCardDraggableProps) => {
+  const { t } = useI18n();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
@@ -340,10 +341,10 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
       transition={{ duration: 0.3 }}
     >
       <motion.div className="absolute top-8 right-6 z-10 bg-accent/90 backdrop-blur-sm text-accent-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[-15deg]" style={{ opacity: likeOpacity }}>
-        BEĞENDİM ✓
+        {t("swipe.like")}
       </motion.div>
       <motion.div className="absolute top-8 left-6 z-10 bg-destructive/90 backdrop-blur-sm text-destructive-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[15deg]" style={{ opacity: nopeOpacity }}>
-        GEÇ ✗
+        {t("swipe.pass")}
       </motion.div>
 
       <div className="h-full" onClick={onToggleExpand}>

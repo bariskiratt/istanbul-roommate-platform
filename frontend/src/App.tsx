@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { I18nProvider } from "@/i18n";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import SwipeScreen from "./pages/SwipeScreen";
@@ -27,6 +28,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="dark">
+  <I18nProvider>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -56,6 +58,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </I18nProvider>
   </ThemeProvider>
 );
 
