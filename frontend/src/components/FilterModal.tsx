@@ -2,6 +2,8 @@ import { useState } from "react";
 import { X, Minus, Plus, ShowerHead, Zap, Dog, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useI18n } from "@/i18n";
+import type { TranslationKey } from "@/i18n/translations";
 
 export interface ListingFilters {
   listingType: string;
@@ -33,18 +35,50 @@ interface FilterModalProps {
 
 const priceDistribution = [3,5,8,12,18,25,30,35,40,38,32,28,24,20,16,14,12,10,8,6,5,4,3,2,2,1,1,1,1,1];
 
-const lifestyleChips = ["Sigara İçmez","Hayvan Dostu","Alkol Kullanmaz","Erken Kalkar","Gece Kuşu","Temiz ve Düzenli","Sosyal","Sessiz"];
-const featureChips = ["Eşyalı","Asansörlü","Otoparkı Var","İnternet Dahil","Isıtma Dahil","Balkonlu","Doğalgaz"];
-const genderOptions = ["Hepsi","Kadın","Erkek"];
+// NOT: `value` alanları filtre kimliğidir ve SwipeScreen'deki eşleştirme
+// ile birebir aynı kalmalıdır; yalnızca `key` (ekranda görünen etiket)
+// dile göre değişir.
+type Chip = { value: string; key: TranslationKey };
 
-const recommendedFilters = [
-  { icon: ShowerHead, label: "Banyo sayısı" },
-  { icon: Zap, label: "Hızlı Eşleşme" },
-  { icon: Dog, label: "Hayvan Dostu" },
-  { icon: Wifi, label: "İnternet Dahil" },
+const lifestyleChips: Chip[] = [
+  { value: "Sigara İçmez", key: "filter.noSmoke" },
+  { value: "Hayvan Dostu", key: "filter.petFriendly" },
+  { value: "Alkol Kullanmaz", key: "filter.noAlcohol" },
+  { value: "Erken Kalkar", key: "filter.earlyBird" },
+  { value: "Gece Kuşu", key: "filter.nightOwl" },
+  { value: "Temiz ve Düzenli", key: "filter.tidy" },
+  { value: "Sosyal", key: "filter.social" },
+  { value: "Sessiz", key: "filter.quiet" },
+];
+const featureChips: Chip[] = [
+  { value: "Eşyalı", key: "filter.furnished" },
+  { value: "Asansörlü", key: "filter.elevator" },
+  { value: "Otoparkı Var", key: "filter.parking" },
+  { value: "İnternet Dahil", key: "filter.internet" },
+  { value: "Isıtma Dahil", key: "filter.heating" },
+  { value: "Balkonlu", key: "filter.balcony" },
+  { value: "Doğalgaz", key: "filter.gas" },
+];
+const genderOptions: Chip[] = [
+  { value: "Hepsi", key: "filter.all" },
+  { value: "Kadın", key: "filter.female" },
+  { value: "Erkek", key: "filter.male" },
+];
+const listingTypeOptions: Chip[] = [
+  { value: "Hepsi", key: "filter.all" },
+  { value: "Ev İlanı", key: "common.houseListing" },
+  { value: "Kişisel İlan", key: "common.personalListing" },
+];
+
+const recommendedFilters: { icon: typeof ShowerHead; value: string; key: TranslationKey }[] = [
+  { icon: ShowerHead, value: "Banyo sayısı", key: "filter.bathroomCount" },
+  { icon: Zap, value: "Hızlı Eşleşme", key: "filter.fastMatch" },
+  { icon: Dog, value: "Hayvan Dostu", key: "filter.petFriendly" },
+  { icon: Wifi, value: "İnternet Dahil", key: "filter.internet" },
 ];
 
 const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
+  const { t, n } = useI18n();
   const [listingType, setListingType] = useState("Hepsi");
   const [priceRange, setPriceRange] = useState([1000, 30000]);
   const [rooms, setRooms] = useState(0);
@@ -100,7 +134,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div />
-              <h2 className="text-base font-bold text-foreground">Filtreler</h2>
+              <h2 className="text-base font-bold text-foreground">{t("filter.title")}</h2>
               <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80">
                 <X className="w-4 h-4" />
               </button>
@@ -111,20 +145,20 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Recommended */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">Önerilen Filtreler</h3>
+                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.recommended")}</h3>
                 <div className="grid grid-cols-4 gap-3">
                   {recommendedFilters.map(f => {
-                    const active = selectedRecommended.includes(f.label);
+                    const active = selectedRecommended.includes(f.value);
                     return (
                       <button
-                        key={f.label}
-                        onClick={() => toggleChip(selectedRecommended, setSelectedRecommended, f.label)}
+                        key={f.value}
+                        onClick={() => toggleChip(selectedRecommended, setSelectedRecommended, f.value)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
                           active ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
                         }`}
                       >
                         <f.icon className={`w-6 h-6 ${active ? "text-primary" : "text-muted-foreground"}`} />
-                        <span className="text-[11px] font-medium text-foreground text-center leading-tight">{f.label}</span>
+                        <span className="text-[11px] font-medium text-foreground text-center leading-tight">{t(f.key)}</span>
                       </button>
                     );
                   })}
@@ -135,19 +169,19 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Listing type */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">İlan Tipi</h3>
+                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.listingType")}</h3>
                 <div className="flex rounded-xl border border-border overflow-hidden">
-                  {["Hepsi","Ev İlanı","Kişisel İlan"].map(t => (
+                  {listingTypeOptions.map(opt => (
                     <button
-                      key={t}
-                      onClick={() => setListingType(t)}
+                      key={opt.value}
+                      onClick={() => setListingType(opt.value)}
                       className={`flex-1 py-3 text-sm font-medium transition-all ${
-                        listingType === t
+                        listingType === opt.value
                           ? "bg-primary text-primary-foreground"
                           : "bg-card text-foreground hover:bg-muted"
                       }`}
                     >
-                      {t}
+                      {t(opt.key)}
                     </button>
                   ))}
                 </div>
@@ -157,8 +191,8 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Price range */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-1">Bütçe Aralığı</h3>
-                <p className="text-xs text-muted-foreground mb-4">Aylık kira, tüm masraflar dahil</p>
+                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.budget")}</h3>
+                <p className="text-xs text-muted-foreground mb-4">{t("filter.budgetSub")}</p>
                 {/* Histogram */}
                 <div className="flex items-end gap-[2px] h-16 mb-2">
                   {priceDistribution.map((v, i) => {
@@ -193,12 +227,12 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                 </div>
                 <div className="flex justify-between">
                   <div className="border border-border rounded-xl px-4 py-2.5">
-                    <div className="text-[10px] text-muted-foreground">Minimum</div>
-                    <div className="text-sm font-semibold text-foreground">{priceRange[0].toLocaleString("tr-TR")} ₺</div>
+                    <div className="text-[10px] text-muted-foreground">{t("filter.min")}</div>
+                    <div className="text-sm font-semibold text-foreground">{n(priceRange[0])} ₺</div>
                   </div>
                   <div className="border border-border rounded-xl px-4 py-2.5 text-right">
-                    <div className="text-[10px] text-muted-foreground">Maximum</div>
-                    <div className="text-sm font-semibold text-foreground">{priceRange[1].toLocaleString("tr-TR")} ₺</div>
+                    <div className="text-[10px] text-muted-foreground">{t("filter.max")}</div>
+                    <div className="text-sm font-semibold text-foreground">{n(priceRange[1])} ₺</div>
                   </div>
                 </div>
               </div>
@@ -207,11 +241,11 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Rooms and beds */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-4">Oda ve Yaşam</h3>
+                <h3 className="text-sm font-bold text-foreground mb-4">{t("filter.roomsSection")}</h3>
                 {[
-                  { label: "Oda Sayısı", value: rooms, set: setRooms },
-                  { label: "Kişi Sayısı", value: people, set: setPeople },
-                  { label: "Banyo", value: bathrooms, set: setBathrooms },
+                  { label: t("filter.rooms"), value: rooms, set: setRooms },
+                  { label: t("filter.people"), value: people, set: setPeople },
+                  { label: t("filter.bathrooms"), value: bathrooms, set: setBathrooms },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                     <span className="text-sm text-foreground">{row.label}</span>
@@ -224,7 +258,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                         <Minus className="w-3.5 h-3.5" />
                       </button>
                       <span className="text-sm font-medium text-foreground w-8 text-center">
-                        {row.value === 0 ? "Any" : row.value}
+                        {row.value === 0 ? t("filter.any") : row.value}
                       </span>
                       <button
                         onClick={() => row.set(row.value + 1)}
@@ -241,19 +275,19 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Lifestyle */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">Yaşam Tarzı Uyumu</h3>
+                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.lifestyle")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {lifestyleChips.map(c => {
-                    const active = selectedLifestyle.includes(c);
+                    const active = selectedLifestyle.includes(c.value);
                     return (
                       <button
-                        key={c}
-                        onClick={() => toggleChip(selectedLifestyle, setSelectedLifestyle, c)}
+                        key={c.value}
+                        onClick={() => toggleChip(selectedLifestyle, setSelectedLifestyle, c.value)}
                         className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
                           active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
                         }`}
                       >
-                        {c}
+                        {t(c.key)}
                       </button>
                     );
                   })}
@@ -264,19 +298,19 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Features */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">Ev Özellikleri</h3>
+                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.features")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {featureChips.map(c => {
-                    const active = selectedFeatures.includes(c);
+                    const active = selectedFeatures.includes(c.value);
                     return (
                       <button
-                        key={c}
-                        onClick={() => toggleChip(selectedFeatures, setSelectedFeatures, c)}
+                        key={c.value}
+                        onClick={() => toggleChip(selectedFeatures, setSelectedFeatures, c.value)}
                         className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
                           active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
                         }`}
                       >
-                        {c}
+                        {t(c.key)}
                       </button>
                     );
                   })}
@@ -287,17 +321,17 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Gender */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">Cinsiyet Tercihi</h3>
+                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.gender")}</h3>
                 <div className="flex gap-2">
                   {genderOptions.map(g => (
                     <button
-                      key={g}
-                      onClick={() => setGender(g)}
+                      key={g.value}
+                      onClick={() => setGender(g.value)}
                       className={`px-5 py-2 rounded-full text-sm font-medium border transition-all ${
-                        gender === g ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
+                        gender === g.value ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
                       }`}
                     >
-                      {g}
+                      {t(g.key)}
                     </button>
                   ))}
                 </div>
@@ -307,13 +341,13 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-border">
               <button onClick={clearAll} className="text-sm font-medium text-foreground underline underline-offset-2">
-                Temizle
+                {t("filter.clear")}
               </button>
               <Button
                 onClick={applyFilters}
                 className="rounded-full bg-foreground text-background hover:bg-foreground/90 px-6 h-11 text-sm font-bold"
               >
-                İlanları göster
+                {t("filter.show")}
               </Button>
             </div>
           </motion.div>
