@@ -80,12 +80,12 @@ const toDeckListing = (a: ApiListing): Listing => ({
   photos: a.photos.length > 0 ? a.photos : anonUser.photos,
   isActive: a.is_active,
   createdAt: a.created_at,
-  user: anonUser,
+  user: a.owner_name ? { ...anonUser, name: a.owner_name } : anonUser,
 });
 
 const SwipeScreen = () => {
-  const { isLoggedIn } = useAuth();
-  const [cards, setCards] = useState<Listing[]>([...mockListings].reverse());
+  const { isLoggedIn, user: me } = useAuth();
+  const [cards, setCards] = useState<Listing[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [superMatchLeft, setSuperMatchLeft] = useState(1);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
@@ -97,11 +97,18 @@ const SwipeScreen = () => {
     staleTime: 60_000,
   });
 
-  // Gerçek ilanlar destenin en üstüne; mock profiller demoyu dolu tutmak için arkada.
-  const allListings = useMemo(
-    () => [...(apiListings ?? []).map(toDeckListing), ...mockListings],
-    [apiListings],
-  );
+  // Deste gerçek ilanlardan oluşur (kendi ilanların hariç). Platformda hiç
+  // gerçek ilan yoksa arayüz ölü görünmesin diye örnek kartlar gösterilir —
+  // rozetli ve uyarılı; kararları sunucuya yazılmaz.
+  const { allListings, usingDemo } = useMemo(() => {
+    if (apiListings === undefined) return { allListings: [] as Listing[], usingDemo: false };
+    const real = apiListings
+      .filter(a => !me || a.owner_id !== me.id)
+      .map(toDeckListing);
+    return real.length > 0
+      ? { allListings: real, usingDemo: false }
+      : { allListings: mockListings, usingDemo: true };
+  }, [apiListings, me]);
 
   useEffect(() => {
     setCards([...allListings].reverse());
@@ -158,6 +165,13 @@ const SwipeScreen = () => {
           </button>
         }
       />
+
+      {usingDemo && (
+        <div className="mx-6 mt-2 rounded-xl bg-sand/40 border border-border px-4 py-2.5 text-xs text-muted-foreground text-center">
+          🧪 Henüz gerçek ilan yok — örnek ilanları görüyorsun. Bunlara verilen
+          kararlar kaydedilmez.
+        </div>
+      )}
 
       <div className="flex-1 relative flex items-center justify-center px-6 pt-2">
         {cards.length === 0 ? (
@@ -239,6 +253,13 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
             {isHouse ? "🏠 Ev İlanı" : "👤 Kişisel İlan"}
           </span>
         </div>
+        {!listing.id.startsWith("api-") && (
+          <div className="absolute top-4 right-4">
+            <span className="px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm bg-black/50 text-white">
+              🧪 Örnek ilan
+            </span>
+          </div>
+        )}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5 pt-16">
           <h3 className="font-bold text-xl text-white leading-tight">{listing.title}</h3>
           <div className="flex items-center gap-3 mt-2">
