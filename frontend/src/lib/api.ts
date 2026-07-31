@@ -216,7 +216,7 @@ export interface UserUpdate {
   name?: string;
   gender?: string;
   birth_year?: number;
-  university?: string;
+  // university yok: e-posta alan adından otomatik atanır, elle değiştirilemez
   department?: string;
   year?: number;
   budget_min?: number;

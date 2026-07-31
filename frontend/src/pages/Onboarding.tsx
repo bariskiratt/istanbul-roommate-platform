@@ -97,7 +97,7 @@ const Onboarding = () => {
       case 0: return email.includes("@") && email.includes(".edu.tr") && passwordValid && passwordsMatch;
       case 1: return otp.every(d => d !== "");
       case 2: return name && gender && birthYear;
-      case 3: return university && department && year;
+      case 3: return department && year;  // üniversite otomatik; zorunlu değil
       case 4: return district.length > 0;
       case 5: return true;
       case 6: return photos.length >= 1;
@@ -141,7 +141,6 @@ const Onboarding = () => {
           name,
           gender,
           birth_year: Number(birthYear),
-          university,
           department,
           year: Number(year),
           budget_min: budget[0],
@@ -374,12 +373,20 @@ const Onboarding = () => {
           {/* Step 3: University */}
           {currentStep === 3 && (
             <div className="space-y-5">
-              <Input
-                placeholder="Üniversiteni yaz... (ör. İTÜ, Boğaziçi)"
-                value={university}
-                onChange={e => setUniversity(e.target.value)}
-                className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
-              />
+              {/* Üniversite e-posta alan adından otomatik atanır; elle girilemez */}
+              <div className="rounded-2xl border-2 border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground">
+                  Üniversite — e-posta adresinden doğrulandı
+                </p>
+                <p className="font-semibold text-foreground mt-1">
+                  {university || "E-posta alan adından belirlenemedi"}
+                </p>
+                {!university && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Okulunun alan adı sistemimize eklendiğinde profiline otomatik yansır.
+                  </p>
+                )}
+              </div>
               <Input
                 placeholder="Bölümün? (ör. Bilgisayar Müh., Psikoloji)"
                 value={department}

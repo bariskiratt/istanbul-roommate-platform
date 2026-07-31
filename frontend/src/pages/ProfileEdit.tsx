@@ -17,7 +17,6 @@ const ProfileEdit = () => {
   const { user: me, setUser } = useAuth();
 
   const [name, setName] = useState(me?.name ?? "");
-  const [university, setUniversity] = useState(me?.university ?? "");
   const [department, setDepartment] = useState(me?.department ?? "");
   const [year, setYear] = useState(me?.year ?? 1);
   const [budget, setBudget] = useState<number[]>([
@@ -50,7 +49,6 @@ const ProfileEdit = () => {
     try {
       const updated = await updateMe({
         name,
-        university,
         department,
         year,
         budget_min: budget[0],
@@ -120,7 +118,13 @@ const ProfileEdit = () => {
         <section className="space-y-3">
           <h2 className="text-sm font-bold text-foreground">Temel Bilgiler</h2>
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="Adın" className="h-12 rounded-xl" />
-          <Input value={university} onChange={e => setUniversity(e.target.value)} placeholder="Üniversite" className="h-12 rounded-xl" />
+          {/* Üniversite e-postadan otomatik atanır; elle değiştirilemez */}
+          <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+            <p className="text-[10px] text-muted-foreground">Üniversite — e-postandan doğrulandı</p>
+            <p className="text-sm font-medium text-foreground">
+              {me.university ?? "E-posta alan adından belirlenemedi"}
+            </p>
+          </div>
           <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Bölüm" className="h-12 rounded-xl" />
           <div className="flex gap-2">
             {[1, 2, 3, 4].map(y => (

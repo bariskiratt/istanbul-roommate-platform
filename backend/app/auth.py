@@ -157,12 +157,16 @@ class UserOut(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    """PATCH /me — yalnızca gönderilen alanlar güncellenir."""
+    """PATCH /me — yalnızca gönderilen alanlar güncellenir.
+
+    `university` bilerek YOK: üniversite e-posta alan adından otomatik atanır
+    ve elle değiştirilemez (doğrulanmış kimlik alanı). Gönderilirse Pydantic
+    tarafından sessizce yok sayılır.
+    """
 
     name: str | None = Field(None, max_length=80)
     gender: str | None = Field(None, max_length=30)
     birth_year: int | None = Field(None, ge=1900, le=2100)
-    university: str | None = Field(None, max_length=80)
     department: str | None = Field(None, max_length=80)
     year: int | None = Field(None, ge=1, le=10)
     budget_min: int | None = Field(None, gt=0, le=10_000_000)

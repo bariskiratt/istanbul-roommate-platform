@@ -93,10 +93,13 @@ def test_profile_update(client):
     res = client.patch(
         "/api/auth/me",
         headers={"Authorization": f"Bearer {token}"},
-        json={"name": "Ali", "university": "İTÜ", "budget_min": 5000, "budget_max": 9000},
+        json={"name": "Ali", "university": "Sahte Üniv", "budget_min": 5000, "budget_max": 9000},
     )
     assert res.status_code == 200, res.text
     assert res.json()["name"] == "Ali"
+    # Üniversite elle değiştirilemez: gönderilen değer yok sayılır
+    # (uni.edu.tr eşlemede yok -> kayıtta None atanmıştı, öyle kalmalı)
+    assert res.json()["university"] is None
 
     res = client.patch(
         "/api/auth/me",
