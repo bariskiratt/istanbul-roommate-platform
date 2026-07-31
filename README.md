@@ -7,12 +7,6 @@ advisor**, a **budget heatmap** of 968 neighborhoods, and rail-network-based
 
 **Live demo:** https://istanbul-roommate-platform.vercel.app
 **API:** https://roommatch-api-4ack.onrender.com ([docs](https://roommatch-api-4ack.onrender.com/docs))
-
-> **Attribution:** the UI (`frontend/`) originates from
-> [mirzemirsat/roommate-finder-plus](https://github.com/mirzemirsat/roommate-finder-plus).
-> This monorepo integrates it with a Python/FastAPI model backend and a full
-> persistence layer.
-
 ---
 
 ## ✨ Features
