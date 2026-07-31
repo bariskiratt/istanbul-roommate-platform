@@ -15,7 +15,9 @@ COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY . .
-RUN python -m scripts.train_model
+# --fast: CV karşılaştırması yerelde/CI'da koşulur; imaj derlemesinde yalnız
+# servis edilen modeller eğitilir (zayıf derleyicide ~40 dk -> ~3 dk)
+RUN python -m scripts.train_model --fast
 
 # ---- runtime ----
 FROM python:3.12-slim

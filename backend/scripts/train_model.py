@@ -139,7 +139,24 @@ def baseline_metrics(X, y, df):
     return metrics(y.values, oof)
 
 
-def main():
+def single_fold_medape(X, y) -> float:
+    """Hızlı mod için tek katlı (%80/20) medyan sapma ölçümü.
+
+    5-kat CV'nin onda biri maliyetle kabaca aynı sayıyı verir; amaç API'de
+    kullanıcıya gösterilen 'medyan sapma' alanını dürüstçe doldurmak.
+    """
+    kf = KFold(n_splits=5, shuffle=True, random_state=SEED)
+    train_idx, test_idx = next(iter(kf.split(X)))
+    model = make_lgbm(objective="quantile", alpha=0.5)
+    model.fit(X.iloc[train_idx], y.iloc[train_idx])
+    pred = model.predict(X.iloc[test_idx])
+    return float(metrics(y.iloc[test_idx].values, pred)["MedAPE%"])
+
+
+def main(fast: bool = False):
+    """fast=True (Docker derlemesi): 4 modelli CV yarışması atlanır; yalnız
+    servis edilen çeyreklik modeller + tek katlı doğruluk ölçümü eğitilir.
+    Zayıf derleme makinelerinde süreyi ~40 dk'dan birkaç dakikaya indirir."""
     print("🔄 Veri hazırlanıyor...")
     df = load_clean_data()
     X = build_features(df)
@@ -147,29 +164,37 @@ def main():
     print(f"   {len(df)} ilan, {X['district'].nunique()} ilçe, "
           f"{X['neighborhood'].nunique()} mahalle")
 
-    print(f"\n📊 {N_SPLITS}-kat çapraz doğrulama (hatalar TL cinsinden):\n")
-    results = {"Baseline (mahalle medyanı)": baseline_metrics(X, y, df)}
-    for name, factory in [
-        ("Ridge", make_ridge),
-        ("XGBoost", make_xgb),
-        ("LightGBM", make_lgbm),
-        # Serviste bu model kullanılıyor (bandın orta çeyreği), bu yüzden
-        # raporlanan hata gerçekten kullanıcıya giden tahminin hatası olsun.
-        ("LightGBM q50 (servis edilen)", lambda: make_lgbm("quantile", 0.5)),
-    ]:
-        results[name] = cross_validate(name, factory, X, y, df)
+    if fast:
+        print("\n⚡ Hızlı mod: CV karşılaştırması atlanıyor; servis edilen "
+              "modelin hatası tek katla ölçülüyor.")
+        table = None
+        served_error = single_fold_medape(X, y)
+        baseline_error = float("nan")
+        print(f"   Servis edilen LightGBM q50 medyan sapma: %{served_error:.1f}")
+    else:
+        print(f"\n📊 {N_SPLITS}-kat çapraz doğrulama (hatalar TL cinsinden):\n")
+        results = {"Baseline (mahalle medyanı)": baseline_metrics(X, y, df)}
+        for name, factory in [
+            ("Ridge", make_ridge),
+            ("XGBoost", make_xgb),
+            ("LightGBM", make_lgbm),
+            # Serviste bu model kullanılıyor (bandın orta çeyreği), bu yüzden
+            # raporlanan hata gerçekten kullanıcıya giden tahminin hatası olsun.
+            ("LightGBM q50 (servis edilen)", lambda: make_lgbm("quantile", 0.5)),
+        ]:
+            results[name] = cross_validate(name, factory, X, y, df)
 
-    table = pd.DataFrame(results).T
-    print(table.to_string(float_format=lambda v: f"{v:,.2f}"))
+        table = pd.DataFrame(results).T
+        print(table.to_string(float_format=lambda v: f"{v:,.2f}"))
 
-    baseline_error = table.loc["Baseline (mahalle medyanı)", "MedAPE%"]
-    served_error = table.loc["LightGBM q50 (servis edilen)", "MedAPE%"]
-    best = table["MedAPE%"].idxmin()
-    print(f"\n🏆 En düşük hata: {best} (%{table.loc[best, 'MedAPE%']:.1f})")
-    print(f"📦 Servis edilen model: LightGBM q50 (%{served_error:.1f}), "
-          f"referanstan {baseline_error - served_error:.1f} puan iyi.")
-    print("   Not: Nokta doğruluğunda modeller birbirine çok yakın; LightGBM'i "
-          "seçme sebebi çeyreklik regresyonuyla bir 'aralık' verebilmesi.")
+        baseline_error = table.loc["Baseline (mahalle medyanı)", "MedAPE%"]
+        served_error = table.loc["LightGBM q50 (servis edilen)", "MedAPE%"]
+        best = table["MedAPE%"].idxmin()
+        print(f"\n🏆 En düşük hata: {best} (%{table.loc[best, 'MedAPE%']:.1f})")
+        print(f"📦 Servis edilen model: LightGBM q50 (%{served_error:.1f}), "
+              f"referanstan {baseline_error - served_error:.1f} puan iyi.")
+        print("   Not: Nokta doğruluğunda modeller birbirine çok yakın; LightGBM'i "
+              "seçme sebebi çeyreklik regresyonuyla bir 'aralık' verebilmesi.")
 
     # Nihai modeller tüm veriyle eğitilir. Nokta tahmini yerine bir bant
     # sunuyoruz: kullanıcıya "adil aralık" göstermek tek sayıdan dürüst.
@@ -184,7 +209,7 @@ def main():
     artifact = {
         "models": models,
         "categories": extract_categories(X),
-        "cv_results": table.to_dict(),
+        "cv_results": table.to_dict() if table is not None else None,
         "served_model": "LightGBM q50",
         "served_medape": float(served_error),
         "baseline_medape": float(baseline_error),
@@ -207,4 +232,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(fast="--fast" in sys.argv)
