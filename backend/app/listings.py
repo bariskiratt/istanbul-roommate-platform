@@ -12,8 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import joinedload
+
 from app import models
-from app.auth import get_optional_user
+from app.auth import get_current_user, get_optional_user
 from app.db import get_db
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
@@ -51,10 +53,23 @@ class ListingIn(BaseModel):
         return self
 
 
-class ListingOut(ListingIn):
+# NOT: ListingIn'den türetilmez — türetilirse tip doğrulayıcısı yanıt
+# şemasında da koşar ve bozuk bir satır GET'leri 500'e düşürür.
+class ListingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    type: ListingType
+    title: str
+    description: str
+    district: str
+    photos: list[str]
+    rent: int | None
+    room_count: str | None
+    smoking_allowed: bool | None
+    pets_allowed: bool | None
+    budget_min: int | None
+    budget_max: int | None
     is_active: bool
     created_at: datetime
     owner_id: int | None = None
@@ -66,11 +81,10 @@ class ListingOut(ListingIn):
 def create_listing(
     payload: ListingIn,
     db: Session = Depends(get_db),
-    user: models.User | None = Depends(get_optional_user),
+    user: models.User = Depends(get_current_user),
 ):
-    row = models.Listing(
-        **payload.model_dump(), owner_id=user.id if user else None
-    )
+    """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı."""
+    row = models.Listing(**payload.model_dump(), owner_id=user.id)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -88,6 +102,7 @@ def list_listings(
     """Aktif ilanlar, en yeni önce."""
     stmt = (
         select(models.Listing)
+        .options(joinedload(models.Listing.owner))  # owner_name için N+1 önlemi
         .where(models.Listing.is_active)
         .order_by(models.Listing.created_at.desc(), models.Listing.id.desc())
     )
@@ -139,7 +154,20 @@ def update_listing(
     if row.owner_id is None or user is None or user.id != row.owner_id:
         raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
 
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    # null gönderilen alanlar "değiştirme" sayılır — zorunlu alanların
+    # PATCH ile boşaltılıp kaydın bozulmasını engeller.
+    updates = {
+        k: v
+        for k, v in payload.model_dump(exclude_unset=True).items()
+        if v is not None
+    }
+    eff_min = updates.get("budget_min", row.budget_min)
+    eff_max = updates.get("budget_max", row.budget_max)
+    if eff_min is not None and eff_max is not None and eff_min > eff_max:
+        raise HTTPException(
+            status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
+        )
+    for key, value in updates.items():
         setattr(row, key, value)
     db.commit()
     db.refresh(row)
@@ -150,17 +178,17 @@ def update_listing(
 def deactivate_listing(
     listing_id: int,
     db: Session = Depends(get_db),
-    user: models.User | None = Depends(get_optional_user),
+    user: models.User = Depends(get_current_user),
 ):
     """Kalıcı silme yerine pasife çeker (geri alınabilir).
 
-    Sahipli ilanı yalnızca sahibi kapatabilir; auth öncesi anonim ilanlar
-    (owner_id=None) serbesttir.
+    Yalnızca ilan sahibi kapatabilir; sahipsiz (eski anonim) kayıtlar API'den
+    silinemez, gerekirse veritabanından temizlenir.
     """
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active:
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
-    if row.owner_id is not None and (user is None or user.id != row.owner_id):
+    if row.owner_id is None or user.id != row.owner_id:
         raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
     row.is_active = False
     db.commit()

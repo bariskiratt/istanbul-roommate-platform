@@ -8,7 +8,7 @@ temizlik ve özellik üretimi tek yerde tutuluyor.
 import numpy as np
 import pandas as pd
 
-from app.config import LISTINGS_CSV, MODEL_PATH  # noqa: F401  (MODEL_PATH yeniden ihraç)
+from app.config import LISTINGS_CSV
 
 # Aylık kira bandı. Ham veride satılık ilanlar (23.000.000 TL'ye kadar) ve
 # bin cinsinden girilmiş değerler (40, 60) karışık duruyor.

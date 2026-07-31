@@ -11,7 +11,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models
 from app.auth import get_current_user
@@ -129,8 +129,11 @@ def swipe(
         )
     )
     if existing is not None:
-        existing.direction = payload.direction
-        existing.responded = False
+        # Yalnızca karar değiştiyse günceller; aynı ilana tekrar tekrar like
+        # atarak sahibin Beğeniler kuyruğunu şişirmek mümkün olmasın.
+        if existing.direction != payload.direction:
+            existing.direction = payload.direction
+            existing.responded = False
     else:
         db.add(
             models.Swipe(
@@ -161,6 +164,10 @@ def received_likes(
     """İlanlarımı beğenen, henüz cevaplamadığım kullanıcılar (en yeni önce)."""
     rows = db.scalars(
         select(models.Swipe)
+        .options(  # kart başına ekstra sorgu atılmasın (N+1)
+            selectinload(models.Swipe.swiper),
+            selectinload(models.Swipe.listing),
+        )
         .join(models.Listing, models.Swipe.listing_id == models.Listing.id)
         .where(
             models.Listing.owner_id == user.id,
@@ -212,6 +219,11 @@ def my_matches(
 ):
     rows = db.scalars(
         select(models.Match)
+        .options(
+            selectinload(models.Match.user_a),
+            selectinload(models.Match.user_b),
+            selectinload(models.Match.listing),
+        )
         .where(
             or_(
                 models.Match.user_a_id == user.id,

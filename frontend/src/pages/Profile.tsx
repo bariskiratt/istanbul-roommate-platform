@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Trash2, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { currentUser, mockMatches } from "@/data/mockData";
+import { currentUser } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchListings, deleteListing } from "@/lib/api";
+import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
+import { parseUtc } from "@/lib/date";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch-me";
 
@@ -44,6 +45,12 @@ const Profile = () => {
     enabled: isLoggedIn && me !== null,
   });
 
+  const { data: myMatches = [] } = useQuery({
+    queryKey: ["matches"],
+    queryFn: fetchMatches,
+    enabled: isLoggedIn && me !== null,
+  });
+
   const queryClient = useQueryClient();
   const removeListing = useMutation({
     mutationFn: deleteListing,
@@ -58,10 +65,10 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
   const [bioExpanded, setBioExpanded] = useState(false);
 
-  const matchCount = mockMatches.length;
+  const matchCount = myMatches.length;
   const listingCount = myListings.length;
   const memberSince = me
-    ? new Date(me.created_at).toLocaleDateString("tr-TR", { month: "short", year: "numeric" })
+    ? parseUtc(me.created_at).toLocaleDateString("tr-TR", { month: "short", year: "numeric" })
     : "Şub 2025";
 
   return (
@@ -69,14 +76,9 @@ const Profile = () => {
       <AppHeader
         title="Profil"
         rightAction={
-          <div className="flex items-center gap-2">
-            <button className="text-xs font-medium text-primary flex items-center gap-1 px-3 py-2 rounded-full hover:bg-primary/5 transition-colors">
-              Düzenle <Edit className="w-3 h-3" />
-            </button>
-            <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
+          <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <Settings className="w-5 h-5" />
+          </button>
         }
       />
 
@@ -93,9 +95,6 @@ const Profile = () => {
                 alt={user.name}
                 className="w-20 h-20 rounded-full object-cover object-top border-4 border-card shadow-lg"
               />
-              <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md active:scale-95 transition-transform">
-                <Edit className="w-3 h-3" />
-              </button>
             </div>
             {/* Info right of avatar */}
             <div className="flex-1 pt-2">
@@ -186,19 +185,23 @@ const Profile = () => {
       {/* Tab content */}
       <div className="px-6 pt-4">
         {activeTab === "photos" && (
-          <div className="grid grid-cols-3 gap-2">
-            {[user.photos[0], user.photos[0], user.photos[0], user.photos[0], user.photos[0], user.photos[0]].map((photo, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.05 }}
-                className="aspect-square rounded-lg overflow-hidden"
-              >
-                <img src={photo} alt="" className="w-full h-full object-cover object-top" />
-              </motion.div>
-            ))}
-          </div>
+          user.photos.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {user.photos.map((photo, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="aspect-square rounded-lg overflow-hidden"
+                >
+                  <img src={photo} alt="" className="w-full h-full object-cover object-top" />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground py-8">Henüz fotoğraf yok</p>
+          )
         )}
 
         {activeTab === "listings" && (
@@ -264,7 +267,7 @@ const Profile = () => {
             className="space-y-0"
           >
             {[
-              { icon: "✉️", label: "E-posta", value: me?.email ?? "@ali_yilmaz" },
+              { icon: "✉️", label: "E-posta", value: me?.email ?? "—" },
               { icon: "🎓", label: "Üniversite ve Bölüm", value: `${user.university} · ${user.department}` },
               { icon: "📍", label: "Tercih edilen semt", value: user.preferredDistrict },
               { icon: "💰", label: "Bütçe aralığı", value: `${user.budgetMin.toLocaleString("tr-TR")} — ${user.budgetMax.toLocaleString("tr-TR")} ₺/ay` },

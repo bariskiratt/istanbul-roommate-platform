@@ -32,7 +32,10 @@ def rent_index() -> tuple[float, str]:
     """
     override = os.getenv("RENT_INDEX_FACTOR")
     if override:
-        return float(override), "manuel"
+        try:
+            return float(override), "manuel"
+        except ValueError:
+            pass  # bozuk değer /api/estimate'i düşürmesin; tabloya dön
 
     factor = 1.0
     last = DATA_PERIOD

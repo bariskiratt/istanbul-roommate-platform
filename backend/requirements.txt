@@ -10,7 +10,6 @@ python-multipart>=0.0.9  # fotoğraf yükleme (multipart form)
 # Testler
 pytest>=8.0
 httpx>=0.27        # FastAPI TestClient
-json-repair>=0.25
 requests>=2.31   # scripts/fetch_transit.py (kendi kök sertifikalarını getirir)
 
 # Adil fiyat modeli (train_model.py)

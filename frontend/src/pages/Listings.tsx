@@ -7,7 +7,9 @@ import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import FilterModal, { type ListingFilters, defaultFilters } from "@/components/FilterModal";
-import { fetchListings, type ApiListing } from "@/lib/api";
+import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const filters = ["Tümü", "Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "1+1", "2+1", "3+1"];
 
@@ -28,10 +30,15 @@ const matchesModalFilters = (l: ApiListing, f: ListingFilters): boolean => {
   if (f.listingType === "Kişisel İlan" && l.type !== "kisisel_ilan") return false;
 
   const [min, max] = f.priceRange;
-  if (l.type === "ev_ilani") {
-    if (l.rent !== undefined && (l.rent < min || l.rent > max)) return false;
-  } else if (l.budget_min !== undefined && l.budget_max !== undefined) {
-    if (l.budget_max < min || l.budget_min > max) return false;
+  // Varsayılan aralık (1000-30000) "filtre yok" demektir; dokunulmadıysa
+  // aralık dışı ilanlar elenmez. null alanlar da elenmez (backend null döner).
+  const rangeTouched = min !== defaultFilters.priceRange[0] || max !== defaultFilters.priceRange[1];
+  if (rangeTouched) {
+    if (l.type === "ev_ilani") {
+      if (l.rent != null && (l.rent < min || l.rent > max)) return false;
+    } else if (l.budget_min != null && l.budget_max != null) {
+      if (l.budget_max < min || l.budget_min > max) return false;
+    }
   }
 
   if (f.rooms > 0 && (!l.room_count || parseInt(l.room_count) < f.rooms)) return false;
@@ -82,7 +89,7 @@ const Listings = () => {
 
       {/* Filter row */}
       <div className="px-6 py-3">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {filters.map(f => (
             <button
               key={f}
@@ -206,9 +213,34 @@ const Listings = () => {
 /* ─── Detail Modal ─── */
 const ListingDetailModal = ({ listing, onClose }: { listing: ApiListing | null; onClose: () => void }) => {
   const navigate = useNavigate();
+  const { isLoggedIn, user: me } = useAuth();
   const [photoIndex, setPhotoIndex] = useState(0);
 
   if (!listing) return null;
+
+  const isOwn = me !== null && listing.owner_id === me.id;
+
+  // Girişliyse beğeni gönderir (eşleşme akışına girer); değilse girişe yönlendirir
+  const handleContact = async () => {
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+    try {
+      const res = await postSwipe(listing.id, "like");
+      if (res.matched) {
+        toast.success("Eşleştiniz! 🎉", { description: "Mesajlar sayfasından yazabilirsin." });
+        navigate("/messages");
+      } else {
+        toast.success("Beğeni gönderildi", {
+          description: "İlan sahibi de seni beğenirse eşleşip mesajlaşabilirsiniz.",
+        });
+        onClose();
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Beğeni gönderilemedi");
+    }
+  };
 
   const isHouse = listing.type === "ev_ilani";
 
@@ -329,12 +361,14 @@ const ListingDetailModal = ({ listing, onClose }: { listing: ApiListing | null; 
             )}
 
             {/* CTA */}
-            <Button
-              onClick={() => navigate("/login")}
-              className="w-full h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground font-bold text-sm"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" /> İletişime Geç
-            </Button>
+            {!isOwn && (
+              <Button
+                onClick={handleContact}
+                className="w-full h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground font-bold text-sm"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" /> {isLoggedIn ? "Beğen ve İletişime Geç" : "Giriş Yap ve İletişime Geç"}
+              </Button>
+            )}
           </div>
         </motion.div>
       </motion.div>

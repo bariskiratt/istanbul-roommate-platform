@@ -18,6 +18,7 @@ const Onboarding = () => {
   const { login, setUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [registered, setRegistered] = useState(false);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [name, setName] = useState("");
@@ -105,10 +106,12 @@ const Onboarding = () => {
     try {
       setBusy(true);
 
-      // Adım 0 → 1: hesabı oluştur, doğrulama kodunu iste
-      if (currentStep === 0) {
+      // Adım 0 → 1: hesabı oluştur, doğrulama kodunu iste.
+      // Geri dönüp tekrar ilerlenirse ikinci kez register çağrılmaz
+      // ("zaten kayıtlı" hatasıyla formu kaybettirmesin).
+      if (currentStep === 0 && !registered) {
         const res = await registerUser(email, password);
-        // E-posta servisi bağlanana kadar kod dev modda yanıtla gelir.
+        setRegistered(true);
         if (res.dev_code) {
           toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
         }

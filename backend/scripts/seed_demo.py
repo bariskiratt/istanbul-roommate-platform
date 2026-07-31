@@ -114,12 +114,23 @@ def seed(force: bool = False) -> None:
     if demo_users and not force:
         print(f"Zaten {len(demo_users)} demo kullanıcı var — çıkılıyor. "
               f"Yeniden üretmek için: --force")
+        db.close()
         return
     if demo_users and force:
         ids = [u.id for u in demo_users]
-        db.query(models.Message).filter(
-            models.Message.sender_id.in_(ids)
-        ).delete(synchronize_session=False)
+        # Önce demo eşleşmelerine ait TÜM mesajlar (karşı taraf gerçek kullanıcı
+        # olsa bile) silinmeli; yoksa Postgres FK ihlaliyle durur.
+        match_ids = [
+            m.id
+            for m in db.query(models.Match.id).filter(
+                (models.Match.user_a_id.in_(ids))
+                | (models.Match.user_b_id.in_(ids))
+            )
+        ]
+        if match_ids:
+            db.query(models.Message).filter(
+                models.Message.match_id.in_(match_ids)
+            ).delete(synchronize_session=False)
         db.query(models.Match).filter(
             (models.Match.user_a_id.in_(ids)) | (models.Match.user_b_id.in_(ids))
         ).delete(synchronize_session=False)

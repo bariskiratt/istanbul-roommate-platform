@@ -22,4 +22,6 @@ RUN python -m scripts.train_model
 ENV HOST=0.0.0.0
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# --proxy-headers: Render proxy'si arkasında request.base_url https üretsin
+# (yoksa yüklenen fotoğraf URL'leri http:// olur ve tarayıcı engeller)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]

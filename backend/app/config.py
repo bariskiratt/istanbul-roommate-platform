@@ -18,7 +18,6 @@ MODELS_DIR = BASE_DIR / "models"
 # Ham veri
 LISTINGS_CSV = RAW_DIR / "istanbulApartmentForRent.csv"
 NEIGHBORHOOD_GEOJSON = RAW_DIR / "mahalle_geojson.json"
-DISTRICT_GEOJSON = RAW_DIR / "ilce_geojson.json"
 
 # Üretilen veri
 MARKET_VALUES_CSV = PROCESSED_DIR / "neighborhood_market_values.csv"

@@ -123,9 +123,8 @@ def test_listing_ownership_and_mine(client):
     assert res.status_code == 201
     assert res.json()["owner_id"] == user["id"]
 
-    # Anonim ilan (token'sız)
-    res = client.post("/api/listings", json=listing)
-    assert res.json()["owner_id"] is None
+    # Token'sız ilan oluşturulamaz
+    assert client.post("/api/listings", json=listing).status_code == 401
 
     # mine=true yalnızca kendi ilanını döndürür
     res = client.get("/api/listings", params={"mine": "true"}, headers=headers)
@@ -136,7 +135,7 @@ def test_listing_ownership_and_mine(client):
 
     # Sahipli ilanı başkası (token'sız) kapatamaz
     owned_id = 1
-    assert client.delete(f"/api/listings/{owned_id}").status_code == 403
+    assert client.delete(f"/api/listings/{owned_id}").status_code == 401
     assert client.delete(f"/api/listings/{owned_id}", headers=headers).status_code == 204
 
 

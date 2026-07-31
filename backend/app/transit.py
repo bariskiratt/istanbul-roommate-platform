@@ -49,6 +49,8 @@ def polygon_centroid(geometry):
     (shoelace) formülüyle gerçek alan merkezi hesaplanıyor. Dejenere
     (sıfır alan) halkalarda köşe ortalamasına düşülür.
     """
+    if not geometry:  # GeoJSON'da geometry null olabilir
+        return None
     if geometry["type"] == "Polygon":
         rings = [geometry["coordinates"][0]]
     elif geometry["type"] == "MultiPolygon":

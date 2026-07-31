@@ -20,19 +20,25 @@ const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
   // Ev ilanında kira, kişisel ilanda bütçe aralığı kesişimi
   const [min, max] = f.priceRange;
   if (l.type === "ev_ilani") {
-    if (l.rent !== undefined && (l.rent < min || l.rent > max)) return false;
-  } else if (l.budgetMin !== undefined && l.budgetMax !== undefined) {
+    if (l.rent != null && (l.rent < min || l.rent > max)) return false;
+  } else if (l.budgetMin != null && l.budgetMax != null) {
     if (l.budgetMax < min || l.budgetMin > max) return false;
   }
 
   if (f.rooms > 0 && (!l.roomCount || parseInt(l.roomCount) < f.rooms)) return false;
 
-  if (f.gender === "Kadın" && l.user.gender !== "kadın") return false;
-  if (f.gender === "Erkek" && l.user.gender !== "erkek") return false;
+  // API ilanlarında kullanıcı profili yer tutucu ("anon"); bilinmeyen alan
+  // üzerinden eleme yapılmaz, yoksa cinsiyet filtresi tüm desteyi boşaltır.
+  const profileKnown = l.user.id !== "anon";
+  if (profileKnown) {
+    if (f.gender === "Kadın" && l.user.gender !== "kadın") return false;
+    if (f.gender === "Erkek" && l.user.gender !== "erkek") return false;
+  }
 
   for (const chip of f.lifestyle) {
-    if (chip === "Sigara İçmez" && (l.type === "ev_ilani" ? l.smokingAllowed !== false : l.user.smoking)) return false;
-    if (chip === "Hayvan Dostu" && (l.type === "ev_ilani" ? !l.petsAllowed : !l.user.pets)) return false;
+    if (chip === "Sigara İçmez" && (l.type === "ev_ilani" ? l.smokingAllowed !== false : profileKnown && l.user.smoking)) return false;
+    if (chip === "Hayvan Dostu" && (l.type === "ev_ilani" ? !l.petsAllowed : profileKnown && !l.user.pets)) return false;
+    if (!profileKnown) continue;
     if (chip === "Alkol Kullanmaz" && l.user.alcohol) return false;
     if (chip === "Erken Kalkar" && l.user.sleepSchedule !== "erken") return false;
     if (chip === "Gece Kuşu" && l.user.sleepSchedule !== "gece") return false;
@@ -80,7 +86,11 @@ const toDeckListing = (a: ApiListing): Listing => ({
   photos: a.photos.length > 0 ? a.photos : anonUser.photos,
   isActive: a.is_active,
   createdAt: a.created_at,
-  user: a.owner_name ? { ...anonUser, name: a.owner_name } : anonUser,
+  user: {
+    ...anonUser,
+    name: a.owner_name ?? anonUser.name,
+    university: a.owner_university ?? "",
+  },
 });
 
 const SwipeScreen = () => {
@@ -110,13 +120,17 @@ const SwipeScreen = () => {
       : { allListings: mockListings, usingDemo: true };
   }, [apiListings, me]);
 
-  useEffect(() => {
-    setCards([...allListings].reverse());
-  }, [allListings]);
+  // Filtre state'te tutulur; liste yenilense de seçim kaybolmaz
+  const [activeFilters, setActiveFilters] = useState<ListingFilters | null>(null);
 
-  const applyFilters = (f: ListingFilters) => {
-    setCards(allListings.filter(l => matchesFilters(l, f)).reverse());
-  };
+  useEffect(() => {
+    const base = activeFilters
+      ? allListings.filter(l => matchesFilters(l, activeFilters))
+      : allListings;
+    setCards([...base].reverse());
+  }, [allListings, activeFilters]);
+
+  const applyFilters = (f: ListingFilters) => setActiveFilters(f);
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
     // Gerçek (API'den gelen) ilanlarda karar sunucuya yazılır; mock kartlar
@@ -268,9 +282,11 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
               {isHouse ? `${listing.rent?.toLocaleString("tr-TR")} ₺` : `${listing.budgetMin?.toLocaleString("tr-TR")}–${listing.budgetMax?.toLocaleString("tr-TR")} ₺`}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 mt-1.5 text-white/80 text-xs">
-            <GraduationCap className="w-3.5 h-3.5" />{listing.user.university}
-          </div>
+          {listing.user.university && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-white/80 text-xs">
+              <GraduationCap className="w-3.5 h-3.5" />{listing.user.university}
+            </div>
+          )}
         </div>
       </div>
       <div className="p-5 flex-1 space-y-3">
@@ -278,7 +294,8 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
         <div className="flex flex-wrap gap-1.5">
           {isHouse && listing.smokingAllowed !== undefined && <LifestyleTag type="smoking" value={listing.smokingAllowed} />}
           {isHouse && listing.petsAllowed !== undefined && <LifestyleTag type="pets" value={listing.petsAllowed} />}
-          {!isHouse && (
+          {/* Profil bilinmiyorsa ("anon") uydurma yaşam tarzı etiketi basılmaz */}
+          {!isHouse && listing.user.id !== "anon" && (
             <>
               <LifestyleTag type="smoking" value={listing.user.smoking} />
               <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
@@ -308,7 +325,7 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 100) onSwipe("right");
     else if (info.offset.x < -100) onSwipe("left");
   };
@@ -355,12 +372,14 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
                 </button>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{listing.description}</p>
-              <div className="flex flex-wrap gap-2">
-                <LifestyleTag type="smoking" value={listing.user.smoking} />
-                <LifestyleTag type="pets" value={listing.user.pets} />
-                <LifestyleTag type="alcohol" value={listing.user.alcohol} />
-                <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
-              </div>
+              {listing.user.id !== "anon" && (
+                <div className="flex flex-wrap gap-2">
+                  <LifestyleTag type="smoking" value={listing.user.smoking} />
+                  <LifestyleTag type="pets" value={listing.user.pets} />
+                  <LifestyleTag type="alcohol" value={listing.user.alcohol} />
+                  <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
+                </div>
+              )}
               <div className="card-listing p-4 flex items-center gap-3">
                 <img src={listing.user.photos[0]} alt="" className="w-14 h-14 rounded-full object-cover" />
                 <div>

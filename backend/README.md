@@ -1,4 +1,3 @@
-# istanbul-real-estate-heatmap
 # 🏙️ İstanbul Akıllı Emlak ve Ev Arkadaşı Eşleştirme Platformu (AI-Powered)
 
 İstanbul gibi dinamik, hiper-enflasyonist ve şeffaf olmayan bir emlak pazarına veri odaklı (data-driven) bir çözüm getiren akıllı web platformu. 
@@ -10,7 +9,7 @@ Bu proje, klasik "ev arkadaşı arama" konseptini makine öğrenmesi (Machine Le
 ## 🚀 Temel Özellikler ve Modüller
 
 ### 1. AI-Tabanlı Adil Fiyat Tahminleyicisi (Regression Engine)
-Ev sahipleri veya oda kiralayanlar ilan verirken, uygulamanın arka planında çalışan makine öğrenmesi modeli (XGBoost / LightGBM) devreye girer.
+Ev sahipleri veya oda kiralayanlar ilan verirken, uygulamanın arka planında çalışan makine öğrenmesi modeli (LightGBM çeyreklik regresyonu) devreye girer.
 * **Nasıl Çalışır:** İstanbul genelindeki binlerce güncel emlak verisi (İlçe, Mahalle, m², Bina Yaşı, Oda Sayısı) analiz edilerek, o odanın "olması gereken" adil piyasa değeri tahmin edilir.
 * **Faydası:** İlan veren kullanıcı, fiyatı pazar ortalamasının çok üzerindeyse uyarılır ("Bu fiyat bölge ortalamasının %30 üzerinde") ve adil bir fiyat bandına yönlendirilir.
 
@@ -29,7 +28,7 @@ Kullanıcı popüler ve pahalı bir lokasyonda (Örn: Beşiktaş) ev arıyorsa, 
 Bu proje, sağlam bir veri boru hattı (data pipeline) ve modern bir web mimarisi üzerine inşa edilmiştir.
 
 * **Veri Toplama (Scraping):** Python, Selenium / Playwright (Büyük emlak platformlarından düzenli ve otomatik veri çekimi).
-* **Makine Öğrenmesi (ML Model):** Python, Pandas, Scikit-learn, XGBoost (Fiyat tahminlemesi ve modelleme).
+* **Makine Öğrenmesi (ML Model):** Python, Pandas, Scikit-learn, LightGBM (Fiyat tahminlemesi ve modelleme).
 * **Backend API:** Python, FastAPI (ML modellerinin hızlı ve asenkron olarak frontend'e servis edilmesi).
 * **Frontend:** React.js / Next.js, TailwindCSS (Modern, swipe tabanlı kullanıcı arayüzü).
 * **Harita Entegrasyonu:** Mapbox GL JS veya Google Maps API (Isı haritası ve lokasyon bazlı görselleşt
@@ -65,8 +64,7 @@ app/                        FastAPI uygulaması
 scripts/                    offline betikler (sunucuda çalışmaz)
   build_market_values.py    ham ilanlardan mahalle medyanlarını üretir
   train_model.py            adil fiyat modelini eğitir
-  explore.py                veri keşfi
-  repair_geojson.py         bozuk GeoJSON onarımı (tek seferlik)
+  seed_demo.py              demo kullanıcı + ilan üretir
   fetch_transit.py          OSM'den metro/Marmaray istasyonlarını indirir
 data/
   raw/                      dokunulmamış kaynak veri

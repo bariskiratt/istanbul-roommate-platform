@@ -92,13 +92,13 @@ const Explore = () => {
       if (data.reachable) {
         const t = data.target;
         altMarkersRef.current.push(
-          L.marker([t.lat, t.lon], { icon: pin("#7c3aed") })
+          L.marker([t.lat, t.lon], { icon: pin("hsl(263 45% 62%)") })
             .bindTooltip(`${t.name} (hedef)`)
             .addTo(mapRef.current!),
         );
         data.recommendations.forEach((r) => {
           altMarkersRef.current.push(
-            L.marker([r.lat, r.lon], { icon: pin("#16a34a") })
+            L.marker([r.lat, r.lon], { icon: pin("hsl(160 32% 52%)") })
               .bindTooltip(`${r.name} · ${fmt.format(Math.round(r.price ?? 0))} TL`)
               .addTo(mapRef.current!),
           );
@@ -155,7 +155,7 @@ const Explore = () => {
               html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
               html += `<div style="font-size:16px;font-weight:650">${price}</div>`;
               if (p.avg_price != null) {
-                html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
+                html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
               }
               return html;
             });
@@ -283,7 +283,7 @@ const Explore = () => {
                       </span>
                       {r.district ? ` · ${r.district}` : ""}
                       {r.saving != null && r.saving > 0 ? (
-                        <span className="text-green-600">
+                        <span className="text-accent">
                           {" "}
                           · {fmt.format(r.saving)} ₺ ucuz
                         </span>

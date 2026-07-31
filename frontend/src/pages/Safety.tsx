@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { Shield, ShieldCheck, MessageCircle, Eye, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Safety = () => {
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -16,8 +18,11 @@ const Safety = () => {
             </div>
             <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
           </button>
-          <Button onClick={() => navigate("/onboarding")} className="bg-primary text-primary-foreground rounded-full text-sm font-bold px-5">
-            Hemen Başla
+          <Button
+            onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")}
+            className="bg-primary text-primary-foreground rounded-full text-sm font-bold px-5"
+          >
+            {isLoggedIn ? "Uygulamaya Dön" : "Hemen Başla"}
           </Button>
         </div>
       </nav>
@@ -69,7 +74,7 @@ const Safety = () => {
             </div>
             <span className="font-extrabold text-foreground">RoomMatch</span>
           </button>
-          <p className="text-xs text-muted-foreground">© 2025 RoomMatch. Tüm hakları saklıdır.</p>
+          <p className="text-xs text-muted-foreground">© 2026 RoomMatch. Tüm hakları saklıdır.</p>
         </div>
       </footer>
     </div>

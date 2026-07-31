@@ -6,12 +6,13 @@ import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMatches } from "@/lib/api";
+import { parseUtc } from "@/lib/date";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 const fmtTime = (iso: string | null) => {
   if (!iso) return "";
-  const d = new Date(iso);
+  const d = parseUtc(iso);
   const today = new Date();
   return d.toDateString() === today.toDateString()
     ? d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })

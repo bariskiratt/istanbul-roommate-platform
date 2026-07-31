@@ -1,11 +1,13 @@
-import { Home, Heart, MessageCircle, User, Bell, Building2 } from "lucide-react";
+import { Home, Heart, MessageCircle, User, Map, Building2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+// Not: /notifications kaldırıldı — Beğeniler ile birebir aynı veriyi
+// gösteriyordu. Yerine uygulama içinden erişilemeyen Bütçe Haritası girdi.
 const navItems = [
   { icon: Home, label: "Keşfet", path: "/swipe" },
-  { icon: Bell, label: "Bildirimler", path: "/notifications" },
   { icon: Heart, label: "Beğeniler", path: "/matches" },
   { icon: Building2, label: "Evler", path: "/listings" },
+  { icon: Map, label: "Harita", path: "/explore" },
   { icon: MessageCircle, label: "Mesajlar", path: "/messages" },
   { icon: User, label: "Profil", path: "/profile" },
 ];

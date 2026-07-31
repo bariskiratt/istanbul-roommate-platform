@@ -87,7 +87,7 @@ npm run dev
 Optional demo content (20 users + 100 realistic listings, rents derived from
 real neighborhood medians): `python -m scripts.seed_demo`.
 
-**Tests:** `python -m pytest tests/` (backend, 38 tests) · `npm test` (frontend).
+**Tests:** `python -m pytest tests/` (backend, 40 tests) · `npm test` (frontend).
 
 ## 🚀 Deployment
 

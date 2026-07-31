@@ -76,8 +76,11 @@ async def lifespan(_app: FastAPI):
     STATE["prices"] = [
         f["properties"]["avg_price"] for f in geojson.get("features", [])
     ]
-    print(f"✅ Hazır: {total} mahalleden {matched} tanesi fiyat verisiyle eşleşti "
-          f"({matched / total * 100:.1f}%).")
+    if total:
+        print(f"✅ Hazır: {total} mahalleden {matched} tanesi fiyat verisiyle "
+              f"eşleşti ({matched / total * 100:.1f}%).")
+    else:
+        print("⚠️  GeoJSON boş — harita uçları veri döndürmeyecek.")
 
     # Adil fiyat modeli opsiyonel: yoksa harita yine de çalışsın.
     if MODEL_PATH.exists():
@@ -156,8 +159,8 @@ app.add_middleware(
         if _env_origins
         else _DEFAULT_ORIGINS
     ),
-    # POST /api/estimate için OPTIONS+POST de gerekiyor.
-    allow_methods=["GET", "POST", "OPTIONS"],
+    # PATCH (ilan/profil güncelleme) ve DELETE (ilan kaldırma) da kullanılıyor.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -190,6 +193,8 @@ async def get_geojson():
     Bu yanıt bütçeden bağımsızdır, bu yüzden istemci tarafından bir kez
     indirilip önbelleğe alınabilir.
     """
+    if "geojson" not in STATE:
+        raise HTTPException(status_code=503, detail="Veriler henüz yüklenmedi.")
     return JSONResponse(
         STATE["geojson"],
         headers={"Cache-Control": "public, max-age=3600"},

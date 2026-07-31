@@ -13,7 +13,9 @@ import os
 import requests
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
-TIMEOUT = 10
+# Gönderim istek içinde (senkron) yapılır; sağlayıcı yavaşladığında kayıt
+# ucunu uzun süre kilitlememek için kısa tutulur.
+TIMEOUT = 6
 
 
 def email_enabled() -> bool:

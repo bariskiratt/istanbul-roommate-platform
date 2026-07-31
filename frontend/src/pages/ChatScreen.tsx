@@ -5,23 +5,26 @@ import { Send, Home, ArrowLeft } from "lucide-react";
 import BottomNav from "@/components/layout/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMatches, fetchMessages, sendMessage } from "@/lib/api";
+import { parseUtc } from "@/lib/date";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 const ChatScreen = () => {
   const { matchId } = useParams();
   const navigate = useNavigate();
-  const { user: me } = useAuth();
+  const { isLoggedIn, user: me } = useAuth();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const id = Number(matchId);
 
+  // isLoggedIn token'a bakar; `me` asenkron dolduğu için sayfa yenilemede
+  // girişli kullanıcıya yanlışlıkla "giriş yap" ekranı göstermeyelim.
   const { data: matches = [] } = useQuery({
     queryKey: ["matches"],
     queryFn: fetchMatches,
-    enabled: me !== null,
+    enabled: isLoggedIn,
   });
   const match = matches.find(m => m.id === id);
 
@@ -29,7 +32,7 @@ const ChatScreen = () => {
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", id],
     queryFn: () => fetchMessages(id),
-    enabled: me !== null && Number.isFinite(id),
+    enabled: isLoggedIn && Number.isFinite(id),
     refetchInterval: 4000,
   });
 
@@ -52,7 +55,7 @@ const ChatScreen = () => {
     send.mutate(content);
   };
 
-  if (!me) {
+  if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Mesajlaşmak için giriş yap</p>
@@ -114,13 +117,13 @@ const ChatScreen = () => {
           </p>
         )}
         {messages.map(msg => {
-          const isMine = msg.sender_id === me.id;
+          const isMine = me !== null && msg.sender_id === me.id;
           return (
             <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[80%] ${isMine ? "message-sent" : "message-received"}`}>
                 <p className="text-[15px] leading-relaxed">{msg.content}</p>
                 <p className={`text-[10px] mt-1.5 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                  {new Date(msg.created_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                  {parseUtc(msg.created_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
             </div>

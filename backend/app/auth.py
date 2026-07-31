@@ -285,13 +285,10 @@ def update_me(
     db: Session = Depends(get_db),
 ):
     updates = payload.model_dump(exclude_unset=True)
-    if (
-        "budget_min" in updates
-        and "budget_max" in updates
-        and updates["budget_min"] is not None
-        and updates["budget_max"] is not None
-        and updates["budget_min"] > updates["budget_max"]
-    ):
+    # Tek alan güncellense bile tutarlılık mevcut değerle birlikte denetlenir
+    eff_min = updates.get("budget_min", user.budget_min)
+    eff_max = updates.get("budget_max", user.budget_max)
+    if eff_min is not None and eff_max is not None and eff_min > eff_max:
         raise HTTPException(
             status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
         )

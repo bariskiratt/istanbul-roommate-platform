@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { X, Check, Heart, GraduationCap, MapPin, DollarSign, Search, Home } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ type LikeCard = ReturnType<typeof toLikeCard>;
 
 const Matches = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isLoggedIn, user: me } = useAuth();
   const [queue, setQueue] = useState<LikeCard[]>([]);
   const [matchPopup, setMatchPopup] = useState<LikeCard | null>(null);
@@ -65,6 +66,9 @@ const Matches = () => {
 
     respondToLike(current.swipeId, direction === "right")
       .then(res => {
+        // Cache tazelenmezse yeniden fetch'te cevaplanmış beğeniler geri gelir
+        queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+        queryClient.invalidateQueries({ queryKey: ["matches"] });
         if (res.matched) {
           setMatchPopup(current);
           setConfetti(true);
@@ -301,7 +305,7 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
   const acceptOpacity = useTransform(x, [0, 100], [0, 1]);
   const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 100) onSwipe("right");
     else if (info.offset.x < -100) onSwipe("left");
   };

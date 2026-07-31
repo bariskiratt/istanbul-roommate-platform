@@ -26,6 +26,17 @@ ALLOWED = {
 }
 
 
+def _matches_signature(data: bytes, ext: str) -> bool:
+    """İçerik, iddia edilen türün dosya imzasıyla uyuşuyor mu?"""
+    if ext == "jpg":
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == "png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == "webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
 @router.post("", status_code=201)
 async def upload_photo(
     request: Request,
@@ -39,13 +50,23 @@ async def upload_photo(
             detail="Yalnızca JPEG, PNG veya WebP yüklenebilir.",
         )
 
-    data = await file.read()
+    # Belleğe okumadan önce beyan edilen boyutu reddet (OOM önlemi)
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_BYTES + 10_000:
+        raise HTTPException(status_code=413, detail="Dosya 5 MB'den büyük olamaz.")
+
+    data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(
             status_code=413, detail="Dosya 5 MB'den büyük olamaz."
         )
     if not data:
         raise HTTPException(status_code=422, detail="Dosya boş.")
+    if not _matches_signature(data, ext):
+        raise HTTPException(
+            status_code=415,
+            detail="Dosya içeriği görüntü formatıyla uyuşmuyor.",
+        )
 
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     name = f"{secrets.token_hex(16)}.{ext}"

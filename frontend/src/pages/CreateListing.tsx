@@ -11,6 +11,8 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import FairPriceCheck from "@/components/FairPriceCheck";
+import AuthGate from "@/components/AuthGate";
+import { useAuth } from "@/contexts/AuthContext";
 import { createListing } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 
@@ -19,6 +21,7 @@ type ListingType = "ev_ilani" | "kisisel_ilan" | null;
 const CreateListing = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isLoggedIn } = useAuth();
 
   // Step 0: type selection, then form
   const [listingType, setListingType] = useState<ListingType>(null);
@@ -116,6 +119,15 @@ const CreateListing = () => {
       setListingType(null);
     }
   };
+
+  // İlan vermek giriş ister — form doldurulup son adımda 401 yemesin
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AuthGate show onClose={() => navigate(-1)} />
+      </div>
+    );
+  }
 
   // Type selection screen
   if (!listingType) {

@@ -21,12 +21,12 @@ const districtGrid = [
   { name: "Beşiktaş", photo: "https://images.unsplash.com/photo-1527838832700-5059252407fa?w=400&h=300&fit=crop" },
   { name: "Üsküdar", photo: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=400&h=300&fit=crop" },
   { name: "Şişli", photo: "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=400&h=300&fit=crop" },
-  { name: "Sarıyer", photo: "https://images.unsplash.com/photo-1564594736624-def7a10ab047?w=400&h=300&fit=crop" },
+  { name: "Sarıyer", photo: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=400&h=300&fit=crop" },
   { name: "Ataşehir", photo: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&h=300&fit=crop" },
-  { name: "Fatih", photo: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=400&h=300&fit=crop" },
+  { name: "Fatih", photo: "https://images.unsplash.com/photo-1465447142348-e9952c393450?w=400&h=300&fit=crop" },
   { name: "Bakırköy", photo: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop" },
-  { name: "Maltepe", photo: "https://images.unsplash.com/photo-1464938050520-ef2571e0d6e0?w=400&h=300&fit=crop" },
-  { name: "Beyoğlu", photo: "https://images.unsplash.com/photo-1527838832700-5059252407fa?w=400&h=300&fit=crop" },
+  { name: "Maltepe", photo: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=400&h=300&fit=crop" },
+  { name: "Beyoğlu", photo: "https://images.unsplash.com/photo-1523731407965-2430cd12f5e4?w=400&h=300&fit=crop" },
 ];
 
 const Index = () => {
@@ -128,7 +128,7 @@ const Index = () => {
           >
             <Button
               onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")}
-              className="h-13 rounded-full bg-primary text-primary-foreground font-bold px-8 py-3.5 text-base h-auto"
+              className="rounded-full bg-primary text-primary-foreground font-bold px-8 py-3.5 text-base h-auto"
             >
               {isLoggedIn ? "Keşfetmeye Devam Et" : "Ücretsiz Başla"}
               <ArrowRight className="w-4 h-4 ml-2" />
