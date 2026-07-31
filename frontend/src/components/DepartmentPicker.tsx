@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Check, ChevronDown } from "lucide-react";
 import { fetchDepartments } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 interface Props {
   value: string;
@@ -13,6 +14,7 @@ interface Props {
  * girilemez — kullanıcı yalnızca listeden seçer.
  */
 const DepartmentPicker = ({ value, onChange }: Props) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -42,7 +44,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
         className="w-full h-14 px-4 rounded-2xl bg-card border border-border text-left flex items-center justify-between hover:border-primary/40 transition-colors"
       >
         <span className={value ? "text-foreground" : "text-muted-foreground"}>
-          {value || (isLoading ? "Bölümler yükleniyor…" : "Bölümünü seç")}
+          {value || t(isLoading ? "dept.loading" : "dept.select")}
         </span>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -55,7 +57,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
               autoFocus
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Bölüm ara…"
+              placeholder={t("dept.search")}
               className="w-full h-12 pl-9 pr-3 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground"
             />
           </div>
@@ -63,26 +65,26 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
           <div className="max-h-64 overflow-y-auto py-1">
             {isLoading && (
               <p className="px-4 py-6 text-sm text-muted-foreground text-center">
-                Bölümler yükleniyor…
+                {t("dept.loading")}
               </p>
             )}
             {(isError || (!isLoading && Object.keys(groups).length === 0)) && (
               <div className="px-4 py-6 text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Bölüm listesi yüklenemedi (sunucuya ulaşılamadı).
+                  {t("dept.loadFailed")}
                 </p>
                 <button
                   type="button"
                   onClick={() => refetch()}
                   className="text-sm font-semibold text-primary hover:underline"
                 >
-                  Tekrar dene
+                  {t("common.retry")}
                 </button>
               </div>
             )}
             {!isLoading && Object.keys(groups).length > 0 && Object.keys(filtered).length === 0 && (
               <p className="px-4 py-6 text-sm text-muted-foreground text-center">
-                Eşleşen bölüm yok. Farklı bir kelime dene ya da "Listede Yok" seç.
+                {t("dept.noMatch")}
               </p>
             )}
             {Object.entries(filtered).map(([group, items]) => (

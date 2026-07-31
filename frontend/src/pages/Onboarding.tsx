@@ -11,12 +11,16 @@ import { registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
+import ThemeToggle from "@/components/ThemeToggle";
+import LanguageToggle from "@/components/LanguageToggle";
+import { useI18n } from "@/i18n";
 
-const steps = ["E-posta", "OTP", "Kişisel", "Üniversite", "Bütçe", "Yaşam Tarzı", "Fotoğraf"];
+const STEP_COUNT = 7;
 
 const Onboarding = () => {
   const navigate = useNavigate();
   const { login, setUser } = useAuth();
+  const { t, n } = useI18n();
   const [currentStep, setCurrentStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -44,7 +48,7 @@ const Onboarding = () => {
   const passwordValid = passwordChecks.length && passwordChecks.uppercase && passwordChecks.number;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
-  const progress = ((currentStep + 1) / steps.length) * 100;
+  const progress = ((currentStep + 1) / STEP_COUNT) * 100;
 
   const handleOtpChange = (index: number, value: string) => {
     // Yapıştırma: "123456" gibi çok haneli girdiyi kutulara dağıt
@@ -77,15 +81,15 @@ const Onboarding = () => {
       const res = await requestOtp(email);
       setOtp(["", "", "", "", "", ""]);
       if (res.dev_code) {
-        toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
+        toast.info(t("ob.verifyCode", { code: res.dev_code }), { duration: 30000 });
       } else {
-        toast.success("Yeni kod e-postana gönderildi!", {
-          description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+        toast.success(t("ob.codeResent"), {
+          description: t("login.codeSentDesc"),
           duration: 8000,
         });
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kod gönderilemedi");
+      toast.error(err instanceof Error ? err.message : t("ob.codeFailed"));
     }
   };
 
@@ -117,10 +121,10 @@ const Onboarding = () => {
         const res = await registerUser(email, password);
         setRegistered(true);
         if (res.dev_code) {
-          toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
+          toast.info(t("ob.verifyCode", { code: res.dev_code }), { duration: 30000 });
         } else {
-          toast.success("Doğrulama kodu e-postana gönderildi!", {
-            description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+          toast.success(t("ob.codeSentTitle"), {
+            description: t("login.codeSentDesc"),
             duration: 8000,
           });
         }
@@ -137,7 +141,7 @@ const Onboarding = () => {
       }
 
       // Son adım: profili kaydet
-      if (currentStep === steps.length - 1) {
+      if (currentStep === STEP_COUNT - 1) {
         const me = await updateMe({
           name,
           gender,
@@ -154,14 +158,14 @@ const Onboarding = () => {
           photos,
         });
         setUser(me);
-        toast.success("Profilin hazır! 🎉");
+        toast.success(t("ob.profileReady"));
         navigate("/swipe");
         return;
       }
 
       setCurrentStep(s => s + 1);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Bir şeyler ters gitti";
+      const message = err instanceof Error ? err.message : t("common.error");
       toast.error(message);
       // Kayıtlı e-posta ile tekrar denenmişse girişe yönlendir
       if (message.includes("zaten kayıtlı")) navigate("/login");
@@ -176,22 +180,13 @@ const Onboarding = () => {
 
   const stepIcons = [Mail, KeyRound, User, GraduationCap, MapPin, Heart, Camera];
   const stepTitles = [
-    "Üniversite E-postan",
-    "Doğrulama Kodu",
-    "Seni Tanıyalım",
-    "Eğitim Bilgilerin",
-    "Bütçe ve Konum",
-    "Yaşam Tarzın",
-    "Fotoğrafların",
+    t("ob.step1Title"), t("ob.step2Title"), t("ob.step3Title"), t("ob.step4Title"),
+    t("ob.step5Title"), t("ob.step6Title"), t("ob.step7Title"),
   ];
   const stepSubtitles = [
-    "Sadece .edu.tr uzantılı e-postalar kabul edilir",
-    `${email || "E-posta"} adresine gönderilen 6 haneli kodu gir`,
-    "Temel bilgilerini paylaş",
-    "Üniversite ve bölüm bilgilerin",
-    "Bütçeni ve tercih ettiğin semti seç",
-    "Ev arkadaşı uyumun için önemli bilgiler",
-    "En az 1 fotoğraf yüklemen gerekiyor",
+    t("ob.step1Sub"),
+    t("ob.step2Sub", { email: email || t("ob.emailFallback") }),
+    t("ob.step3Sub"), t("ob.step4Sub"), t("ob.step5Sub"), t("ob.step6Sub"), t("ob.step7Sub"),
   ];
 
   const StepIcon = stepIcons[currentStep];
@@ -210,6 +205,8 @@ const Onboarding = () => {
           </button>
         )}
         <div className="flex-1" />
+        <LanguageToggle />
+        <ThemeToggle />
       </div>
 
       {/* Progress — thin animated bar */}
@@ -249,7 +246,7 @@ const Onboarding = () => {
               <div className="space-y-2">
                 <Input
                   type="email"
-                  placeholder="öğrenci@üniversite.edu.tr"
+                  placeholder={t("login.emailPlaceholder")}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   autoComplete="email"
@@ -257,16 +254,16 @@ const Onboarding = () => {
                 />
                 {email.length > 3 && !email.includes(".edu.tr") && (
                   <p className="text-xs text-destructive pt-1">
-                    Yalnızca .edu.tr uzantılı üniversite e-postaları kabul edilir
+                    {t("ob.eduOnly")}
                   </p>
                 )}
               </div>
 
               {/* Password */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Şifre oluştur</label>
+                <label className="text-sm font-medium text-foreground">{t("ob.createPassword")}</label>
                 <PasswordInput
-                  placeholder="En az 8 karakter"
+                  placeholder={t("ob.passwordPlaceholder")}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
@@ -274,9 +271,9 @@ const Onboarding = () => {
                 {password.length > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
-                      { ok: passwordChecks.length, text: "En az 8 karakter" },
-                      { ok: passwordChecks.uppercase, text: "En az 1 büyük harf" },
-                      { ok: passwordChecks.number, text: "En az 1 rakam" },
+                      { ok: passwordChecks.length, text: t("ob.ruleLength") },
+                      { ok: passwordChecks.uppercase, text: t("ob.ruleUpper") },
+                      { ok: passwordChecks.number, text: t("ob.ruleNumber") },
                     ].map(rule => (
                       <div key={rule.text} className="flex items-center gap-2 text-xs">
                         <Check className={`w-3.5 h-3.5 ${rule.ok ? "text-accent" : "text-muted-foreground/40"}`} />
@@ -289,15 +286,15 @@ const Onboarding = () => {
 
               {/* Confirm Password */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Şifreyi tekrarla</label>
+                <label className="text-sm font-medium text-foreground">{t("ob.repeatPassword")}</label>
                 <PasswordInput
-                  placeholder="Şifreni tekrar gir"
+                  placeholder={t("ob.repeatPlaceholder")}
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
                 />
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p className="text-xs text-destructive pt-1">Şifreler eşleşmiyor</p>
+                  <p className="text-xs text-destructive pt-1">{t("ob.passwordMismatch")}</p>
                 )}
               </div>
             </div>
@@ -321,9 +318,9 @@ const Onboarding = () => {
                 ))}
               </div>
               <p className="text-center text-sm text-muted-foreground">
-                Kod gelmedi mi?{" "}
+                {t("ob.noCode")}{" "}
                 <button type="button" onClick={resendCode} className="text-primary font-semibold hover:underline">
-                  Tekrar gönder
+                  {t("ob.resend")}
                 </button>
               </p>
             </div>
@@ -333,18 +330,18 @@ const Onboarding = () => {
           {currentStep === 2 && (
             <div className="space-y-5">
               <Input
-                placeholder="Adın ne? (ör. Zeynep, Mehmet)"
+                placeholder={t("ob.namePlaceholder")}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
               />
               <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">Cinsiyet</p>
+                <p className="text-sm font-medium text-foreground">{t("ob.gender")}</p>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: "erkek", label: "Erkek", icon: "👨" },
-                    { value: "kadın", label: "Kadın", icon: "👩" },
-                    { value: "belirtmek_istemiyorum", label: "Belirtmek\nistemiyorum", icon: "🤝" },
+                    { value: "erkek", label: t("ob.male"), icon: "👨" },
+                    { value: "kadın", label: t("ob.female"), icon: "👩" },
+                    { value: "belirtmek_istemiyorum", label: t("ob.preferNot"), icon: "🤝" },
                   ].map(g => (
                     <button
                       key={g.value}
@@ -363,16 +360,16 @@ const Onboarding = () => {
               </div>
               {/* Yaş 17-30 ile sınırlı (üniversite öğrencisi platformu) */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Doğum yılın</label>
+                <label className="text-sm font-medium text-foreground">{t("ob.birthYear")}</label>
                 <select
                   value={birthYear}
                   onChange={e => setBirthYear(e.target.value)}
                   className="w-full h-14 rounded-2xl bg-card border border-border px-4 text-base text-foreground outline-none focus:ring-2 focus:ring-primary/20"
                 >
-                  <option value="">Seç…</option>
+                  <option value="">{t("ob.select")}</option>
                   {Array.from({ length: 14 }, (_, i) => new Date().getFullYear() - 17 - i).map(y => (
                     <option key={y} value={y}>
-                      {y} ({new Date().getFullYear() - y} yaşında)
+                      {y} ({t("ob.ageSuffix", { age: new Date().getFullYear() - y })})
                     </option>
                   ))}
                 </select>
@@ -385,21 +382,19 @@ const Onboarding = () => {
             <div className="space-y-5">
               {/* Üniversite e-posta alan adından otomatik atanır; elle girilemez */}
               <div className="rounded-2xl border-2 border-border bg-card p-4">
-                <p className="text-xs text-muted-foreground">
-                  Üniversite — e-posta adresinden doğrulandı
-                </p>
+                <p className="text-xs text-muted-foreground">{t("ob.universityLabel")}</p>
                 <p className="font-semibold text-foreground mt-1">
-                  {university || "E-posta alan adından belirlenemedi"}
+                  {university || t("ob.universityUnknown")}
                 </p>
                 {!university && (
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Okulunun alan adı sistemimize eklendiğinde profiline otomatik yansır.
+                    {t("ob.universityNote")}
                   </p>
                 )}
               </div>
               <DepartmentPicker value={department} onChange={setDepartment} />
               <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">Kaçıncı Sınıf?</p>
+                <p className="text-sm font-medium text-foreground">{t("ob.whichYear")}</p>
                 <div className="grid grid-cols-4 gap-3">
                   {["1", "2", "3", "4"].map(y => (
                     <button
@@ -411,7 +406,7 @@ const Onboarding = () => {
                           : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
                       }`}
                     >
-                      {y}. Sınıf
+                      {t("ob.yearOption", { year: y })}
                     </button>
                   ))}
                 </div>
@@ -424,9 +419,9 @@ const Onboarding = () => {
             <div className="space-y-6">
               <div className="card-listing p-6 space-y-5">
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Aylık Kira Bütçesi</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("ob.budgetLabel")}</p>
                   <p className="text-2xl font-bold text-primary">
-                    {budget[0].toLocaleString("tr-TR")} ₺ — {budget[1].toLocaleString("tr-TR")} ₺
+                    {n(budget[0])} ₺ — {n(budget[1])} ₺
                   </p>
                 </div>
                 <Slider
@@ -438,14 +433,14 @@ const Onboarding = () => {
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>1.000 ₺</span>
-                  <span>20.000 ₺</span>
+                  <span>{n(1000)} ₺</span>
+                  <span>{n(20000)} ₺</span>
                 </div>
               </div>
               <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">Tercih Edilen Semtler</p>
+                <p className="text-sm font-medium text-foreground">{t("ob.districts")}</p>
                 <Input
-                  placeholder="İstanbul'da bir semt ara... (ör. Sarıyer, Maltepe)"
+                  placeholder={t("ob.districtSearch")}
                   value={districtSearch}
                   onChange={e => setDistrictSearch(e.target.value)}
                   className="h-12 text-sm rounded-xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
@@ -472,7 +467,7 @@ const Onboarding = () => {
                   </div>
                 </div>
                 {district.length > 0 && (
-                  <p className="text-xs text-muted-foreground">{district.length} semt seçildi</p>
+                  <p className="text-xs text-muted-foreground">{t("ob.districtsSelected", { count: district.length })}</p>
                 )}
               </div>
             </div>
@@ -482,9 +477,9 @@ const Onboarding = () => {
           {currentStep === 5 && (
             <div className="space-y-4">
               {[
-                { key: "smoking" as const, icon: Cigarette, label: "Sigara", desc: "Sigara kullanıyor musun?" },
-                { key: "alcohol" as const, icon: Wine, label: "Alkol", desc: "Alkol kullanıyor musun?" },
-                { key: "pets" as const, icon: Dog, label: "Evcil Hayvan", desc: "Evcil hayvan dostu musun?" },
+                { key: "smoking" as const, icon: Cigarette, label: t("ob.smoking"), desc: t("ob.smokingDesc") },
+                { key: "alcohol" as const, icon: Wine, label: t("ob.alcohol"), desc: t("ob.alcoholDesc") },
+                { key: "pets" as const, icon: Dog, label: t("ob.pets"), desc: t("ob.petsDesc") },
               ].map(item => (
                 <button
                   key={item.key}
@@ -517,12 +512,12 @@ const Onboarding = () => {
               ))}
 
               <div className="pt-4 space-y-3">
-                <p className="text-sm font-medium text-foreground">Uyku Düzeni</p>
+                <p className="text-sm font-medium text-foreground">{t("ob.sleepTitle")}</p>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: "erken", label: "Erken Kalkar", icon: Sun, emoji: "🌅" },
-                    { value: "gece", label: "Gece Kuşu", icon: Moon, emoji: "🌙" },
-                    { value: "esnek", label: "Esnek", icon: Clock, emoji: "⏰" },
+                    { value: "erken", label: t("ob.sleepEarly"), icon: Sun, emoji: "🌅" },
+                    { value: "gece", label: t("ob.sleepNight"), icon: Moon, emoji: "🌙" },
+                    { value: "esnek", label: t("ob.sleepFlexible"), icon: Clock, emoji: "⏰" },
                   ].map(s => (
                     <button
                       key={s.value}
@@ -561,7 +556,7 @@ const Onboarding = () => {
                 >
                   <Camera className={`w-8 h-8 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
                   <span className="text-xs text-muted-foreground font-medium">
-                    {uploading ? "Yükleniyor…" : "Ekle"}
+                    {t(uploading ? "ob.uploading" : "ob.addPhoto")}
                   </span>
                 </button>
               )}
@@ -577,7 +572,7 @@ const Onboarding = () => {
           disabled={!canProceed() || busy}
           className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg disabled:opacity-40"
         >
-          {busy ? "Bekleyin..." : currentStep === steps.length - 1 ? "Başla" : "Devam Et"}
+          {busy ? t("login.busy") : t(currentStep === STEP_COUNT - 1 ? "ob.start" : "common.continue")}
           <ArrowRight className="w-5 h-5 ml-2" />
         </Button>
       </div>
