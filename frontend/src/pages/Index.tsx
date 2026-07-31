@@ -13,7 +13,7 @@ const mockProfiles = [
   { name: "Elif", age: 21, uni: "Marmara", dept: "Psikoloji", district: "ÜSKÜDAR", budget: "4.000 — 7.000", tags: ["Sigara içmez", "Sosyal"], photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop" },
   { name: "Kaan", age: 24, uni: "Yıldız Teknik", dept: "Elektrik Müh.", district: "ŞİŞLİ", budget: "5.500 — 8.500", tags: ["Düzenli", "Spor sever"], photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop" },
   { name: "Sude", age: 20, uni: "İstanbul Ü.", dept: "Hukuk", district: "FATİH", budget: "4.500 — 7.000", tags: ["Sessiz", "Sigara içmez"], photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop" },
-  { name: "Emre", age: 25, uni: "Koç Üniversitesi", dept: "İşletme", district: "SARIYER", budget: "7.000 — 12.000", tags: ["Hayvan dostu", "Sosyal"], photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop" },
+  { name: "Ahmet Durtmez", age: 25, uni: "Koç Üniversitesi", dept: "İşletme", district: "SARIYER", budget: "7.000 — 12.000", tags: ["Hayvan dostu", "Sosyal"], photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop" },
 ];
 
 const mockListings = [
