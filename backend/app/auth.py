@@ -211,6 +211,17 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class AccountDelete(BaseModel):
+    """Hesap silme onayı: şifre ya da geçerli OTP ile."""
+
+    password: str = Field(..., min_length=1, max_length=128)
+
+
 # ---- bağımlılıklar ----
 
 def get_optional_user(
@@ -377,6 +388,78 @@ def update_me(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/change-password", status_code=204)
+def change_password(
+    payload: PasswordChange,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Şifre değiştirir ve diğer tüm oturumları kapatır."""
+    if not user.password_hash or not _verify_password(
+        payload.current_password, user.password_hash
+    ):
+        raise HTTPException(status_code=400, detail="Mevcut şifren hatalı.")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=400, detail="Yeni şifre eskisiyle aynı olamaz."
+        )
+
+    user.password_hash = _hash_password(payload.new_password)
+    # Güvenlik: şifre değişince tüm token'lar düşer, kullanıcı yeniden girer
+    db.query(models.AuthToken).filter(
+        models.AuthToken.user_id == user.id
+    ).delete(synchronize_session=False)
+    db.commit()
+
+
+@router.delete("/me", status_code=204)
+def delete_account(
+    payload: AccountDelete,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Hesabı ve ona bağlı tüm verileri kalıcı olarak siler."""
+    if not user.password_hash or not _verify_password(
+        payload.password, user.password_hash
+    ):
+        raise HTTPException(status_code=400, detail="Şifren hatalı.")
+
+    uid = user.id
+    # Eşleşmelere ait mesajlar (karşı tarafınkiler dahil) önce silinmeli
+    match_ids = [
+        m.id
+        for m in db.query(models.Match.id).filter(
+            (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
+        )
+    ]
+    if match_ids:
+        db.query(models.Message).filter(
+            models.Message.match_id.in_(match_ids)
+        ).delete(synchronize_session=False)
+    db.query(models.Match).filter(
+        (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
+    ).delete(synchronize_session=False)
+
+    listing_ids = [
+        l.id for l in db.query(models.Listing.id).filter_by(owner_id=uid)
+    ]
+    if listing_ids:
+        db.query(models.Swipe).filter(
+            models.Swipe.listing_id.in_(listing_ids)
+        ).delete(synchronize_session=False)
+    db.query(models.Swipe).filter(models.Swipe.swiper_id == uid).delete(
+        synchronize_session=False
+    )
+    db.query(models.Listing).filter_by(owner_id=uid).delete(
+        synchronize_session=False
+    )
+    db.query(models.AuthToken).filter_by(user_id=uid).delete(
+        synchronize_session=False
+    )
+    db.delete(user)
+    db.commit()
 
 
 @router.post("/logout", status_code=204)

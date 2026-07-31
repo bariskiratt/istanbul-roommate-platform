@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Lock, User, LogOut, ChevronRight, Sun, Moon, Monitor } from "lucide-react";
+import { ArrowLeft, Lock, User, LogOut, ChevronRight, Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
 import BottomNav from "@/components/layout/BottomNav";
 import { toast } from "sonner";
@@ -17,8 +17,7 @@ const Settings = () => {
   const { theme, setTheme } = useTheme();
 
   const items = [
-    { icon: User, label: "Hesap Bilgileri", action: () => toast("Bu sayfa yakında geliyor") },
-    { icon: Bell, label: "Bildirim Ayarları", action: () => toast("Bu sayfa yakında geliyor") },
+    { icon: User, label: "Hesap Bilgileri", action: () => navigate("/settings/account") },
     { icon: Lock, label: "Gizlilik ve Güvenlik", action: () => navigate("/safety") },
     { icon: LogOut, label: "Çıkış Yap", action: () => { logout(); toast("Çıkış yapıldı"); navigate("/"); }, destructive: true },
   ];

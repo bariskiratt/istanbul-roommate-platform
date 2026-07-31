@@ -297,6 +297,23 @@ export const updateMe = (payload: UserUpdate) =>
 export const logoutApi = () =>
   request<void>("/api/auth/logout", { method: "POST" });
 
+/** Şifre değiştirir; sunucu tüm oturumları düşürür. */
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  request<void>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+
+/** Hesabı ve tüm verilerini kalıcı olarak siler. */
+export const deleteAccount = (password: string) =>
+  request<void>("/api/auth/me", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
+
 // ---- Swipe ve eşleşme ----
 
 export interface PublicUser {

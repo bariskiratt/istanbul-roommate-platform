@@ -14,6 +14,7 @@ import Messages from "./pages/Messages";
 import ChatScreen from "./pages/ChatScreen";
 import Profile from "./pages/Profile";
 import ProfileEdit from "./pages/ProfileEdit";
+import AccountSettings from "./pages/AccountSettings";
 import CreateListing from "./pages/CreateListing";
 import Listings from "./pages/Listings";
 import Explore from "./pages/Explore";
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/safety" element={<Safety />} />
             <Route path="/login" element={<Login />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/account" element={<AccountSettings />} />
             <Route path="/premium" element={<Premium />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
