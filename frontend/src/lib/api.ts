@@ -163,6 +163,15 @@ export interface ApiListing extends ListingPayload {
 export const createListing = (payload: ListingPayload) =>
   postJSON<ApiListing>("/api/listings", payload);
 
+export const updateListing = (id: number, payload: Partial<ListingPayload>) =>
+  request<ApiListing>(`/api/listings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteListing = (id: number) =>
+  request<void>(`/api/listings/${id}`, { method: "DELETE" });
+
 export const fetchListings = (params?: {
   type?: ListingPayload["type"];
   district?: string;

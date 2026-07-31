@@ -107,6 +107,29 @@ def test_kisisel_ilan_budget_order(client):
     assert res.status_code == 422
 
 
+def test_patch_requires_owner(client):
+    # Anonim ilan: sahibi yok -> kimse PATCH edemez
+    client.post("/api/listings", json=EV_ILANI)
+    res = client.patch("/api/listings/1", json={"rent": 20000})
+    assert res.status_code == 403
+
+    # Sahipli ilan: sahibi günceller, yabancı 403 alır
+    reg = client.post(
+        "/api/auth/register", json={"email": "ali@uni.edu.tr", "password": "Sifre1234"}
+    )
+    token = client.post(
+        "/api/auth/verify-otp",
+        json={"email": "ali@uni.edu.tr", "code": reg.json()["dev_code"]},
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/api/listings", json=EV_ILANI, headers=headers)
+
+    res = client.patch("/api/listings/2", json={"rent": 20000}, headers=headers)
+    assert res.status_code == 200
+    assert res.json()["rent"] == 20000
+    assert client.patch("/api/listings/2", json={"rent": 1}).status_code == 403
+
+
 def test_deactivate_hides_listing(client):
     client.post("/api/listings", json=EV_ILANI)
     res = client.delete("/api/listings/1")

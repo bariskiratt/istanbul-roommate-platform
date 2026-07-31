@@ -2,55 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
 
+/*
+ * Tasarım dili: Hinge esinli — sıcak krem zemin, mürekkep rengi (neredeyse
+ * siyah) birincil aksiyonlar, derin mor ikincil vurgu, editoryal serif
+ * başlıklar. Oyuncul pastel/gradyan yerine sakin, yetişkin bir ton.
+ */
 @layer base {
   :root {
-    --background: 252 33% 97%;
-    --foreground: 234 33% 14%;
+    --background: 36 30% 96%;
+    --foreground: 24 12% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 234 33% 14%;
+    --card-foreground: 24 12% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 234 33% 14%;
+    --popover-foreground: 24 12% 10%;
 
-    --primary: 220 90% 60%;
-    --primary-foreground: 0 0% 100%;
+    /* Mürekkep — birincil düğmeler Hinge gibi koyu */
+    --primary: 24 12% 12%;
+    --primary-foreground: 36 30% 97%;
 
-    --secondary: 234 87% 67%;
-    --secondary-foreground: 0 0% 100%;
+    /* Derin mor — vurgu ve gradyanların bittiği ton */
+    --secondary: 263 45% 34%;
+    --secondary-foreground: 36 30% 97%;
 
-    --muted: 240 10% 92%;
-    --muted-foreground: 240 3% 55%;
+    --muted: 36 14% 90%;
+    --muted-foreground: 28 7% 44%;
 
-    --accent: 165 70% 58%;
-    --accent-foreground: 0 0% 100%;
+    /* Olumlu/beğeni: dingin adaçayı yeşili */
+    --accent: 160 30% 40%;
+    --accent-foreground: 36 30% 97%;
 
-    --destructive: 6 100% 69%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 4 62% 52%;
+    --destructive-foreground: 36 30% 97%;
 
-    --border: 40 15% 92%;
-    --input: 40 15% 90%;
-    --ring: 220 90% 60%;
+    --border: 32 14% 87%;
+    --input: 32 14% 85%;
+    --ring: 24 12% 12%;
 
-    --radius: 1rem;
+    --radius: 0.8rem;
 
-    /* Brand tokens */
-    --lavender: 244 100% 92%;
-    --sand: 33 33% 85%;
-    --coral: 6 100% 69%;
-    --mint: 165 70% 58%;
-    --indigo: 234 87% 67%;
+    /* Brand tokens — eski adlar korunarak yeni tona çekildi */
+    --lavender: 263 30% 92%;   /* mor tül */
+    --sand: 33 24% 89%;        /* sıcak kum */
+    --coral: 4 62% 58%;
+    --mint: 160 30% 40%;
+    --indigo: 263 45% 34%;
 
-    --sidebar-background: 252 33% 97%;
-    --sidebar-foreground: 234 33% 14%;
-    --sidebar-primary: 220 90% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 252 33% 95%;
-    --sidebar-accent-foreground: 234 33% 14%;
-    --sidebar-border: 40 15% 92%;
-    --sidebar-ring: 220 90% 60%;
+    --sidebar-background: 36 30% 96%;
+    --sidebar-foreground: 24 12% 10%;
+    --sidebar-primary: 24 12% 12%;
+    --sidebar-primary-foreground: 36 30% 97%;
+    --sidebar-accent: 36 20% 93%;
+    --sidebar-accent-foreground: 24 12% 10%;
+    --sidebar-border: 32 14% 87%;
+    --sidebar-ring: 24 12% 12%;
   }
 }
 
@@ -64,7 +72,13 @@
     font-family: 'Inter', sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /* Editoryal serif başlıklar — Hinge'in dergi havası */
+  h1, h2, h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+
+  h4, h5, h6 {
     font-family: 'Inter', sans-serif;
   }
 }
@@ -76,10 +90,10 @@
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
   }
 
-  /* Cards — white on cream, warm shadow */
+  /* Cards — beyaz, ince çizgili, yumuşak tek gölge (Hinge kartları gibi) */
   .card-listing {
-    @apply bg-card rounded-2xl overflow-hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    @apply bg-card rounded-xl overflow-hidden border border-border;
+    box-shadow: 0 1px 3px rgba(28, 25, 20, 0.05);
   }
 
   /* Swipe action buttons — large circles with colored shadows */
@@ -100,7 +114,7 @@
   }
 
   .btn-supermatch {
-    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full transition-all duration-200 active:scale-95;
+    @apply bg-secondary text-secondary-foreground rounded-full transition-all duration-200 active:scale-95;
     box-shadow: 0 4px 16px hsl(var(--indigo) / 0.3);
   }
   .btn-supermatch:hover {
@@ -130,13 +144,13 @@
     @apply h-[3px] rounded-full bg-primary transition-all duration-500;
   }
 
-  /* Messages — 20px radius */
+  /* Messages — gönderilen mürekkep, alınan sıcak gri */
   .message-sent {
-    @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-[20px] rounded-br-md px-4 py-3;
+    @apply bg-primary text-primary-foreground rounded-[18px] rounded-br-md px-4 py-3;
   }
 
   .message-received {
-    @apply bg-sand text-foreground rounded-[20px] rounded-bl-md px-4 py-3;
+    @apply bg-card border border-border text-foreground rounded-[18px] rounded-bl-md px-4 py-3;
   }
 
   /* Bottom nav — shadow, no border */

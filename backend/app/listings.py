@@ -109,6 +109,42 @@ def get_listing(listing_id: int, db: Session = Depends(get_db)):
     return row
 
 
+class ListingUpdate(BaseModel):
+    """PATCH — yalnızca gönderilen alanlar güncellenir; tip değiştirilemez."""
+
+    title: str | None = Field(None, min_length=3, max_length=120)
+    description: str | None = Field(None, min_length=1, max_length=2000)
+    district: str | None = Field(None, min_length=1, max_length=40)
+    photos: list[str] | None = Field(None, max_length=6)
+    rent: int | None = Field(None, gt=0, le=10_000_000)
+    room_count: str | None = Field(None, max_length=10)
+    smoking_allowed: bool | None = None
+    pets_allowed: bool | None = None
+    budget_min: int | None = Field(None, gt=0, le=10_000_000)
+    budget_max: int | None = Field(None, gt=0, le=10_000_000)
+
+
+@router.patch("/{listing_id}", response_model=ListingOut)
+def update_listing(
+    listing_id: int,
+    payload: ListingUpdate,
+    db: Session = Depends(get_db),
+    user: models.User | None = Depends(get_optional_user),
+):
+    """İlan güncelleme — yalnızca ilan sahibi."""
+    row = db.get(models.Listing, listing_id)
+    if row is None or not row.is_active:
+        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+    if row.owner_id is None or user is None or user.id != row.owner_id:
+        raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 @router.delete("/{listing_id}", status_code=204)
 def deactivate_listing(
     listing_id: int,

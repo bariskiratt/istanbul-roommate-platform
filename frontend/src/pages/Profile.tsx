@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Trash2, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { currentUser, mockMatches } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
@@ -9,7 +10,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchListings } from "@/lib/api";
+import { fetchListings, deleteListing } from "@/lib/api";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch-me";
 
@@ -41,6 +42,17 @@ const Profile = () => {
     queryKey: ["listings", "mine"],
     queryFn: () => fetchListings({ mine: true }),
     enabled: isLoggedIn && me !== null,
+  });
+
+  const queryClient = useQueryClient();
+  const removeListing = useMutation({
+    mutationFn: deleteListing,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      toast.success("İlan kaldırıldı");
+    },
+    onError: err =>
+      toast.error(err instanceof Error ? err.message : "İlan kaldırılamadı"),
   });
 
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
@@ -218,6 +230,18 @@ const Profile = () => {
                       : `${listing.budget_min?.toLocaleString("tr-TR")}–${listing.budget_max?.toLocaleString("tr-TR")} ₺`}
                   </p>
                 </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`"${listing.title}" ilanını kaldırmak istediğine emin misin?`)) {
+                      removeListing.mutate(listing.id);
+                    }
+                  }}
+                  disabled={removeListing.isPending}
+                  className="self-center mr-3 w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                  title="İlanı kaldır"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </motion.div>
             )) : (
               <p className="text-center text-muted-foreground py-8">Henüz ilan oluşturmadın</p>

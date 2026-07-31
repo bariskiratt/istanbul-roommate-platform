@@ -1,27 +1,74 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Heart, GraduationCap, DollarSign, MessageCircle, ArrowRight } from "lucide-react";
-import { mockSwipeNotifications, type SwipeNotification } from "@/data/mockData";
+import { toast } from "sonner";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+
+const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
+
+// API beğenisini kartın beklediği görünüme çevirir
+const toNotification = (r: ReceivedLike) => ({
+  id: String(r.swipe_id),
+  swipeId: r.swipe_id,
+  listingTitle: r.listing_title,
+  user: {
+    name: r.user.name || "İsimsiz",
+    university: r.user.university ?? "—",
+    budgetMin: r.user.budget_min ?? 0,
+    budgetMax: r.user.budget_max ?? 0,
+    smoking: r.user.smoking ?? false,
+    pets: r.user.pets ?? false,
+    sleepSchedule: (r.user.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
+    photos: r.user.photos.length > 0 ? r.user.photos : [placeholderAvatar],
+  },
+});
+
+type Notification = ReturnType<typeof toNotification>;
 
 const Notifications = () => {
-  const { isLoggedIn } = useAuth();
-  const [notifications, setNotifications] = useState(mockSwipeNotifications);
-  const [matchPopup, setMatchPopup] = useState<SwipeNotification | null>(null);
+  const { isLoggedIn, user: me } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [matchPopup, setMatchPopup] = useState<Notification | null>(null);
   const [confetti, setConfetti] = useState(false);
+
+  const { data: received = [] } = useQuery({
+    queryKey: ["received-likes"],
+    queryFn: fetchReceivedLikes,
+    enabled: isLoggedIn,
+  });
+
+  useEffect(() => {
+    setNotifications(received.map(toNotification));
+  }, [received]);
 
   const handleSwipe = (notifId: string, direction: "left" | "right") => {
     const notif = notifications.find(n => n.id === notifId);
-    if (direction === "right" && notif) {
-      setMatchPopup(notif);
-      setConfetti(true);
-      setTimeout(() => setConfetti(false), 2000);
-    }
+    if (!notif) return;
+
+    respondToLike(notif.swipeId, direction === "right")
+      .then(res => {
+        queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+        queryClient.invalidateQueries({ queryKey: ["matches"] });
+        if (res.matched) {
+          setMatchPopup(notif);
+          setConfetti(true);
+          setTimeout(() => setConfetti(false), 2000);
+        }
+      })
+      .catch(err =>
+        toast.error(err instanceof Error ? err.message : "Cevap kaydedilemedi"),
+      );
+
     setNotifications(prev => prev.filter(n => n.id !== notifId));
   };
 
@@ -29,7 +76,7 @@ const Notifications = () => {
     if (!acc[notif.listingTitle]) acc[notif.listingTitle] = [];
     acc[notif.listingTitle].push(notif);
     return acc;
-  }, {} as Record<string, SwipeNotification[]>);
+  }, {} as Record<string, Notification[]>);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -120,7 +167,7 @@ const Notifications = () => {
                   initial={{ x: 40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face"
+                  src={me?.photos[0] ?? placeholderAvatar}
                   alt=""
                   className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
                 />
@@ -132,7 +179,7 @@ const Notifications = () => {
               
               <div className="space-y-3 pt-2">
                 <Button
-                  onClick={() => setMatchPopup(null)}
+                  onClick={() => { setMatchPopup(null); navigate("/messages"); }}
                   className="w-full h-14 bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg font-bold text-base"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
@@ -183,7 +230,7 @@ const Notifications = () => {
   );
 };
 
-const NotificationCard = ({ notification, onSwipe }: { notification: SwipeNotification; onSwipe: (dir: "left" | "right") => void }) => {
+const NotificationCard = ({ notification, onSwipe }: { notification: Notification; onSwipe: (dir: "left" | "right") => void }) => {
   const { user } = notification;
   return (
     <div className="card-listing p-5 flex items-center gap-4">
