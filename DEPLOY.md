@@ -11,7 +11,7 @@ Kod tarafı hazır; aşağıdaki adımlar hesap açıp bağlamaktan ibaret.
    Postgres'i kurulur. Docker imajı derlenirken adil fiyat modeli eğitilir (~5-10 dk).
 3. Kurulum bittiğinde API adresini not al: `https://roommatch-api.onrender.com` gibi.
 4. Service → Environment → `CORS_ORIGINS` değerine Vercel adresini gir
-   (2. bölümü bitirince): `https://SENIN-PROJEN.vercel.app`
+   (2. bölümü bitirince): `https://evdes.tr`
 
 Notlar:
 - **Fotoğraflar:** Ücretsiz planda disk kalıcı değildir — yüklenen fotoğraflar

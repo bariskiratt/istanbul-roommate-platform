@@ -13,4 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping API
-        run: curl -fsS --max-time 90 https://roommatch-api-4ack.onrender.com/ > /dev/null || true
+        run: curl -fsS --max-time 90 https://api.evdes.tr/ > /dev/null || true

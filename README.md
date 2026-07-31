@@ -5,8 +5,8 @@ It combines a swipe-based matching UI with a machine-learning **fair rent
 advisor**, a **budget heatmap** of 968 neighborhoods, and rail-network-based
 **alternative district suggestions** — all in one app.
 
-**Live demo:** https://istanbul-roommate-platform.vercel.app
-**API:** https://roommatch-api-4ack.onrender.com ([docs](https://roommatch-api-4ack.onrender.com/docs))
+**Live:** https://evdes.tr
+**API:** https://api.evdes.tr ([docs](https://api.evdes.tr/docs))
 ---
 
 ## ✨ Features
@@ -87,7 +87,7 @@ npm run dev
 Optional demo content (20 users + 100 realistic listings, rents derived from
 real neighborhood medians): `python -m scripts.seed_demo`.
 
-**Tests:** `python -m pytest tests/` (backend, 40 tests) · `npm test` (frontend).
+**Tests:** `python -m pytest tests/` (backend, 57 tests) · `npm test` (frontend).
 
 ## 🚀 Deployment
 
