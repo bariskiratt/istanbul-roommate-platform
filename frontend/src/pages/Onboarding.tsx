@@ -5,10 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { registerUser, verifyOtp, updateMe } from "@/lib/api";
+import { registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
+import PasswordInput from "@/components/PasswordInput";
 
 const steps = ["E-posta", "OTP", "Kişisel", "Üniversite", "Bütçe", "Yaşam Tarzı", "Fotoğraf"];
 
@@ -32,8 +33,6 @@ const Onboarding = () => {
   const [photos, setPhotos] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordChecks = {
     length: password.length >= 8,
@@ -46,13 +45,42 @@ const Onboarding = () => {
   const progress = ((currentStep + 1) / steps.length) * 100;
 
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) return;
+    // Yapıştırma: "123456" gibi çok haneli girdiyi kutulara dağıt
+    const digits = value.replace(/\D/g, "");
+    if (digits.length > 1) {
+      const newOtp = [...otp];
+      for (let i = 0; i < 6 - index && i < digits.length; i++) {
+        newOtp[index + i] = digits[i];
+      }
+      setOtp(newOtp);
+      document.getElementById(`otp-${Math.min(index + digits.length, 5)}`)?.focus();
+      return;
+    }
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = digits;
     setOtp(newOtp);
-    if (value && index < 5) {
-      const next = document.getElementById(`otp-${index + 1}`);
-      next?.focus();
+    if (digits && index < 5) {
+      document.getElementById(`otp-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      document.getElementById(`otp-${index - 1}`)?.focus();
+    }
+  };
+
+  const resendCode = async () => {
+    try {
+      const res = await requestOtp(email);
+      setOtp(["", "", "", "", "", ""]);
+      if (res.dev_code) {
+        toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
+      } else {
+        toast.success("Yeni kod e-postana gönderildi!");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kod gönderilemedi");
     }
   };
 
@@ -203,33 +231,31 @@ const Onboarding = () => {
           {/* Step 0: Email */}
           {currentStep === 0 && (
             <div className="space-y-5">
-              <Input
-                type="email"
-                placeholder="öğrenci@üniversite.edu.tr"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
-              />
+              <div className="space-y-2">
+                <Input
+                  type="email"
+                  placeholder="öğrenci@üniversite.edu.tr"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  autoComplete="email"
+                  className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
+                />
+                {email.length > 3 && !email.includes(".edu.tr") && (
+                  <p className="text-xs text-destructive pt-1">
+                    Yalnızca .edu.tr uzantılı üniversite e-postaları kabul edilir
+                  </p>
+                )}
+              </div>
 
               {/* Password */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Şifre oluştur</label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="En az 8 karakter"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
+                <PasswordInput
+                  placeholder="En az 8 karakter"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
+                />
                 {password.length > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
@@ -238,8 +264,8 @@ const Onboarding = () => {
                       { ok: passwordChecks.number, text: "En az 1 rakam" },
                     ].map(rule => (
                       <div key={rule.text} className="flex items-center gap-2 text-xs">
-                        <Check className={`w-3.5 h-3.5 ${rule.ok ? "text-green-500" : "text-muted-foreground/40"}`} />
-                        <span className={rule.ok ? "text-green-600" : "text-muted-foreground"}>{rule.text}</span>
+                        <Check className={`w-3.5 h-3.5 ${rule.ok ? "text-accent" : "text-muted-foreground/40"}`} />
+                        <span className={rule.ok ? "text-accent" : "text-muted-foreground"}>{rule.text}</span>
                       </div>
                     ))}
                   </div>
@@ -249,22 +275,12 @@ const Onboarding = () => {
               {/* Confirm Password */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Şifreyi tekrarla</label>
-                <div className="relative">
-                  <Input
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Şifreni tekrar gir"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
+                <PasswordInput
+                  placeholder="Şifreni tekrar gir"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
+                />
                 {confirmPassword.length > 0 && !passwordsMatch && (
                   <p className="text-xs text-destructive pt-1">Şifreler eşleşmiyor</p>
                 )}
@@ -282,15 +298,18 @@ const Onboarding = () => {
                     id={`otp-${i}`}
                     type="text"
                     inputMode="numeric"
-                    maxLength={1}
                     value={digit}
                     onChange={e => handleOtpChange(i, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(i, e)}
                     className="w-14 h-14 text-center text-2xl font-bold rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
                   />
                 ))}
               </div>
               <p className="text-center text-sm text-muted-foreground">
-                Kod gelmedi mi? <button className="text-primary font-semibold">Tekrar gönder</button>
+                Kod gelmedi mi?{" "}
+                <button type="button" onClick={resendCode} className="text-primary font-semibold hover:underline">
+                  Tekrar gönder
+                </button>
               </p>
             </div>
           )}

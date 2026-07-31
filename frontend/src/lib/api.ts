@@ -246,6 +246,12 @@ export const verifyOtp = (email: string, code: string) =>
     code,
   });
 
+export const loginWithPassword = (email: string, password: string) =>
+  postJSON<{ token: string; user: ApiUser }>("/api/auth/login", {
+    email,
+    password,
+  });
+
 export const fetchMe = () => getJSON<ApiUser>("/api/auth/me");
 
 export const updateMe = (payload: UserUpdate) =>

@@ -140,6 +140,44 @@ def test_listing_ownership_and_mine(client):
     assert client.delete(f"/api/listings/{owned_id}", headers=headers).status_code == 204
 
 
+def test_password_login(client):
+    _register_and_login(client)
+
+    # Doğru şifre -> token
+    res = client.post(
+        "/api/auth/login",
+        json={"email": REGISTER["email"], "password": REGISTER["password"]},
+    )
+    assert res.status_code == 200, res.text
+    token = res.json()["token"]
+    assert client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+    ).status_code == 200
+
+    # Yanlış şifre -> 401
+    res = client.post(
+        "/api/auth/login",
+        json={"email": REGISTER["email"], "password": "YanlisSifre1"},
+    )
+    assert res.status_code == 401
+
+    # Kayıtsız e-posta -> 401 (aynı mesaj; hesap varlığı sızdırılmaz)
+    res = client.post(
+        "/api/auth/login",
+        json={"email": "yok@uni.edu.tr", "password": "Sifre1234"},
+    )
+    assert res.status_code == 401
+
+
+def test_password_login_requires_verified(client):
+    client.post("/api/auth/register", json=REGISTER)  # OTP doğrulanmadı
+    res = client.post(
+        "/api/auth/login",
+        json={"email": REGISTER["email"], "password": REGISTER["password"]},
+    )
+    assert res.status_code == 403
+
+
 def test_logout_invalidates_token(client):
     token, _ = _register_and_login(client)
     headers = {"Authorization": f"Bearer {token}"}

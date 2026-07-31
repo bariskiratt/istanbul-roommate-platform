@@ -108,6 +108,10 @@ class VerifyIn(EmailIn):
     code: str = Field(..., min_length=6, max_length=6)
 
 
+class LoginIn(EmailIn):
+    password: str = Field(..., min_length=1, max_length=128)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -217,6 +221,33 @@ def request_otp(payload: EmailIn, db: Session = Depends(get_db)):
     return response
 
 
+def _issue_token(db: Session, user: models.User) -> str:
+    token = secrets.token_urlsafe(32)
+    db.add(models.AuthToken(user_id=user.id, token_hash=_sha256(token)))
+    return token
+
+
+@router.post("/login", response_model=TokenOut)
+def login(payload: LoginIn, db: Session = Depends(get_db)):
+    """E-posta + şifre ile giriş (OTP'siz)."""
+    user = db.scalar(select(models.User).where(models.User.email == payload.email))
+    if (
+        user is None
+        or not user.password_hash
+        or not _verify_password(payload.password, user.password_hash)
+    ):
+        raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
+    if not user.verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Hesabın henüz doğrulanmamış. 'Kodla gir' ile e-postanı doğrula.",
+        )
+
+    token = _issue_token(db, user)
+    db.commit()
+    return {"token": token, "user": user}
+
+
 @router.post("/verify-otp", response_model=TokenOut)
 def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
@@ -235,8 +266,7 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     user.otp_hash = None
     user.otp_expires = None
 
-    token = secrets.token_urlsafe(32)
-    db.add(models.AuthToken(user_id=user.id, token_hash=_sha256(token)))
+    token = _issue_token(db, user)
     db.commit()
     db.refresh(user)
 
