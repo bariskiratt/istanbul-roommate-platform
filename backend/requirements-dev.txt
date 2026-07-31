@@ -3,7 +3,6 @@
 -r requirements.txt
 
 # Model eğitimi (scripts/train_model.py — CV karşılaştırması)
-scikit-learn>=1.4
 xgboost>=2.0
 
 # Testler

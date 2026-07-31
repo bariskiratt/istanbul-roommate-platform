@@ -13,3 +13,7 @@ requests>=2.31     # OTP e-postası (Brevo) + scripts/fetch_transit.py
 # Model servis etme (yükleme + tahmin)
 lightgbm>=4.0
 joblib>=1.3
+# LGBMRegressor sklearn'in BaseEstimator'ından türer; model dosyası sklearn
+# kuruluyken kaydedildiği için yüklemede de gerekli. (Asıl ağırlık olan
+# xgboost + nvidia paketleri yalnızca eğitimde: requirements-dev.txt)
+scikit-learn>=1.4
