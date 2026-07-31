@@ -233,7 +233,9 @@ def seed(force: bool = False) -> None:
                 district=district,
                 budget_min=int(round(mid * 0.8, -2)),
                 budget_max=int(round(mid * 1.25, -2)),
-                photos=[owner.photos[0]],
+                # İlan görseli iç mekân olsun; sahibinin portresi profil/deste
+                # şeritlerinde zaten görünüyor (Evler sayfasında yüz garip duruyor)
+                photos=[_home_photo(i)],
             )
         db.add(listing)
         created += 1
