@@ -1,19 +1,32 @@
-"""SQLite bağlantısı ve oturum yönetimi.
+"""Veritabanı bağlantısı ve oturum yönetimi.
 
-Tek dosyalık SQLite yeterli: tek süreç, düşük yazma hacmi. İleride Postgres'e
-geçiş gerekirse yalnızca buradaki engine değişir.
+Yerelde tek dosyalık SQLite yeterli. Yayında DATABASE_URL ortam değişkeni
+verilirse (ör. Render/Railway Postgres'i: postgresql://...) o kullanılır.
 """
+
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import DB_PATH
 
-# check_same_thread=False: FastAPI istekleri farklı thread'lerden gelebilir;
-# oturumlar istek başına açılıp kapandığı için paylaşım riski yok.
+_url = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+# SQLAlchemy 2 + psycopg3 sürücüsü "postgresql+psycopg://" ister;
+# sağlayıcılar genelde "postgres(ql)://" verir, burada düzeltiyoruz.
+if _url.startswith("postgres://"):
+    _url = _url.replace("postgres://", "postgresql+psycopg://", 1)
+elif _url.startswith("postgresql://"):
+    _url = _url.replace("postgresql://", "postgresql+psycopg://", 1)
+
 engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False},
+    _url,
+    # check_same_thread yalnız SQLite için: FastAPI istekleri farklı
+    # thread'lerden gelebilir; oturumlar istek başına açılıp kapanıyor.
+    connect_args=(
+        {"check_same_thread": False} if _url.startswith("sqlite") else {}
+    ),
+    pool_pre_ping=not _url.startswith("sqlite"),
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

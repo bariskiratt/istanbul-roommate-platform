@@ -3,7 +3,8 @@ numpy>=1.26
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.0
-sqlalchemy>=2.0    # ilan persistansı (SQLite)
+sqlalchemy>=2.0    # ilan persistansı (yerel: SQLite, yayın: DATABASE_URL)
+psycopg[binary]>=3.1  # Postgres sürücüsü (yalnız yayında kullanılır)
 python-multipart>=0.0.9  # fotoğraf yükleme (multipart form)
 
 # Testler

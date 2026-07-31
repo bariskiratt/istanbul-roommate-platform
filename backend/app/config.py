@@ -4,6 +4,7 @@ Yollar `__file__` üzerinden çözülüyor; böylece betikler hangi dizinden
 çalıştırılırsa çalıştırılsın veriyi buluyor (cwd'ye bağımlı değil).
 """
 
+import os
 from pathlib import Path
 
 # app/config.py -> app/ -> proje kökü
@@ -28,5 +29,6 @@ MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
 # Uygulama veritabanı (ilanlar; ileride kullanıcı/eşleşme/mesaj)
 DB_PATH = DATA_DIR / "app.db"
 
-# Kullanıcı fotoğrafları (yerelde üretilir, git'e girmez)
-UPLOADS_DIR = DATA_DIR / "uploads"
+# Kullanıcı fotoğrafları (yerelde üretilir, git'e girmez).
+# Yayında kalıcı disk bağlanan yolu UPLOADS_DIR env ile ver.
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))
