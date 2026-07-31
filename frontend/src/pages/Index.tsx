@@ -23,7 +23,7 @@ const median = (xs: number[]): number | null => {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { isLoggedIn, logout } = useAuth();
+  const { isLoggedIn, user, logout } = useAuth();
   const listingsRef = useRef<HTMLDivElement>(null);
 
   // Vitrindeki her şey gerçek: canlı ilanlardan beslenir
@@ -67,7 +67,9 @@ const Index = () => {
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-            <button onClick={() => navigate("/listings")} className="hover:text-foreground transition-colors">Ev Bul</button>
+            {isLoggedIn && user?.is_admin && (
+              <button onClick={() => navigate("/listings")} className="hover:text-foreground transition-colors">Ev Bul</button>
+            )}
             <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">Ev Arkadaşı Bul</button>
             <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">Bütçe Haritası</button>
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">Güvenlik</button>
@@ -140,7 +142,7 @@ const Index = () => {
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate("/listings")}
+              onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")}
               className="rounded-full font-semibold px-8 py-3.5 text-base h-auto border-border"
             >
               İlanlara Göz At
@@ -193,7 +195,7 @@ const Index = () => {
       {houses.length > 0 && (
         <section className="max-w-7xl mx-auto px-6 py-16">
           <div className="flex items-end justify-between mb-8">
-            <button onClick={() => navigate("/listings")} className="group text-left">
+            <button onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")} className="group text-left">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground inline-flex items-center gap-2">
                 Öne çıkan evler
                 <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:translate-x-1 transition-transform" />
@@ -219,7 +221,7 @@ const Index = () => {
                 transition={{ delay: Math.min(i * 0.05, 0.3) }}
                 className="flex-shrink-0 w-72 snap-start"
               >
-                <div onClick={() => navigate("/listings")} className="card-listing overflow-hidden group cursor-pointer h-full">
+                <div onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")} className="card-listing overflow-hidden group cursor-pointer h-full">
                   <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                     {l.photos[0] ? (
                       <img src={l.photos[0]} alt={l.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -337,7 +339,7 @@ const Index = () => {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: Math.min(i * 0.03, 0.2) }}
-                onClick={() => navigate("/listings")}
+                onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")}
                 className="card-listing p-5 text-left hover:shadow-lg transition-shadow group"
               >
                 <p className="text-lg font-bold text-foreground group-hover:text-secondary transition-colors" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
@@ -393,7 +395,7 @@ const Index = () => {
           <div className="flex gap-6 text-sm text-muted-foreground">
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">Güvenlik</button>
             <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">Bütçe Haritası</button>
-            <button onClick={() => navigate("/listings")} className="hover:text-foreground transition-colors">İlanlar</button>
+            <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">İlanlar</button>
           </div>
           <p className="text-xs text-muted-foreground">© 2026 RoomMatch</p>
         </div>

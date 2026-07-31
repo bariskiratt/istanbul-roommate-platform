@@ -36,6 +36,7 @@ TOKEN_TTL = timedelta(days=30)
 
 # Platform üniversite öğrencilerine yönelik
 MIN_AGE, MAX_AGE = 17, 30
+
 _SCRYPT_PARAMS = {"n": 2**14, "r": 8, "p": 1}
 
 # Basit bellek-içi hız limiti: (uç, e-posta) başına pencere içi istek sayısı.
@@ -159,6 +160,7 @@ class UserOut(BaseModel):
     bio: str
     photos: list[str]
     created_at: datetime
+    is_admin: bool = False
 
 
 class UserUpdate(BaseModel):

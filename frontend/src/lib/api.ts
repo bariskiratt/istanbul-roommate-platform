@@ -91,12 +91,14 @@ export const fetchLocations = () =>
 
 // ---- Bütçe ısı haritası ----
 
-export type StatusKey = "safe" | "borderline" | "expensive" | "lowdata" | "nodata";
+export type StatusKey = "safe" | "borderline" | "expensive" | "nodata";
 
 export interface HeatmapResponse {
   budget: number;
   statuses: StatusKey[];
-  summary: Record<StatusKey, number>;
+  /** Az ilana dayanan (zayıf temsil) mahalleler — aynı sırada. */
+  low_confidence: boolean[];
+  summary: Record<StatusKey, number> & { low_confidence: number };
 }
 
 export const fetchGeojson = () =>
@@ -200,11 +202,14 @@ export const fetchListings = (params?: {
   type?: ListingPayload["type"];
   district?: string;
   mine?: boolean;
+  /** Kaydırılmış ve kendi ilanlarını gizler (deste için). */
+  unswiped?: boolean;
 }) => {
   const query = new URLSearchParams();
   if (params?.type) query.set("type", params.type);
   if (params?.district) query.set("district", params.district);
   if (params?.mine) query.set("mine", "true");
+  if (params?.unswiped) query.set("unswiped", "true");
   const qs = query.toString();
   return getJSON<ApiListing[]>(`/api/listings${qs ? `?${qs}` : ""}`);
 };
@@ -233,6 +238,7 @@ export interface ApiUser {
   bio: string;
   photos: string[];
   created_at: string;
+  is_admin: boolean;
 }
 
 export interface UserUpdate {

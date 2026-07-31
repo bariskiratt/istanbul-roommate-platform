@@ -1,12 +1,14 @@
 import { Home, Heart, MessageCircle, User, Map, Building2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Not: /notifications kaldırıldı — Beğeniler ile birebir aynı veriyi
 // gösteriyordu. Yerine uygulama içinden erişilemeyen Bütçe Haritası girdi.
 const navItems = [
   { icon: Home, label: "Keşfet", path: "/swipe" },
   { icon: Heart, label: "Beğeniler", path: "/matches" },
-  { icon: Building2, label: "Evler", path: "/listings" },
+  // Evler yalnızca yöneticiye görünür (adminOnly)
+  { icon: Building2, label: "Evler", path: "/listings", adminOnly: true },
   { icon: Map, label: "Harita", path: "/explore" },
   { icon: MessageCircle, label: "Mesajlar", path: "/messages" },
   { icon: User, label: "Profil", path: "/profile" },
@@ -15,11 +17,13 @@ const navItems = [
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const items = navItems.filter(i => !i.adminOnly || user?.is_admin);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
       <div className="max-w-lg mx-auto flex justify-around items-center pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-6">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const isActive = location.pathname === item.path ||
             (item.path === "/messages" && location.pathname.startsWith("/chat"));
           return (

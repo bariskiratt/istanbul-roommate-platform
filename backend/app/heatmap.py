@@ -17,15 +17,16 @@ from app.normalize import (
 # Bütçenin bu oranına kadar olan bölgeler "sınırda" sayılır.
 BORDERLINE_RATIO = 1.20
 
-# Bu sayının altında ilanı olan mahallenin medyanı güvenilmez (örn. Kazlıçeşme:
-# 6 lüks ilan medyanı 137.500 ₺'ye taşıyor) — normal renk yerine "Veri Az".
+# Bu sayının altında ilanı olan mahallenin medyanı zayıf temsil eder (örn.
+# Kazlıçeşme: 6 lüks ilan medyanı 137.500 ₺'ye taşıyor). Renk yine verilir —
+# harita boş kalmasın — ama "düşük güven" olarak işaretlenir; istemci bu
+# mahalleleri soluk/kesik çizgiyle çizip uyarı gösterir.
 MIN_LISTINGS = 8
 
 STATUS_STYLES = {
     "safe": {"label": "Bütçene Uygun", "color": "#2ecc71"},
     "borderline": {"label": "Sınırda", "color": "#f1c40f"},
     "expensive": {"label": "Bütçeni Aşıyor", "color": "#e74c3c"},
-    "lowdata": {"label": "Veri Az (güvenilmez)", "color": "#b8b1c9"},
     "nodata": {"label": "Veri Yok", "color": "#95a5a6"},
 }
 
@@ -103,11 +104,13 @@ def annotate_features(geojson_data, df):
 
 
 def classify(avg_price, user_budget, listing_count=None):
-    """Tek bir mahallenin bütçeye göre durumunu döndürür."""
+    """Tek bir mahallenin bütçeye göre durumunu döndürür.
+
+    listing_count yalnızca güven işaretlemesinde kullanılır; az ilanlı
+    mahalle de renklendirilir (bkz. build_budget_heatmap -> low_confidence).
+    """
     if avg_price is None:
         return "nodata"
-    if listing_count is not None and listing_count < MIN_LISTINGS:
-        return "lowdata"
     if avg_price <= user_budget:
         return "safe"
     if avg_price <= user_budget * BORDERLINE_RATIO:
@@ -121,11 +124,15 @@ def build_budget_heatmap(feature_prices, user_budget, feature_counts=None):
     Geometriyi geri göndermek yerine (istek başına ~4 MB) yalnızca feature
     sırasına göre dizilmiş durum kodlarını döndürür (~10 KB). İstemci bu
     listeyi kendi tuttuğu geometriyle eşleştirip yeniden renklendirir.
+
+    `low_confidence`: aynı sırada, o mahallenin medyanının az ilana dayanıp
+    dayanmadığı. Renk yine verilir; istemci bunları soluk çizer.
     """
     if feature_counts is None:
         feature_counts = [None] * len(feature_prices)
-    statuses = [
-        classify(price, user_budget, count)
+    statuses = [classify(price, user_budget) for price in feature_prices]
+    low_confidence = [
+        price is not None and count is not None and count < MIN_LISTINGS
         for price, count in zip(feature_prices, feature_counts)
     ]
     counts = {key: 0 for key in STATUS_STYLES}
@@ -135,5 +142,6 @@ def build_budget_heatmap(feature_prices, user_budget, feature_counts=None):
     return {
         "budget": user_budget,
         "statuses": statuses,
-        "summary": counts,
+        "low_confidence": low_confidence,
+        "summary": counts | {"low_confidence": sum(low_confidence)},
     }

@@ -39,12 +39,12 @@ def test_register_sets_university(client=None):
     assert university_from_email("BARIS@ITU.EDU.TR") == "İstanbul Teknik Üniversitesi"
 
 
-def test_heatmap_lowdata_status():
-    # 5 ilanlı mahalle bütçeye uygun bile olsa 'lowdata' işaretlenir
-    assert classify(10000, 20000, listing_count=5) == "lowdata"
-    assert classify(10000, 20000, listing_count=12) == "safe"
-    assert classify(None, 20000, listing_count=None) == "nodata"
+def test_heatmap_low_confidence_flag():
+    # Az ilanlı mahalle de renklenir; ayrıca "düşük güven" işaretlenir
+    assert classify(10000, 20000, listing_count=5) == "safe"
+    assert classify(None, 20000) == "nodata"
 
     result = build_budget_heatmap([10000, 10000, None], 20000, [5, 20, None])
-    assert result["statuses"] == ["lowdata", "safe", "nodata"]
-    assert result["summary"]["lowdata"] == 1
+    assert result["statuses"] == ["safe", "safe", "nodata"]
+    assert result["low_confidence"] == [True, False, False]
+    assert result["summary"]["low_confidence"] == 1

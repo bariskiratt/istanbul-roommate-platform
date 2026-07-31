@@ -96,6 +96,9 @@ def list_listings(
     listing_type: ListingType | None = Query(None, alias="type"),
     district: str | None = Query(None, max_length=40),
     mine: bool = Query(False, description="Sadece kendi ilanlarım (giriş ister)"),
+    unswiped: bool = Query(
+        False, description="Daha önce kaydırdıklarımı ve kendi ilanlarımı gizle"
+    ),
     db: Session = Depends(get_db),
     user: models.User | None = Depends(get_optional_user),
 ):
@@ -110,6 +113,15 @@ def list_listings(
         if user is None:
             raise HTTPException(status_code=401, detail="Giriş yapman gerekiyor.")
         stmt = stmt.where(models.Listing.owner_id == user.id)
+    if unswiped and user is not None:
+        # Karar verilmiş ilanlar desteye geri gelmesin; kendi ilanları da çıkar
+        swiped = select(models.Swipe.listing_id).where(
+            models.Swipe.swiper_id == user.id
+        )
+        stmt = stmt.where(
+            models.Listing.id.not_in(swiped),
+            (models.Listing.owner_id != user.id) | models.Listing.owner_id.is_(None),
+        )
     if listing_type is not None:
         stmt = stmt.where(models.Listing.type == listing_type)
     if district is not None:

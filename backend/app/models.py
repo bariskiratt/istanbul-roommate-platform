@@ -57,6 +57,12 @@ class User(Base):
 
     listings: Mapped[list["Listing"]] = relationship(back_populates="owner")
 
+    @property
+    def is_admin(self) -> bool:
+        from app.config import ADMIN_EMAILS
+
+        return self.email.lower() in ADMIN_EMAILS
+
 
 class AuthToken(Base):
     """Opak Bearer token (hash'i saklanır). Çıkışta silinir."""

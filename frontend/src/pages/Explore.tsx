@@ -23,7 +23,6 @@ const FALLBACK_COLORS: Record<StatusKey, string> = {
   safe: "#2ecc71",
   borderline: "#f1c40f",
   expensive: "#e74c3c",
-  lowdata: "#b8b1c9",
   nodata: "#95a5a6",
 };
 
@@ -34,6 +33,7 @@ const Explore = () => {
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.Path[]>([]);
   const statusesRef = useRef<StatusKey[]>([]);
+  const lowConfRef = useRef<boolean[]>([]);
   const altMarkersRef = useRef<L.Marker[]>([]);
   const colorsRef = useRef<Record<StatusKey, string>>(FALLBACK_COLORS);
   const seqRef = useRef(0);
@@ -49,12 +49,15 @@ const Explore = () => {
   const budgetRef = useRef(budget);
   budgetRef.current = budget;
 
-  const styleFor = (s: StatusKey): L.PathOptions => ({
+  // Az ilana dayanan mahalleler yine renklenir (harita boş kalmasın) ama
+  // soluk dolgu + kesik çizgiyle "bu tahmin zayıf" sinyali verilir.
+  const styleFor = (s: StatusKey, lowConfidence = false): L.PathOptions => ({
     fillColor: colorsRef.current[s] ?? FALLBACK_COLORS[s],
-    fillOpacity: s === "nodata" ? 0.25 : 0.65,
+    fillOpacity: s === "nodata" ? 0.25 : lowConfidence ? 0.3 : 0.65,
     weight: 1,
     color: "#fff",
     opacity: 0.6,
+    dashArray: lowConfidence ? "3 3" : undefined,
   });
 
   // Bütçe değişince yalnızca durum listesini çek ve yeniden renklendir.
@@ -64,12 +67,17 @@ const Explore = () => {
       const data = await fetchHeatmap(b);
       if (seq !== seqRef.current) return; // yarış: yalnızca son istek uygulanır
       statusesRef.current = data.statuses;
+      lowConfRef.current = data.low_confidence ?? [];
       layersRef.current.forEach((layer, i) => {
-        if (layer) layer.setStyle(styleFor(data.statuses[i]));
+        if (layer) layer.setStyle(styleFor(data.statuses[i], lowConfRef.current[i]));
       });
       setSummary(data.summary);
       const total = data.summary.safe + data.summary.borderline + data.summary.expensive;
-      setStatus(`Veri bulunan ${total} mahalleden ${data.summary.safe} tanesi bütçene uygun.`);
+      const weak = data.summary.low_confidence ?? 0;
+      setStatus(
+        `Veri bulunan ${total} mahalleden ${data.summary.safe} tanesi bütçene uygun.` +
+          (weak ? ` (${weak} mahalle az ilana dayanıyor, soluk gösteriliyor.)` : ""),
+      );
     } catch (e) {
       setStatus(`Isı haritası alınamadı: ${(e as Error).message}`);
     }
@@ -226,7 +234,7 @@ const Explore = () => {
         />
         {summary && (
           <div className="flex flex-wrap gap-3 text-xs">
-            {(["safe", "borderline", "expensive", "lowdata", "nodata"] as StatusKey[]).map((k) => (
+            {(["safe", "borderline", "expensive", "nodata"] as StatusKey[]).map((k) => (
               <span key={k} className="flex items-center gap-1.5">
                 <i
                   className="inline-block w-3 h-3 rounded-sm"

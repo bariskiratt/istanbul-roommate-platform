@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
@@ -96,15 +96,18 @@ const toDeckListing = (a: ApiListing): Listing => ({
 
 const SwipeScreen = () => {
   const { isLoggedIn, user: me } = useAuth();
+  const queryClient = useQueryClient();
   const [cards, setCards] = useState<Listing[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [superMatchLeft, setSuperMatchLeft] = useState(1);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  // Deste: karar verilmemiş ilanlar (girişliyse kaydırdıkları ve kendi
+  // ilanları sunucuda elenir; girişsizken tüm ilanlar gösterilir)
   const { data: apiListings } = useQuery({
-    queryKey: ["listings"],
-    queryFn: () => fetchListings(),
+    queryKey: ["listings", "deck", isLoggedIn],
+    queryFn: () => fetchListings({ unswiped: isLoggedIn }),
     staleTime: 60_000,
   });
 
@@ -140,6 +143,10 @@ const SwipeScreen = () => {
     if (card && isLoggedIn && card.id.startsWith("api-")) {
       postSwipe(Number(card.id.slice(4)), direction === "right" ? "like" : "pass")
         .then(res => {
+          // Deste sorgusu tazelenmesin: kart zaten elden çıktı, yeniden
+          // çekilirse liste sıfırlanır. Yalnızca eşleşme ekranları tazelenir.
+          queryClient.invalidateQueries({ queryKey: ["matches"] });
+          queryClient.invalidateQueries({ queryKey: ["received-likes"] });
           if (res.matched) {
             toast.success("Eşleştiniz! 🎉", {
               description: "Eşleşmeni Beğeniler sayfasında görebilirsin.",

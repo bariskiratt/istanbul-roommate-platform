@@ -51,10 +51,13 @@ const matchesModalFilters = (l: ApiListing, f: ListingFilters): boolean => {
 
 const Listings = () => {
   const navigate = useNavigate();
+  const { user: viewer } = useAuth();
   const [activeFilter, setActiveFilter] = useState("Tümü");
   const [selectedListing, setSelectedListing] = useState<ApiListing | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [modalFilters, setModalFilters] = useState<ListingFilters>(defaultFilters);
+
+  const isAdmin = viewer?.is_admin === true;
 
   const { data: listings, isLoading, isError, refetch } = useQuery({
     queryKey: ["listings"],
@@ -66,6 +69,22 @@ const Listings = () => {
     if (activeFilter === "Tümü") return true;
     return l.district === activeFilter || l.room_count === activeFilter;
   });
+
+  // Bu sayfa şimdilik yalnızca yöneticiye açık
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-4 pb-24">
+        <h1 className="text-2xl font-semibold text-foreground">Bu sayfa şu an kapalı</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          İlanları Keşfet ekranında kaydırarak görebilirsin.
+        </p>
+        <Button onClick={() => navigate("/swipe")} className="rounded-full px-6">
+          Keşfet'e git
+        </Button>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
