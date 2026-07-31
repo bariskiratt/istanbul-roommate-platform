@@ -45,7 +45,10 @@ const Login = () => {
         if (res.dev_code) {
           toast.info(`Giriş kodun: ${res.dev_code}`, { duration: 20000 });
         } else {
-          toast.success("Giriş kodu e-postana gönderildi!");
+          toast.success("Giriş kodu e-postana gönderildi!", {
+            description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+            duration: 8000,
+          });
         }
       } else {
         const { token, user } = await verifyOtp(email, code);

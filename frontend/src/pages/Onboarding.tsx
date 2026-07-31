@@ -78,7 +78,10 @@ const Onboarding = () => {
       if (res.dev_code) {
         toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
       } else {
-        toast.success("Yeni kod e-postana gönderildi!");
+        toast.success("Yeni kod e-postana gönderildi!", {
+          description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+          duration: 8000,
+        });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kod gönderilemedi");
@@ -114,6 +117,11 @@ const Onboarding = () => {
         setRegistered(true);
         if (res.dev_code) {
           toast.info(`Doğrulama kodun: ${res.dev_code}`, { duration: 30000 });
+        } else {
+          toast.success("Doğrulama kodu e-postana gönderildi!", {
+            description: "Gelmesi 1-2 dakika sürebilir; spam klasörünü de kontrol et.",
+            duration: 8000,
+          });
         }
       }
 
