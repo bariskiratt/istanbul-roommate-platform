@@ -108,5 +108,4 @@ Backend environment variables: `DATABASE_URL`, `CORS_ORIGINS`, `DEV_OTP`,
 - Transit graph covers rail only (no metrobus/bus/ferry).
 - Uploaded photos live on local disk — moving to S3/R2 is planned before real
   scale.
-- No rate limiting or token expiry yet; the landing-page showcase cards are
-  decorative.
+- No rate limiting or token expiry yet.

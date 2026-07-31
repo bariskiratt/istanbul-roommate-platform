@@ -110,6 +110,10 @@ class Listing(Base):
     def owner_name(self) -> str | None:
         return self.owner.name if self.owner else None
 
+    @property
+    def owner_university(self) -> str | None:
+        return self.owner.university if self.owner else None
+
 
 class Swipe(Base):
     """Bir kullanıcının bir ilana verdiği karar (beğen/geç).

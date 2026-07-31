@@ -59,6 +59,7 @@ class ListingOut(ListingIn):
     created_at: datetime
     owner_id: int | None = None
     owner_name: str | None = None
+    owner_university: str | None = None
 
 
 @router.post("", status_code=201, response_model=ListingOut)

@@ -158,6 +158,7 @@ export interface ApiListing extends ListingPayload {
   created_at: string;
   owner_id: number | null;
   owner_name: string | null;
+  owner_university: string | null;
 }
 
 export const createListing = (payload: ListingPayload) =>
