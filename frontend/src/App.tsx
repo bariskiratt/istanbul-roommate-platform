@@ -21,7 +21,6 @@ import Explore from "./pages/Explore";
 import Safety from "./pages/Safety";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
-import Premium from "./pages/Premium";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,7 +50,6 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/account" element={<AccountSettings />} />
-            <Route path="/premium" element={<Premium />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

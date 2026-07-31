@@ -209,16 +209,6 @@ const Listings = () => {
         )}
       </div>
 
-      {/* Premium banner */}
-      <div className="sticky bottom-20 mx-6 rounded-2xl p-4 flex items-center gap-3" style={{ background: "linear-gradient(135deg, hsl(var(--lavender)) 0%, hsl(var(--background)) 100%)" }}>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-foreground">İlanını öne çıkar, daha fazla kişiye ulaş ⚡</p>
-        </div>
-        <Button size="sm" onClick={() => navigate("/premium")} className="rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground text-xs px-4 shadow-md">
-          Premium'a Geç
-        </Button>
-      </div>
-
       {/* Listing Detail Modal */}
       <ListingDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} />
 
