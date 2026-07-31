@@ -11,16 +11,17 @@ import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 // API beğenisini kart bileşeninin beklediği görünüme çevirir
-const toLikeCard = (r: ReceivedLike) => ({
+const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
   id: String(r.swipe_id),
   swipeId: r.swipe_id,
   listingTitle: r.listing_title,
   user: {
-    name: r.user.name || "İsimsiz",
+    name: r.user.name || unnamed,
     university: r.user.university ?? "—",
     department: r.user.department ?? "—",
     year: r.user.year ?? 0,
@@ -42,6 +43,7 @@ const Matches = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isLoggedIn, user: me } = useAuth();
+  const { t } = useI18n();
   const [queue, setQueue] = useState<LikeCard[]>([]);
   const [matchPopup, setMatchPopup] = useState<LikeCard | null>(null);
   const [confetti, setConfetti] = useState(false);
@@ -53,9 +55,10 @@ const Matches = () => {
     enabled: isLoggedIn,
   });
 
+  const unnamed = t("messages.unnamed");
   useEffect(() => {
-    setQueue(received.map(toLikeCard));
-  }, [received]);
+    setQueue(received.map(r => toLikeCard(r, unnamed)));
+  }, [received, unnamed]);
 
   const total = received.length;
   const remaining = queue.length;
@@ -76,7 +79,7 @@ const Matches = () => {
         }
       })
       .catch(err =>
-        toast.error(err instanceof Error ? err.message : "Cevap kaydedilemedi"),
+        toast.error(err instanceof Error ? err.message : t("likes.responseFailed")),
       );
 
     setSwipeDir(direction);
@@ -84,25 +87,25 @@ const Matches = () => {
       setQueue(prev => prev.slice(1));
       setSwipeDir(null);
     }, 300);
-  }, [queue]);
+  }, [queue, queryClient, t]);
 
   const currentProfile = queue[0];
   const nextProfile = queue[1];
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
-      <AppHeader title="Beğeniler" />
+      <AppHeader title={t("likes.title")} />
 
       {/* Header section */}
       <div className="px-6 pt-4 pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-foreground">Seni Beğenenler</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Profillerini incele, uygun bulursan eşleş</p>
+            <h2 className="text-xl font-bold text-foreground">{t("likes.heading")}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">{t("likes.sub")}</p>
           </div>
           {remaining > 0 && (
             <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-destructive/15 text-destructive">
-              {remaining} yeni
+              {t("likes.new", { count: remaining })}
             </span>
           )}
         </div>
@@ -118,9 +121,9 @@ const Matches = () => {
                 <Search className="w-5 h-5 text-primary absolute -bottom-1 -right-1" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-foreground">Henüz kimse yok</h2>
+            <h2 className="text-xl font-bold text-foreground">{t("likes.emptyTitle")}</h2>
             <p className="text-sm text-muted-foreground max-w-[260px] mx-auto">
-              İlanına swipe atan biri olduğunda burada görünür
+              {t("likes.emptyDesc")}
             </p>
           </div>
         ) : currentProfile ? (
@@ -161,7 +164,7 @@ const Matches = () => {
             >
               <X className="w-7 h-7" strokeWidth={2.5} />
             </button>
-            <span className="text-[11px] text-muted-foreground font-medium">Geç</span>
+            <span className="text-[11px] text-muted-foreground font-medium">{t("likes.pass")}</span>
           </div>
           <div className="flex flex-col items-center gap-1.5">
             <button
@@ -171,7 +174,7 @@ const Matches = () => {
             >
               <Check className="w-7 h-7" strokeWidth={2.5} />
             </button>
-            <span className="text-[11px] text-muted-foreground font-medium">Eşleş</span>
+            <span className="text-[11px] text-muted-foreground font-medium">{t("likes.match")}</span>
           </div>
         </div>
       )}
@@ -203,7 +206,7 @@ const Matches = () => {
               >
                 🎉
               </motion.p>
-              <h2 className="text-3xl font-extrabold text-foreground">Eşleştiniz!</h2>
+              <h2 className="text-3xl font-extrabold text-foreground">{t("likes.matched")}</h2>
 
               <div className="flex items-center justify-center">
                 <motion.img
@@ -233,7 +236,7 @@ const Matches = () => {
               </div>
 
               <p className="text-muted-foreground text-sm">
-                {matchPopup.user.name} ile eşleştin! Artık mesajlaşabilirsiniz.
+                {t("likes.matchedWith", { name: matchPopup.user.name })}
               </p>
 
               <div className="space-y-3 pt-2">
@@ -244,14 +247,14 @@ const Matches = () => {
                   }}
                   className="w-full h-14 bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg font-bold text-base"
                 >
-                  Mesaj Gönder
+                  {t("likes.sendMessage")}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setMatchPopup(null)}
                   className="w-full h-12 text-foreground font-medium"
                 >
-                  Keşfetmeye Devam Et →
+                  {t("likes.keepExploring")}
                 </Button>
               </div>
             </motion.div>
@@ -300,6 +303,7 @@ interface ProfileCardProps {
 
 const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => {
   const { user } = notification;
+  const { t, n } = useI18n();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const acceptOpacity = useTransform(x, [0, 100], [0, 1]);
@@ -328,13 +332,13 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
         className="absolute top-8 right-6 z-10 bg-accent/90 backdrop-blur-sm text-accent-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[-15deg]"
         style={{ opacity: acceptOpacity }}
       >
-        EŞLEŞ ✓
+        {t("likes.matchLabel")}
       </motion.div>
       <motion.div
         className="absolute top-8 left-6 z-10 bg-destructive/90 backdrop-blur-sm text-destructive-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[15deg]"
         style={{ opacity: rejectOpacity }}
       >
-        GEÇ ✗
+        {t("likes.passLabel")}
       </motion.div>
 
       <div className="card-listing h-full flex flex-col">
@@ -358,14 +362,14 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="w-4 h-4" />
-            <span>{user.preferredDistrict} · {user.year}. Sınıf</span>
+            <span>{user.preferredDistrict} · {t("likes.year", { year: user.year })}</span>
           </div>
 
           {/* Budget pill */}
           <div className="inline-flex items-center gap-1.5 bg-accent/15 rounded-full px-3 py-1.5">
             <DollarSign className="w-3.5 h-3.5 text-accent" />
             <span className="text-xs font-bold text-foreground">
-              {user.budgetMin.toLocaleString("tr-TR")} — {user.budgetMax.toLocaleString("tr-TR")} ₺
+              {n(user.budgetMin)} — {n(user.budgetMax)} ₺
             </span>
           </div>
 
@@ -379,7 +383,7 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
 
           {/* Note */}
           <p className="text-xs text-muted-foreground italic">
-            Bu kişi evinize ilgi gösterdi · {notification.listingTitle}
+            {t("likes.interested", { title: notification.listingTitle })}
           </p>
 
           {/* Bio */}

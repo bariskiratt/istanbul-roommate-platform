@@ -7,21 +7,23 @@ import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMatches } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
+import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
-const fmtTime = (iso: string | null) => {
+const fmtTime = (iso: string | null, locale: string) => {
   if (!iso) return "";
   const d = parseUtc(iso);
   const today = new Date();
   return d.toDateString() === today.toDateString()
-    ? d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+    ? d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 };
 
 const Messages = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
+  const { t, locale } = useI18n();
 
   const { data: matches = [], isLoading } = useQuery({
     queryKey: ["matches"],
@@ -31,7 +33,7 @@ const Messages = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title="Mesajlar" />
+      <AppHeader title={t("messages.title")} />
 
       <div className="px-6 py-4 space-y-3">
         {matches.map((match, i) => {
@@ -55,13 +57,13 @@ const Messages = () => {
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-foreground">{other.name || "İsimsiz"}</p>
+                  <p className="font-semibold text-foreground">{other.name || t("messages.unnamed")}</p>
                   <span className="text-xs text-muted-foreground">
-                    {fmtTime(match.last_message_at ?? match.created_at)}
+                    {fmtTime(match.last_message_at ?? match.created_at, locale)}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground truncate mt-0.5">
-                  {match.last_message ?? "Eşleştiniz — ilk mesajı sen at! 👋"}
+                  {match.last_message ?? t("messages.firstMessage")}
                 </p>
                 {match.listing_title && (
                   <span className="inline-block mt-2 text-[10px] px-2.5 py-1 rounded-full font-medium bg-lavender/50 text-foreground">
@@ -78,8 +80,8 @@ const Messages = () => {
             <div className="w-20 h-20 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">💬</span>
             </div>
-            <p className="font-medium text-foreground">Henüz mesajın yok</p>
-            <p className="text-sm text-muted-foreground mt-1">Eşleştiğinde burada görünecek</p>
+            <p className="font-medium text-foreground">{t("messages.emptyTitle")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("messages.emptyDesc")}</p>
           </div>
         )}
       </div>

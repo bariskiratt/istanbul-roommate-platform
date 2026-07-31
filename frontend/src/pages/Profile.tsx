@@ -12,18 +12,20 @@ import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
+import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch-me";
 
 const Profile = () => {
   const { isLoggedIn, user: me } = useAuth();
   const navigate = useNavigate();
+  const { t, n, locale } = useI18n();
 
   // Girişliyse gerçek profil; değilse AuthGate zaten kapatıyor ama render
   // için mock iskelet kalır.
   const user = me
     ? {
-        name: me.name || "İsimsiz",
+        name: me.name || t("messages.unnamed"),
         university: me.university ?? "—",
         department: me.department ?? "—",
         year: me.year ?? 0,
@@ -56,10 +58,10 @@ const Profile = () => {
     mutationFn: deleteListing,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["listings"] });
-      toast.success("İlan kaldırıldı");
+      toast.success(t("profile.removed"));
     },
     onError: err =>
-      toast.error(err instanceof Error ? err.message : "İlan kaldırılamadı"),
+      toast.error(err instanceof Error ? err.message : t("profile.removeFailed")),
   });
 
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
@@ -68,18 +70,18 @@ const Profile = () => {
   const matchCount = myMatches.length;
   const listingCount = myListings.length;
   const memberSince = me
-    ? parseUtc(me.created_at).toLocaleDateString("tr-TR", { month: "short", year: "numeric" })
-    : "Şub 2025";
+    ? parseUtc(me.created_at).toLocaleDateString(locale, { month: "short", year: "numeric" })
+    : "—";
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader
-        title="Profil"
+        title={t("profile.title")}
         rightAction={
           <div className="flex items-center gap-2">
             {me && (
               <button onClick={() => navigate("/profile/edit")} className="text-xs font-medium text-primary flex items-center gap-1 px-3 py-2 rounded-full hover:bg-primary/5 transition-colors">
-                Düzenle <Edit className="w-3 h-3" />
+                {t("profile.edit")} <Edit className="w-3 h-3" />
               </button>
             )}
             <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -108,13 +110,13 @@ const Profile = () => {
               <h2 className="text-xl font-bold text-foreground">{user.name}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{user.university} · {user.department}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3" /> {user.preferredDistrict} · {user.year}. Sınıf
+                <MapPin className="w-3 h-3" /> {user.preferredDistrict} · {t("likes.year", { year: user.year })}
               </p>
               {/* Budget pill */}
               <div className="mt-2 inline-flex items-center gap-1.5 bg-accent/15 rounded-full px-3 py-1">
                 <DollarSign className="w-3 h-3 text-accent" />
                 <span className="text-xs font-bold text-foreground">
-                  {user.budgetMin.toLocaleString("tr-TR")} — {user.budgetMax.toLocaleString("tr-TR")} ₺
+                  {n(user.budgetMin)} — {n(user.budgetMax)} ₺
                 </span>
               </div>
             </div>
@@ -139,7 +141,7 @@ const Profile = () => {
             </p>
             {user.bio.length > 120 && (
               <button onClick={() => setBioExpanded(!bioExpanded)} className="text-xs text-primary font-medium mt-1">
-                {bioExpanded ? "Kısalt" : "Devamını gör"}
+                {t(bioExpanded ? "profile.showLess" : "profile.showMore")}
               </button>
             )}
           </div>
@@ -150,9 +152,9 @@ const Profile = () => {
       <div className="px-6 pt-4">
         <div className="grid grid-cols-3 border border-border rounded-xl overflow-hidden">
           {[
-            { label: "İlanlarım", value: listingCount.toString() },
-            { label: "Eşleşmeler", value: matchCount.toString() },
-            { label: "Üyelik", value: memberSince },
+            { label: t("profile.statListings"), value: listingCount.toString() },
+            { label: t("profile.statMatches"), value: matchCount.toString() },
+            { label: t("profile.statMember"), value: memberSince },
           ].map((stat, i) => (
             <div key={stat.label} className={`text-center py-3 ${i < 2 ? "border-r border-border" : ""}`}>
               <p className="text-lg font-bold text-foreground">{stat.value}</p>
@@ -166,9 +168,9 @@ const Profile = () => {
       <div className="px-6 pt-5">
         <div className="flex border-b border-border">
           {[
-            { key: "photos" as const, label: "Fotoğraflar" },
-            { key: "listings" as const, label: "İlanlarım" },
-            { key: "about" as const, label: "Hakkımda" },
+            { key: "photos" as const, label: t("profile.tabPhotos") },
+            { key: "listings" as const, label: t("profile.tabListings") },
+            { key: "about" as const, label: t("profile.tabAbout") },
           ].map(tab => (
             <button
               key={tab.key}
@@ -207,7 +209,7 @@ const Profile = () => {
               ))}
             </div>
           ) : (
-            <p className="text-center text-sm text-muted-foreground py-8">Henüz fotoğraf yok</p>
+            <p className="text-center text-sm text-muted-foreground py-8">{t("profile.noPhotos")}</p>
           )
         )}
 
@@ -227,34 +229,34 @@ const Profile = () => {
                     <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
                       listing.type === "ev_ilani" ? "bg-lavender/50 text-foreground" : "bg-accent/15 text-foreground"
                     }`}>
-                      {listing.type === "ev_ilani" ? "🏠 Ev" : "👤 Kişisel"}
+                      {t(listing.type === "ev_ilani" ? "profile.house" : "profile.personal")}
                     </span>
                     {listing.is_active && (
-                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-accent/15 text-foreground font-medium">Aktif</span>
+                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-accent/15 text-foreground font-medium">{t("profile.active")}</span>
                     )}
                   </div>
                   <p className="font-bold text-sm text-foreground mt-1.5 truncate">{listing.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {listing.district} • {listing.type === "ev_ilani"
-                      ? `${listing.rent?.toLocaleString("tr-TR")} ₺`
-                      : `${listing.budget_min?.toLocaleString("tr-TR")}–${listing.budget_max?.toLocaleString("tr-TR")} ₺`}
+                      ? `${n(listing.rent ?? 0)} ₺`
+                      : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} ₺`}
                   </p>
                 </div>
                 <button
                   onClick={() => {
-                    if (window.confirm(`"${listing.title}" ilanını kaldırmak istediğine emin misin?`)) {
+                    if (window.confirm(t("profile.confirmRemove", { title: listing.title }))) {
                       removeListing.mutate(listing.id);
                     }
                   }}
                   disabled={removeListing.isPending}
                   className="self-center mr-3 w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                  title="İlanı kaldır"
+                  title={t("profile.removeListing")}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </motion.div>
             )) : (
-              <p className="text-center text-muted-foreground py-8">Henüz ilan oluşturmadın</p>
+              <p className="text-center text-muted-foreground py-8">{t("profile.noListings")}</p>
             )}
             <motion.button
               whileTap={{ scale: 0.98 }}
@@ -262,7 +264,7 @@ const Profile = () => {
               className="w-full card-listing p-4 flex items-center justify-center gap-2 text-primary font-semibold hover:shadow-lg transition-shadow"
             >
               <Plus className="w-5 h-5" />
-              Yeni İlan Oluştur
+              {t("profile.newListing")}
             </motion.button>
           </div>
         )}
@@ -274,15 +276,15 @@ const Profile = () => {
             className="space-y-0"
           >
             {[
-              { icon: "✉️", label: "E-posta", value: me?.email ?? "—" },
-              { icon: "🎓", label: "Üniversite ve Bölüm", value: `${user.university} · ${user.department}` },
-              { icon: "📍", label: "Tercih edilen semt", value: user.preferredDistrict },
-              { icon: "💰", label: "Bütçe aralığı", value: `${user.budgetMin.toLocaleString("tr-TR")} — ${user.budgetMax.toLocaleString("tr-TR")} ₺/ay` },
-              { icon: "🚬", label: "Sigara", value: user.smoking ? "İçer" : "İçmez" },
-              { icon: "🐾", label: "Hayvan", value: user.pets ? "Dostu" : "Tercih etmez" },
-              { icon: "🍺", label: "Alkol", value: user.alcohol ? "Kullanır" : "Kullanmaz" },
-              { icon: "🌙", label: "Uyku düzeni", value: user.sleepSchedule === "gece" ? "Gece kuşu" : user.sleepSchedule === "erken" ? "Erken kalkar" : "Esnek" },
-              { icon: "📝", label: "Hakkımda", value: user.bio },
+              { icon: "✉️", label: t("profile.fieldEmail"), value: me?.email ?? "—" },
+              { icon: "🎓", label: t("profile.fieldUniversity"), value: `${user.university} · ${user.department}` },
+              { icon: "📍", label: t("profile.fieldDistrict"), value: user.preferredDistrict },
+              { icon: "💰", label: t("profile.fieldBudget"), value: `${n(user.budgetMin)} — ${n(user.budgetMax)} ₺${t("common.perMonth")}` },
+              { icon: "🚬", label: t("profile.fieldSmoking"), value: t(user.smoking ? "profile.smokes" : "profile.noSmoke") },
+              { icon: "🐾", label: t("profile.fieldPets"), value: t(user.pets ? "profile.petFriendly" : "profile.noPets") },
+              { icon: "🍺", label: t("profile.fieldAlcohol"), value: t(user.alcohol ? "profile.drinks" : "profile.noDrinks") },
+              { icon: "🌙", label: t("profile.fieldSleep"), value: t(user.sleepSchedule === "gece" ? "profile.nightOwl" : user.sleepSchedule === "erken" ? "profile.earlyBird" : "profile.flexible") },
+              { icon: "📝", label: t("profile.fieldBio"), value: user.bio },
             ].map((field, i) => (
               <div key={field.label} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
                 <span className="text-base">{field.icon}</span>

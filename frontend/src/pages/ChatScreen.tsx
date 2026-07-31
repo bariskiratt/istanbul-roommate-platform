@@ -6,6 +6,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMatches, fetchMessages, sendMessage } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
+import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
@@ -13,6 +14,7 @@ const ChatScreen = () => {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { isLoggedIn, user: me } = useAuth();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,7 @@ const ChatScreen = () => {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Mesajlaşmak için giriş yap</p>
+        <p className="text-muted-foreground">{t("chat.loginRequired")}</p>
       </div>
     );
   }
@@ -66,7 +68,7 @@ const ChatScreen = () => {
   if (matches.length > 0 && !match) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Eşleşme bulunamadı</p>
+        <p className="text-muted-foreground">{t("chat.notFound")}</p>
       </div>
     );
   }
@@ -89,7 +91,7 @@ const ChatScreen = () => {
           className="w-10 h-10 rounded-full object-cover"
         />
         <div className="flex-1">
-          <p className="font-bold text-sm text-foreground">{other?.name || "İsimsiz"}</p>
+          <p className="font-bold text-sm text-foreground">{other?.name || t("messages.unnamed")}</p>
           <p className="text-[11px] text-muted-foreground">{other?.university ?? ""}</p>
         </div>
       </div>
@@ -102,7 +104,7 @@ const ChatScreen = () => {
               <Home className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground">Eşleşme İlanı</p>
+              <p className="text-xs font-semibold text-foreground">{t("chat.matchListing")}</p>
               <p className="text-[11px] text-muted-foreground truncate">{match.listing_title}</p>
             </div>
           </div>
@@ -113,7 +115,7 @@ const ChatScreen = () => {
       <div className="flex-1 overflow-y-auto px-6 py-3 space-y-3">
         {messages.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-8">
-            Henüz mesaj yok — ilk mesajı sen at! 👋
+            {t("chat.empty")}
           </p>
         )}
         {messages.map(msg => {
@@ -123,7 +125,7 @@ const ChatScreen = () => {
               <div className={`max-w-[80%] ${isMine ? "message-sent" : "message-received"}`}>
                 <p className="text-[15px] leading-relaxed">{msg.content}</p>
                 <p className={`text-[10px] mt-1.5 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                  {parseUtc(msg.created_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                  {parseUtc(msg.created_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
             </div>
@@ -139,7 +141,7 @@ const ChatScreen = () => {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSend()}
-          placeholder="Bir mesaj yaz..."
+          placeholder={t("chat.placeholder")}
           className="flex-1 h-12 bg-background rounded-full px-5 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
           style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
         />

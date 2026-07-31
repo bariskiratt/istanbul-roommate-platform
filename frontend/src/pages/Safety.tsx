@@ -1,11 +1,24 @@
 import { useNavigate } from "react-router-dom";
-import { Shield, ShieldCheck, MessageCircle, Eye, Home } from "lucide-react";
+import { Shield, ShieldCheck, MessageCircle, KeyRound, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n";
+import ThemeToggle from "@/components/ThemeToggle";
+import LanguageToggle from "@/components/LanguageToggle";
 
 const Safety = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
+  const { t } = useI18n();
+
+  // NOT: Bu sayfa yalnızca üründe gerçekten var olan güvenceleri anlatır.
+  // "Yapay zeka moderasyonu" ve "uçtan uca şifreli mesajlaşma" iddiaları
+  // kaldırıldı — ikisi de uygulanmış değil.
+  const cards = [
+    { icon: ShieldCheck, title: t("safety.card1Title"), desc: t("safety.card1Desc") },
+    { icon: MessageCircle, title: t("safety.card2Title"), desc: t("safety.card2Desc") },
+    { icon: KeyRound, title: t("safety.card3Title"), desc: t("safety.card3Desc") },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -18,12 +31,16 @@ const Safety = () => {
             </div>
             <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
           </button>
-          <Button
-            onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")}
-            className="bg-primary text-primary-foreground rounded-full text-sm font-bold px-5"
-          >
-            {isLoggedIn ? "Uygulamaya Dön" : "Hemen Başla"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+            <Button
+              onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")}
+              className="bg-primary text-primary-foreground rounded-full text-sm font-bold px-5"
+            >
+              {t(isLoggedIn ? "safety.backToApp" : "landing.getStarted")}
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -32,28 +49,12 @@ const Safety = () => {
           <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto">
             <Shield className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">Güvenliğiniz Önceliğimiz</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">RoomMatch olarak kullanıcılarımızın güvenliğini en üst düzeyde tutuyoruz.</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">{t("safety.title")}</h1>
+          <p className="text-muted-foreground max-w-xl mx-auto">{t("safety.sub")}</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-10">
-          {[
-            {
-              icon: ShieldCheck,
-              title: ".edu.tr Doğrulama",
-              desc: "Sadece doğrulanmış üniversite e-posta adresine sahip öğrenciler kayıt olabilir. Her hesap tek bir .edu.tr adresiyle eşleştirilir, sahte profillerin önüne geçilir."
-            },
-            {
-              icon: Eye,
-              title: "İçerik Moderasyonu",
-              desc: "Tüm ilanlar ve mesajlar yapay zeka destekli moderasyon sistemimiz tarafından kontrol edilir. Uygunsuz içerikler anında kaldırılır."
-            },
-            {
-              icon: MessageCircle,
-              title: "Güvenli Mesajlaşma",
-              desc: "Eşleşme olmadan mesajlaşma mümkün değildir. Tüm mesajlar şifrelenmiş olarak iletilir ve kişisel bilgileriniz korunur."
-            },
-          ].map((section, i) => (
+          {cards.map((section, i) => (
             <div key={i} className="text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
                 <section.icon className="w-7 h-7 text-primary" />
@@ -62,6 +63,11 @@ const Safety = () => {
               <p className="text-sm text-muted-foreground leading-relaxed">{section.desc}</p>
             </div>
           ))}
+        </div>
+
+        <div className="card-listing p-6 max-w-2xl mx-auto text-center space-y-2">
+          <h2 className="text-lg font-bold text-foreground">{t("safety.tipsTitle")}</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">{t("safety.tips")}</p>
         </div>
       </div>
 
@@ -74,7 +80,7 @@ const Safety = () => {
             </div>
             <span className="font-extrabold text-foreground">RoomMatch</span>
           </button>
-          <p className="text-xs text-muted-foreground">© 2026 RoomMatch. Tüm hakları saklıdır.</p>
+          <p className="text-xs text-muted-foreground">© 2026 RoomMatch. {t("safety.rights")}</p>
         </div>
       </footer>
     </div>
