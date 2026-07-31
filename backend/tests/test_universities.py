@@ -11,12 +11,21 @@ def test_known_domains():
 
 
 def test_subdomains_match():
-    assert university_from_email("ali@ogr.iu.edu.tr") is None  # iu bilinmiyor
+    assert university_from_email("ali@ogr.iu.edu.tr") == "İstanbul Üniversitesi"
     assert (
         university_from_email("ali@std.yildiz.edu.tr")
         == "Yıldız Teknik Üniversitesi"
     )
     assert university_from_email("a@ogrenci.marmara.edu.tr") == "Marmara Üniversitesi"
+
+
+def test_alternate_domains():
+    # Okulların kısaltma dışındaki tam alan adları da tanınmalı
+    assert (
+        university_from_email("huseyinilker.gocer@bahcesehir.edu.tr")
+        == "Bahçeşehir Üniversitesi"
+    )
+    assert university_from_email("a@bau.edu.tr") == "Bahçeşehir Üniversitesi"
 
 
 def test_unknown_domain_returns_none():
