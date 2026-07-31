@@ -36,6 +36,8 @@ COPY . .
 COPY --from=builder /app/models/fair_price_model.joblib models/
 
 ENV HOST=0.0.0.0
+# print() çıktıları tamponlanmadan Render loglarına düşsün
+ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # --proxy-headers: Render proxy'si arkasında request.base_url https üretsin

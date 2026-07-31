@@ -54,9 +54,9 @@ def send_otp_email(to: str, code: str) -> bool:
         if res.status_code not in (200, 201):
             # Kod/alıcı loglanmaz; yalnız sağlayıcının hata sebebi.
             print(f"⚠️  Brevo gönderimi reddetti: HTTP {res.status_code} "
-                  f"{res.text[:300]}")
+                  f"{res.text[:300]}", flush=True)
             return False
         return True
     except requests.RequestException as exc:
-        print(f"⚠️  Brevo'ya ulaşılamadı: {type(exc).__name__}: {exc}")
+        print(f"⚠️  Brevo'ya ulaşılamadı: {type(exc).__name__}: {exc}", flush=True)
         return False
