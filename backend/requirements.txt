@@ -4,6 +4,7 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.0
 sqlalchemy>=2.0    # ilan persistansı (SQLite)
+python-multipart>=0.0.9  # fotoğraf yükleme (multipart form)
 
 # Testler
 pytest>=8.0

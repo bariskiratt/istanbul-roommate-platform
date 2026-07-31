@@ -12,12 +12,14 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.config import (
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
+    UPLOADS_DIR,
 )
 from app.auth import router as auth_router
 from app.db import init_db
@@ -26,6 +28,7 @@ from app.indexing import DATA_PERIOD, rent_index
 from app.listings import router as listings_router
 from app.messages import router as messages_router
 from app.swipes import router as swipes_router
+from app.uploads import router as uploads_router
 from app.pricing import BOUNDS, build_features
 from app.transit import TRANSIT_PATH, AccessibilityIndex, TransitNetwork
 
@@ -122,6 +125,11 @@ app.include_router(listings_router)
 app.include_router(auth_router)
 app.include_router(swipes_router)
 app.include_router(messages_router)
+app.include_router(uploads_router)
+
+# Yüklenen fotoğrafların statik servisi
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # Yanıtlar büyük GeoJSON içerdiği için sıkıştırma kritik (~4 MB -> ~700 KB).
 app.add_middleware(GZipMiddleware, minimum_size=1024)

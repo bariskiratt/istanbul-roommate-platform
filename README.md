@@ -104,9 +104,9 @@ frontend/       React/Vite roommate arayüzü
   OTP ile (`/api/auth`), ilanlar SQLite'a yazılır (`/api/listings`),
   kaydırma kararları kaydedilir ve karşılıklı beğeni eşleşme üretir
   (`/api/swipes`, `/api/matches`), eşleşenler mesajlaşır
-  (`/api/matches/{id}/messages`, 4 sn'lik polling ile). Kaydırma
-  destesindeki örnek profiller ve fotoğraf yükleme (Unsplash yer tutucular)
-  hâlâ sahtedir.
+  (`/api/matches/{id}/messages`, 4 sn'lik polling ile), fotoğraflar gerçek
+  dosya olarak yüklenir (`/api/uploads`, 5 MB sınır, `/uploads/` statik
+  servisi). Kaydırma destesindeki örnek profiller hâlâ sahtedir.
 - E-posta servisi bağlı değil: OTP kodu geliştirme modunda API yanıtındaki
   `dev_code` alanında döner ve arayüzde toast olarak gösterilir
   (`DEV_OTP=0` ile kapatılır).

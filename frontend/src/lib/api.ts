@@ -314,3 +314,24 @@ export const fetchMessages = (matchId: number) =>
 
 export const sendMessage = (matchId: number, content: string) =>
   postJSON<ChatMessage>(`/api/matches/${matchId}/messages`, { content });
+
+// ---- Fotoğraf yükleme ----
+
+export const uploadPhoto = async (file: File): Promise<{ url: string }> => {
+  const form = new FormData();
+  form.append("file", file);
+  // Content-Type elle verilmez; tarayıcı multipart sınırını kendisi ekler.
+  const res = await fetch(`${BASE_URL}/api/uploads`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(
+      (data && typeof data.detail === "string" && data.detail) ||
+        `Yükleme başarısız (${res.status})`,
+    );
+  }
+  return data as { url: string };
+};

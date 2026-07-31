@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { registerUser, verifyOtp, updateMe } from "@/lib/api";
+import { usePhotoUpload } from "@/hooks/use-photo-upload";
 
 const steps = ["E-posta", "OTP", "Kişisel", "Üniversite", "Bütçe", "Yaşam Tarzı", "Fotoğraf"];
 
@@ -55,12 +56,9 @@ const Onboarding = () => {
     }
   };
 
-  const handlePhotoAdd = () => {
-    const mockPhotos = [
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
-    ];
-    setPhotos([...photos, mockPhotos[0]]);
-  };
+  const { pick: pickPhoto, uploading } = usePhotoUpload(url =>
+    setPhotos(prev => (prev.length < 6 ? [...prev, url] : prev)),
+  );
 
   const canProceed = () => {
     switch (currentStep) {
@@ -511,11 +509,14 @@ const Onboarding = () => {
               ))}
               {photos.length < 6 && (
                 <button
-                  onClick={handlePhotoAdd}
-                  className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm"
+                  onClick={pickPhoto}
+                  disabled={uploading}
+                  className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm disabled:opacity-50"
                 >
-                  <Camera className="w-8 h-8 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground font-medium">Ekle</span>
+                  <Camera className={`w-8 h-8 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {uploading ? "Yükleniyor…" : "Ekle"}
+                  </span>
                 </button>
               )}
             </div>

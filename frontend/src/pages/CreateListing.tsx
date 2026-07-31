@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import FairPriceCheck from "@/components/FairPriceCheck";
 import { createListing } from "@/lib/api";
+import { usePhotoUpload } from "@/hooks/use-photo-upload";
 
 type ListingType = "ev_ilani" | "kisisel_ilan" | null;
 
@@ -49,16 +50,9 @@ const CreateListing = () => {
   const totalSteps = stepsForType.length;
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
-  const handlePhotoAdd = () => {
-    const mockPhotos = [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400&h=300&fit=crop",
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop",
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&h=300&fit=crop",
-    ];
-    if (photos.length < 6) {
-      setPhotos([...photos, mockPhotos[photos.length % mockPhotos.length]]);
-    }
-  };
+  const { pick: pickPhoto, uploading } = usePhotoUpload(url =>
+    setPhotos(prev => (prev.length < 6 ? [...prev, url] : prev)),
+  );
 
   const removePhoto = (index: number) => {
     setPhotos(photos.filter((_, i) => i !== index));
@@ -427,11 +421,14 @@ const CreateListing = () => {
                 ))}
                 {photos.length < 6 && (
                   <button
-                    onClick={handlePhotoAdd}
-                    className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm"
+                    onClick={pickPhoto}
+                    disabled={uploading}
+                    className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm disabled:opacity-50"
                   >
-                    <ImagePlus className="w-8 h-8 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground font-medium">Ekle</span>
+                    <ImagePlus className={`w-8 h-8 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {uploading ? "Yükleniyor…" : "Ekle"}
+                    </span>
                   </button>
                 )}
               </div>

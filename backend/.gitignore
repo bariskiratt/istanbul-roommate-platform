@@ -30,3 +30,4 @@ data/raw/transit_overpass_raw.json
 
 # Uygulama veritabanı (yerelde üretilir)
 data/app.db
+data/uploads/

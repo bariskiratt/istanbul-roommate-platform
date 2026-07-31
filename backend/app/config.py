@@ -27,3 +27,6 @@ MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
 
 # Uygulama veritabanı (ilanlar; ileride kullanıcı/eşleşme/mesaj)
 DB_PATH = DATA_DIR / "app.db"
+
+# Kullanıcı fotoğrafları (yerelde üretilir, git'e girmez)
+UPLOADS_DIR = DATA_DIR / "uploads"
