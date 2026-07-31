@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.db import get_db
+from app.emailer import send_otp_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -65,6 +66,24 @@ def _issue_otp(user: models.User) -> str:
 
 def _dev_otp_enabled() -> bool:
     return os.getenv("DEV_OTP", "1") == "1"
+
+
+def _deliver_otp(email: str, code: str) -> dict:
+    """Kodu e-postayla yollar; dev modda yanıtta da döndürür.
+
+    E-posta gönderilemedi VE dev modu kapalıysa hata fırlatır — çağıran
+    henüz commit etmediği için kullanıcı kodsuz bırakılmaz.
+    """
+    sent = send_otp_email(email, code)
+    if not sent and not _dev_otp_enabled():
+        raise HTTPException(
+            status_code=502,
+            detail="Doğrulama e-postası gönderilemedi. Az sonra tekrar dene.",
+        )
+    response = {"detail": "Doğrulama kodu gönderildi."}
+    if _dev_otp_enabled():
+        response["dev_code"] = code
+    return response
 
 
 # ---- şemalar ----
@@ -179,11 +198,8 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     )
     code = _issue_otp(user)
     db.add(user)
+    response = _deliver_otp(payload.email, code)  # başarısızsa rollback
     db.commit()
-
-    response = {"detail": "Doğrulama kodu gönderildi."}
-    if _dev_otp_enabled():
-        response["dev_code"] = code
     return response
 
 
@@ -196,11 +212,8 @@ def request_otp(payload: EmailIn, db: Session = Depends(get_db)):
         )
 
     code = _issue_otp(user)
+    response = _deliver_otp(payload.email, code)  # başarısızsa rollback
     db.commit()
-
-    response = {"detail": "Giriş kodu gönderildi."}
-    if _dev_otp_enabled():
-        response["dev_code"] = code
     return response
 
 

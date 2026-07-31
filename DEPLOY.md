@@ -42,9 +42,10 @@ Notlar:
 
 | Konu | Durum |
 |---|---|
-| OTP e-postası | `DEV_OTP=1`: kod API yanıtında dönüyor. Gerçek kullanıcı için Resend/Postmark bağlanıp `DEV_OTP=0` yapılmalı — **bu yapılmadan siteyi gerçek kullanıcıya açma** (herkes herkesin hesabına girebilir). |
+| OTP e-postası | Brevo entegrasyonu hazır (`app/emailer.py`). Aktifleştirme: Brevo hesabı aç → gönderici e-postanı doğrula → API key al → Render env: `BREVO_API_KEY`, `EMAIL_FROM`, `DEV_OTP=0`. Bunlar ayarlanmadan `DEV_OTP=1` kalmalı. |
 | Fotoğraf depolama | Yerel disk; kalıcı depolama (R2/S3) gerekli. |
 | Rate limiting / token süresi | Yok; yayın sonrası ilk sertleştirme adımı. |
+| Uyku modu | `.github/workflows/keepalive.yml` 10 dakikada bir API'yi yoklayarak ücretsiz servisi uyanık tutar. |
 
 ## Ortam değişkenleri özeti (backend)
 
@@ -53,6 +54,8 @@ Notlar:
 | `DATABASE_URL` | `sqlite:///data/app.db` | Postgres bağlantısı (Render otomatik verir) |
 | `CORS_ORIGINS` | localhost listesi | Virgülle ayrılmış izinli origin'ler |
 | `DEV_OTP` | `1` | 1: OTP kodu API yanıtında döner (dev) |
+| `BREVO_API_KEY` | — | Brevo API anahtarı (gerçek OTP e-postası) |
+| `EMAIL_FROM` | — | Brevo'da doğrulanmış gönderici adresi |
 | `UPLOADS_DIR` | `data/uploads` | Fotoğrafların yazıldığı dizin |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Sunucu adresi (Render PORT verir) |
 | `RENT_INDEX_FACTOR` | (tablodan) | TÜFE çarpanını elle sabitleme |
