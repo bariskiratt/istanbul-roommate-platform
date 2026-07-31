@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { SlidersHorizontal, X, Heart, Zap, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
+import { SlidersHorizontal, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
 import { mockListings, type Listing, type UserProfile } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
@@ -67,8 +67,6 @@ const anonUser: UserProfile = {
   preferredDistrict: "",
   bio: "",
   photos: ["https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch"],
-  weeklySupermatchUsed: false,
-  supermatchRemaining: 0,
 };
 
 const toDeckListing = (a: ApiListing): Listing => ({
@@ -99,7 +97,6 @@ const SwipeScreen = () => {
   const queryClient = useQueryClient();
   const [cards, setCards] = useState<Listing[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [superMatchLeft, setSuperMatchLeft] = useState(1);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -161,13 +158,6 @@ const SwipeScreen = () => {
       setSwipeDirection(null);
     }, 300);
   }, [isLoggedIn, cards]);
-
-  const handleSuperMatch = () => {
-    if (superMatchLeft > 0) {
-      setSuperMatchLeft(s => s - 1);
-      handleSwipe("right");
-    }
-  };
 
   const currentCard = cards[cards.length - 1];
   const nextCard = cards[cards.length - 2];
@@ -236,16 +226,6 @@ const SwipeScreen = () => {
         <div className="flex items-center justify-center gap-8 py-4">
           <button onClick={() => handleSwipe("left")} className="btn-swipe-pass w-[60px] h-[60px] flex items-center justify-center">
             <X className="w-7 h-7" />
-          </button>
-          <button
-            onClick={handleSuperMatch}
-            disabled={superMatchLeft === 0}
-            className="btn-supermatch w-[52px] h-[52px] flex items-center justify-center relative animate-pulse-glow disabled:opacity-40 disabled:animate-none"
-          >
-            <Zap className="w-6 h-6" />
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-secondary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
-              {superMatchLeft}
-            </span>
           </button>
           <button onClick={() => handleSwipe("right")} className="btn-swipe-like w-[60px] h-[60px] flex items-center justify-center">
             <Heart className="w-7 h-7" />

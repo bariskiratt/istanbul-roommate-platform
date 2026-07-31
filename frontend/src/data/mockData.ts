@@ -15,8 +15,6 @@ export interface UserProfile {
   preferredDistrict: string;
   bio: string;
   photos: string[];
-  weeklySupermatchUsed: boolean;
-  supermatchRemaining: number;
 }
 
 export interface Listing {
@@ -55,8 +53,6 @@ export const currentUser: UserProfile = {
   preferredDistrict: "Kadıköy",
   bio: "Yazılımla ilgileniyorum, kedileri seviyorum. Temiz ve düzenli bir ev ortamı arıyorum.",
   photos: ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"],
-  weeklySupermatchUsed: false,
-  supermatchRemaining: 1,
 };
 
 const mockUsers: UserProfile[] = [
@@ -77,8 +73,6 @@ const mockUsers: UserProfile[] = [
     preferredDistrict: "Beşiktaş",
     bio: "Kitap kurdu, sabahçı biri. Sessiz ve huzurlu bir ev ortamı arıyorum.",
     photos: ["https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=face"],
-    weeklySupermatchUsed: false,
-    supermatchRemaining: 1,
   },
   {
     id: "user-2",
@@ -97,8 +91,6 @@ const mockUsers: UserProfile[] = [
     preferredDistrict: "Kadıköy",
     bio: "Müzikle ilgileniyorum, gitar çalıyorum. Eğlenceli ama saygılı bir ev arkadaşı arıyorum.",
     photos: ["https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=face"],
-    weeklySupermatchUsed: true,
-    supermatchRemaining: 0,
   },
   {
     id: "user-3",
@@ -117,8 +109,6 @@ const mockUsers: UserProfile[] = [
     preferredDistrict: "Üsküdar",
     bio: "Staj dönemindeyim, sakin bir ev ortamı tercih ediyorum. Temizlik konusunda hassasım.",
     photos: ["https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face"],
-    weeklySupermatchUsed: false,
-    supermatchRemaining: 1,
   },
   {
     id: "user-4",
@@ -137,8 +127,6 @@ const mockUsers: UserProfile[] = [
     preferredDistrict: "Beşiktaş",
     bio: "Mimarlık öğrencisi, yaratıcı projelerle uğraşıyorum. Kedim var, hayvan dostu ev arıyorum.",
     photos: ["https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face"],
-    weeklySupermatchUsed: false,
-    supermatchRemaining: 1,
   },
   {
     id: "user-5",
@@ -157,8 +145,6 @@ const mockUsers: UserProfile[] = [
     preferredDistrict: "Kadıköy",
     bio: "Çalışkan ve düzenli biriyim. Yemek yapmayı seviyorum, mutfağı paylaşmak isterim.",
     photos: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face"],
-    weeklySupermatchUsed: false,
-    supermatchRemaining: 1,
   },
 ];
 

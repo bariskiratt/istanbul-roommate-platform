@@ -164,14 +164,6 @@
     box-shadow: 0 6px 24px hsl(var(--coral) / 0.4);
   }
 
-  .btn-supermatch {
-    @apply bg-secondary text-secondary-foreground rounded-full transition-all duration-200 active:scale-95;
-    box-shadow: 0 4px 16px hsl(var(--indigo) / 0.3);
-  }
-  .btn-supermatch:hover {
-    box-shadow: 0 6px 24px hsl(var(--indigo) / 0.4);
-  }
-
   /* Tags */
   .tag-lifestyle {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-lavender/40 text-foreground;
