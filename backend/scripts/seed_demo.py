@@ -1,14 +1,14 @@
-"""Demo içerik üretici: 20 sahte kullanıcı + 100 gerçekçi ilan.
+"""Demo içerik üretici: 5 kullanıcı + 5 özenli ilan.
 
-Kiralar gerçek mahalle medyanlarından türetilir
-(data/processed/neighborhood_market_values.csv) ve TÜFE ile bugüne
-endekslenir; böylece adil fiyat danışmanıyla tutarlı kalırlar.
+Az ama dolu dolu: her ilan elle yazılmış (gerçek semt, çok fotoğraflı,
+ayrıntılı açıklama). Kiralar mahalle medyanlarından türetilip
+(data/processed/neighborhood_market_values.csv) TÜFE ile bugüne endekslenir;
+böylece adil fiyat danışmanıyla tutarlı kalırlar.
 
 Çalıştırma:  python -m scripts.seed_demo          (tekrar çalıştırmak eklemez)
              python -m scripts.seed_demo --force  (demo verisini silip yeniden üretir)
 """
 
-import random
 import sys
 
 import pandas as pd
@@ -21,86 +21,215 @@ from app.indexing import rent_index
 
 DEMO_DOMAIN = "demo.roommatch.tr"  # demo hesaplar bu alan adından tanınır
 
-# (ad, cinsiyet) — portre fotoğrafı cinsiyetle tutarlı seçilir
+
+def _unsplash(photo_id: str) -> str:
+    return f"https://images.unsplash.com/{photo_id}?w=900&h=675&fit=crop"
+
+
+def _portrait(kind: str, n: int) -> str:
+    return f"https://randomuser.me/api/portraits/{kind}/{n}.jpg"
+
+
+# --- 5 demo kullanıcı (profilleri eksiksiz) ---
 PEOPLE = [
-    ("Elif", "kadın"), ("Zeynep", "kadın"), ("Defne", "kadın"),
-    ("Azra", "kadın"), ("Ecrin", "kadın"), ("Selin", "kadın"),
-    ("Melis", "kadın"), ("İrem", "kadın"), ("Ceren", "kadın"),
-    ("Buse", "kadın"), ("Mert", "erkek"), ("Emir", "erkek"),
-    ("Kerem", "erkek"), ("Arda", "erkek"), ("Deniz", "erkek"),
-    ("Ege", "erkek"), ("Baran", "erkek"), ("Can", "erkek"),
-    ("Kaan", "erkek"), ("Umut", "erkek"),
+    {
+        "name": "Elif", "budget": (18000, 30000), "gender": "kadın", "birth_year": 2003,
+        "university": "Boğaziçi Üniversitesi", "department": "Psikoloji", "year": 3,
+        "smoking": False, "alcohol": False, "pets": True, "sleep": "erken",
+        "bio": "Kitap kurdu, sabah insanıyım. Ev düzenine önem veririm ama "
+               "kurallarla boğmam; sadece paylaşılan alanların temiz kalmasını "
+               "isterim. Hafta sonları genelde evdeyim, kahve demleyip ders çalışırım.",
+        "photo": _portrait("women", 44),
+        "districts": ["Beşiktaş", "Sarıyer"],
+    },
+    {
+        "name": "Mert", "budget": (12000, 20000), "gender": "erkek", "birth_year": 2002,
+        "university": "İstanbul Teknik Üniversitesi",
+        "department": "Bilgisayar Mühendisliği", "year": 4,
+        "smoking": False, "alcohol": True, "pets": True, "sleep": "gece",
+        "bio": "Son sınıf öğrencisiyim, yarı zamanlı yazılım işim var. Geceleri "
+               "kod yazarım ama kulaklıkla. Mutfağı severim, hafta içi akşam "
+               "yemeğini genelde ben yaparım — ortak yemek kültürüne varım.",
+        "photo": _portrait("men", 32),
+        "districts": ["Şişli", "Beşiktaş"],
+    },
+    {
+        "name": "Zeynep", "budget": (15000, 26000), "gender": "kadın", "birth_year": 2004,
+        "university": "Marmara Üniversitesi", "department": "Hukuk", "year": 2,
+        "smoking": False, "alcohol": False, "pets": False, "sleep": "erken",
+        "bio": "Sessiz ve düzenliyim. Sınav dönemlerinde eve kapanırım, onun "
+               "dışında sosyalim. Aynı evde yaşadığım kişiyle arkadaş olmayı "
+               "isterim, sadece fatura paylaşan iki yabancı gibi değil.",
+        "photo": _portrait("women", 68),
+        "districts": ["Kadıköy", "Üsküdar"],
+    },
+    {
+        "name": "Kerem", "budget": (16000, 28000), "gender": "erkek", "birth_year": 2001,
+        "university": "Yıldız Teknik Üniversitesi",
+        "department": "Endüstri Mühendisliği", "year": 4,
+        "smoking": True, "alcohol": True, "pets": False, "sleep": "esnek",
+        "bio": "Yüksek lisansa hazırlanıyorum, gündüzlerim kampüste geçiyor. "
+               "Balkonda sigara içerim, evde içmem. Spor salonuna yakın bir yer "
+               "arıyorum; hafta sonları basketbol oynarım.",
+        "photo": _portrait("men", 51),
+        "districts": ["Beşiktaş", "Şişli"],
+    },
+    {
+        "name": "Defne", "budget": (14000, 24000), "gender": "kadın", "birth_year": 2003,
+        "university": "İstanbul Üniversitesi", "department": "Mimarlık", "year": 3,
+        "smoking": False, "alcohol": True, "pets": True, "sleep": "gece",
+        "bio": "Mimarlık öğrencisiyim, maket ve çizim için geniş bir masaya "
+               "ihtiyacım var. Gece geç saatlere kadar çalışırım ama sessizim. "
+               "Kedim Zeytin benimle geliyor — hayvan dostu ev şart.",
+        "photo": _portrait("women", 12),
+        "districts": ["Kadıköy", "Beyoğlu"],
+    },
 ]
 
-def _portrait(gender: str, idx: int) -> str:
-    """randomuser.me portreleri: cinsiyete uygun, sabit (0-99 arası)."""
-    kind = "women" if gender == "kadın" else "men"
-    return f"https://randomuser.me/api/portraits/{kind}/{(idx * 7 + 3) % 99}.jpg"
-
-# Ev ilanları için elle seçilmiş iç mekân fotoğrafları (Unsplash, stabil id'ler)
-HOME_PHOTOS = [
-    "photo-1502672260266-1c1ef2d93688",  # salon, aydınlık
-    "photo-1522708323590-d24dbb6b0267",  # modern oturma odası
-    "photo-1560448204-e02f11c3d0e2",     # stüdyo daire
-    "photo-1493809842364-78817add7ffb",  # salon, kanepe
-    "photo-1484154218962-a197022b5858",  # mutfak-salon
-    "photo-1586023492125-27b2c045efd7",  # oturma odası, bitkili
-    "photo-1512918728675-ed5a9ecdebfd",  # yatak odası
-    "photo-1554995207-c18c203602cb",     # salon, minimal
+# --- 5 ilan: 4 ev + 1 kişisel, hepsi elle yazılmış ---
+LISTINGS = [
+    {
+        "owner": 0,
+        "type": "ev_ilani",
+        "district": "Beşiktaş",
+        "neighborhood": "Etiler Mah.",
+        "rooms": "2+1",
+        "title": "Etiler'de aydınlık 2+1 — bir oda boş, kampüse 10 dk",
+        "description": (
+            "Boğaziçi Güney Kampüs'e yürüme mesafesinde, sakin bir sokakta "
+            "2+1 dairede oda arkadaşı arıyorum. Ev güney cepheli, gün boyu "
+            "güneş alıyor.\n\n"
+            "Boşalan oda 14 m²; içinde gardırop, çalışma masası ve tek kişilik "
+            "yatak mevcut. Salon ortak, ben genelde odamda çalıştığım için "
+            "salonu rahatça kullanabilirsin.\n\n"
+            "Bina asansörlü ve kapıcılı. Doğalgaz kombi (fatura ortak), "
+            "internet fiber ve kiraya dahil. Markete ve metrobüse 5 dakika.\n\n"
+            "Aidat 1.200 TL, ortalama fatura kişi başı ~1.500 TL. Depozito bir "
+            "kira. En az iki dönem kalmayı düşünen birini tercih ederim."
+        ),
+        "photos": [
+            "photo-1502672260266-1c1ef2d93688",  # salon
+            "photo-1512918728675-ed5a9ecdebfd",  # yatak odası
+            "photo-1556911220-bff31c812dba",     # mutfak
+            "photo-1600566753190-17f0baa2a6c3",  # oda detay
+            "photo-1584622650111-993a426fbf0a",  # banyo
+        ],
+        "smoking": False,
+        "pets": True,
+    },
+    {
+        "owner": 1,
+        "type": "ev_ilani",
+        "district": "Şişli",
+        "neighborhood": "Mecidiyeköy Mah.",
+        "rooms": "3+1",
+        "title": "Mecidiyeköy metroya 3 dk, 3+1 dairede geniş oda",
+        "description": (
+            "Metro çıkışına 3 dakika yürüme mesafesinde, 3+1 dairede tek kişilik "
+            "oda. Şu an iki kişiyiz (ben ve bir arkadaşım), üçüncü ev arkadaşımızı "
+            "arıyoruz.\n\n"
+            "Oda 16 m², bina cephesine bakıyor ve gürültü almıyor — çift cam var. "
+            "Eşyalı: yatak, dolap, kitaplık, çalışma masası.\n\n"
+            "Ev tamamen eşyalı ve yeni tadilatlı. Bulaşık makinesi, çamaşır "
+            "makinesi, klima mevcut. Mutfak geniş, birlikte yemek yapmayı seven "
+            "biri olursa çok memnun oluruz.\n\n"
+            "İTÜ, YTÜ ve Bilgi kampüslerine tek vasıta. Depozito bir kira, "
+            "faturalar üçe bölünüyor (kişi başı ~1.200 TL)."
+        ),
+        "photos": [
+            "photo-1522708323590-d24dbb6b0267",  # oturma odası
+            "photo-1554995207-c18c203602cb",     # salon
+            "photo-1586023492125-27b2c045efd7",  # oturma alanı
+            "photo-1560448204-e02f11c3d0e2",     # stüdyo
+        ],
+        "smoking": False,
+        "pets": False,
+    },
+    {
+        "owner": 2,
+        "type": "ev_ilani",
+        "district": "Kadıköy",
+        "neighborhood": "Caferağa Mah.",
+        "rooms": "2+1",
+        "title": "Moda'da deniz kokan 2+1 — sessiz ev arkadaşı aranıyor",
+        "description": "",  # aşağıda doldurulur
+        "photos": [
+            "photo-1493809842364-78817add7ffb",
+            "photo-1484154218962-a197022b5858",
+            "photo-1505873242700-f289a29e1e0f",
+            "photo-1616486338812-3dadae4b4ace",
+        ],
+        "smoking": False,
+        "pets": False,
+    },
+    {
+        "owner": 4,
+        "type": "ev_ilani",
+        "district": "Beyoğlu",
+        "neighborhood": "Cihangir Mah.",
+        "rooms": "2+1",
+        "title": "Cihangir'de tarihi binada 2+1 — mimarlık öğrencisi ev sahibi",
+        "description": (
+            "Cihangir'in ara sokaklarından birinde, 1950'ler binasında yüksek "
+            "tavanlı 2+1. Ev karakterli: ahşap zemin, büyük pencereler, küçük bir "
+            "Fransız balkonu.\n\n"
+            "Boşalan oda 13 m², içinde geniş bir çalışma masası var (mimarlık/"
+            "tasarım öğrencisiyseniz maket için ideal). Yatak ve dolap mevcut.\n\n"
+            "Kedim Zeytin bizimle yaşıyor, uysal ve temiz — hayvan sevmeyen biri "
+            "için uygun değil. Ev sıcak, kalorifer merkezi.\n\n"
+            "Taksim'e yürüme mesafesi, gece hayatının içinde ama sokak sakin. "
+            "MSGSÜ ve İTÜ Taşkışla'ya yürüyerek gidilebiliyor. Aidat 900 TL."
+        ),
+        "photos": [
+            "photo-1560448204-e02f11c3d0e2",     # yüksek tavanlı salon
+            "photo-1502672260266-1c1ef2d93688",  # aydınlık oda
+            "photo-1586023492125-27b2c045efd7",  # oturma alanı
+            "photo-1512918728675-ed5a9ecdebfd",  # yatak odası
+            "photo-1505873242700-f289a29e1e0f",  # çalışma köşesi
+        ],
+        "smoking": False,
+        "pets": True,
+    },
+    {
+        "owner": 3,
+        "type": "kisisel_ilan",
+        "district": "Beşiktaş",
+        "neighborhood": "Levent Mah.",
+        "rooms": None,
+        "title": "Beşiktaş / Levent civarında oda arıyorum — 4. sınıf öğrencisi",
+        "description": (
+            "YTÜ Endüstri son sınıf öğrencisiyim, eylül döneminde taşınmak için "
+            "oda arıyorum. Beşiktaş, Levent, Etiler ve Şişli çevresine bakıyorum; "
+            "metroya yakın olması benim için önemli.\n\n"
+            "Kendimden: düzenliyim, bulaşığı biriktirmem, ortak alanları "
+            "temiz tutarım. Balkonda sigara içerim, evde içmem. Hafta içi gündüz "
+            "kampüste oluyorum, akşamları genelde evdeyim.\n\n"
+            "Uzun dönem (en az 1 yıl) kalmayı planlıyorum. Kefil ve gelir belgesi "
+            "sunabilirim. Eşyalı bir oda tercih ederim ama şart değil.\n\n"
+            "Ev arkadaşımla ara sıra yemek yiyip film izleyebileceğimiz, ama "
+            "birbirimizin alanına da saygı duyduğumuz bir düzen ideal."
+        ),
+        "photos": [
+            "photo-1522708323590-d24dbb6b0267",
+            "photo-1554995207-c18c203602cb",
+        ],
+        "smoking": True,
+        "pets": False,
+    },
 ]
 
-def _home_photo(seed: int) -> str:
-    pid = HOME_PHOTOS[seed % len(HOME_PHOTOS)]
-    return f"https://images.unsplash.com/{pid}?w=640&h=480&fit=crop"
-UNIVERSITIES = [
-    "Boğaziçi Üniversitesi", "İTÜ", "Marmara Üniversitesi", "Yıldız Teknik",
-    "İstanbul Üniversitesi", "Koç Üniversitesi", "Sabancı Üniversitesi",
-    "Galatasaray Üniversitesi", "Bahçeşehir Üniversitesi", "Bilgi Üniversitesi",
-]
-DEPARTMENTS = [
-    "Bilgisayar Mühendisliği", "Psikoloji", "Hukuk", "Tıp", "Mimarlık",
-    "İşletme", "Endüstri Mühendisliği", "Sosyoloji", "İktisat",
-    "Elektrik-Elektronik Müh.", "Grafik Tasarım", "Moleküler Biyoloji",
-]
-BIOS = [
-    "Sabahçıyım, ev düzenine önem veririm. Sessiz bir çalışma ortamı arıyorum.",
-    "Kitap ve kahve düşkünü. Hafta sonları genelde evdeyim.",
-    "Sporla ilgileniyorum, erken kalkarım. Temizlik konusunda titizim.",
-    "Müzik yapıyorum ama kulaklıkla çalışırım, merak etme.",
-    "Yemek yapmayı severim, mutfağı paylaşmaktan mutluluk duyarım.",
-    "Sakin, anlaşması kolay biriyim. Uzun dönem ev arkadaşı arıyorum.",
-    "Yüksek lisans öğrencisiyim, günümün çoğu kampüste geçiyor.",
-    "Dizi maratonlarına ortak arıyorum ama ders dönemi sessizlik esas.",
-]
-EV_TITLES = [
-    "{n} güneşli {r} — oda arkadaşı arıyorum",
-    "{d} merkezde ferah {r}, 1 oda boş",
-    "{n} temiz ve eşyalı {r}",
-    "Metroya yakın {r}, ev arkadaşı aranıyor",
-    "{d} öğrenci dostu {r}, hemen taşınılır",
-    "{n} sessiz sokakta {r}",
-]
-EV_DESCS = [
-    "Ev aydınlık ve eşyalı. Ortak alanları birlikte kullanıyoruz, faturalar bölüşülüyor. Durak 5 dk.",
-    "Oda geniş, gardırop ve çalışma masası mevcut. İnternet dahil. Uzun dönem tercihimiz.",
-    "Binada asansör var, market ve kafeler yürüme mesafesinde. Depozito 1 kira.",
-    "Ev arkadaşım mezun olup taşındığı için odası boşaldı. Düzenli ve sakin bir ev.",
-    "Kampüse tek vasıta. Isınma merkezi, aidat düşük. Görmeye gelebilirsin.",
-]
-KISISEL_TITLES = [
-    "{d} civarında oda arıyorum",
-    "Ekim başı için ev arkadaşı arayışındayım",
-    "{d} ya da çevresinde paylaşımlı ev arıyorum",
-    "Sessiz bir oda arıyorum ({d} tercihim)",
-]
-KISISEL_DESCS = [
-    "Bütçeme uygun, ulaşımı rahat bir oda arıyorum. Kendi eşyam yok, eşyalı tercih ederim.",
-    "Okula yakın bir yer arıyorum. Temiz ve düzenliyim, referans verebilirim.",
-    "Staja başladım, hafta içi yoğunum. Sakin bir ev ortamı önceliğim.",
-    "İkinci sınıf öğrencisiyim, yurttan eve geçmek istiyorum.",
-]
-
-ROOM_OPTIONS = ["1+1", "2+1", "2+1", "3+1"]  # 2+1 ağırlıklı
+LISTINGS[2]["description"] = (
+    "Moda sahiline 6 dakika, Bahariye'ye 8 dakika yürüme mesafesinde 2+1 daire. "
+    "Ev arkadaşım mezun olup şehir değiştirdiği için odası boşaldı.\n\n"
+    "Oda 15 m², parke zemin, çift kişilik yatak ve büyük gardırop var. Sokak "
+    "cephesine bakıyor ama üst kat olduğu için sessiz.\n\n"
+    "Ben hukuk öğrencisiyim, sınav dönemlerinde eve kapanırım — benzer şekilde "
+    "sessizliğe önem veren biriyle yaşamak isterim. Evde parti/kalabalık "
+    "misafir düzeni yok, ara sıra 2-3 kişilik kahve sohbetleri olur.\n\n"
+    "Bina 12 yaşında, asansörlü. Kombi bireysel, faturalar ikiye bölünüyor "
+    "(kişi başı ~1.400 TL). Marmaray ve metroya yürüme mesafesi; Marmara "
+    "Göztepe kampüsüne tek vasıta. Depozito bir kira."
+)
 
 
 def seed(force: bool = False) -> None:
@@ -158,90 +287,77 @@ def seed(force: bool = False) -> None:
         print(f"♻️  Eski demo verisi silindi ({len(demo_users)} kullanıcı).")
 
     market = pd.read_csv(MARKET_VALUES_CSV)
-    # En az 10 ilanlık mahalleler — medyanı daha güvenilir
-    market = market[market["total_listings"] >= 10].reset_index(drop=True)
 
-    # --- 20 demo kullanıcı ---
+    def median_rent(district: str, neighborhood: str, rooms: str | None) -> int:
+        """Mahalle medyanını TÜFE ile endeksleyip oda payına böler."""
+        row = market[
+            (market["district"].str.strip() == district)
+            & (market["neighborhood"].str.strip() == neighborhood)
+        ]
+        if row.empty:  # mahalle yoksa ilçe medyanı
+            row = market[market["district"].str.strip() == district]
+        base = float(row["avg_price"].median()) * factor
+        share = int(rooms[0]) if rooms else 2
+        return int(round(base / max(share, 1), -2))
+
+    # --- kullanıcılar ---
     users: list[models.User] = []
-    for i, (name, gender) in enumerate(PEOPLE):
-        row = market.sample(1).iloc[0]
-        budget_mid = row["avg_price"] * factor / random.choice([2, 2, 3])
-        b_min = int(round(budget_mid * 0.8, -2))
-        b_max = int(round(budget_mid * 1.25, -2))
-        user = models.User(
-            email=f"demo{i + 1}@{DEMO_DOMAIN}",
-            password_hash=_hash_password("Demo1234!"),
-            verified=True,
-            name=name,
-            gender=gender,
-            birth_year=random.randint(1999, 2006),
-            university=random.choice(UNIVERSITIES),
-            department=random.choice(DEPARTMENTS),
-            year=random.randint(1, 4),
-            budget_min=b_min,
-            budget_max=b_max,
-            smoking=random.random() < 0.25,
-            pets=random.random() < 0.4,
-            alcohol=random.random() < 0.5,
-            sleep_schedule=random.choice(["erken", "gece", "esnek"]),
-            preferred_districts=[str(row["district"])],
-            bio=random.choice(BIOS),
-            photos=[_portrait(gender, i)],
+    for i, p in enumerate(PEOPLE):
+        users.append(
+            models.User(
+                email=f"demo{i + 1}@{DEMO_DOMAIN}",
+                password_hash=_hash_password("Demo1234!"),
+                verified=True,
+                name=p["name"],
+                gender=p["gender"],
+                birth_year=p["birth_year"],
+                university=p["university"],
+                department=p["department"],
+                year=p["year"],
+                budget_min=p["budget"][0],
+                budget_max=p["budget"][1],
+                smoking=p["smoking"],
+                alcohol=p["alcohol"],
+                pets=p["pets"],
+                sleep_schedule=p["sleep"],
+                preferred_districts=p["districts"],
+                bio=p["bio"],
+                photos=[p["photo"]],
+            )
         )
-        db.add(user)
-        users.append(user)
+    db.add_all(users)
     db.flush()
 
-    # --- 100 ilan: 60 ev + 40 kişisel ---
-    created = 0
-    for i in range(100):
-        owner = users[i % len(users)]
-        row = market.sample(1).iloc[0]
-        district = str(row["district"]).strip()
-        neighborhood = str(row["neighborhood"]).strip()
-        is_house = i < 60
-
-        if is_house:
-            rooms = random.choice(ROOM_OPTIONS)
-            n_rooms = int(rooms[0])
-            # Oda payı = endeksli daire kirası / oda sayısı, ±%15 oynama
-            share = row["avg_price"] * factor / max(n_rooms, 1)
-            rent = int(round(share * random.uniform(0.85, 1.15), -2))
+    # --- ilanlar ---
+    for item in LISTINGS:
+        owner = users[item["owner"]]
+        rent = median_rent(item["district"], item["neighborhood"], item["rooms"])
+        common = dict(
+            owner_id=owner.id,
+            type=item["type"],
+            title=item["title"],
+            description=item["description"],
+            district=item["district"],
+            photos=[_unsplash(p) for p in item["photos"]],
+        )
+        if item["type"] == "ev_ilani":
             listing = models.Listing(
-                owner_id=owner.id,
-                type="ev_ilani",
-                title=random.choice(EV_TITLES).format(
-                    d=district, n=neighborhood.replace(" Mah.", ""), r=rooms
-                ),
-                description=random.choice(EV_DESCS),
-                district=district,
+                **common,
                 rent=rent,
-                room_count=rooms,
-                smoking_allowed=random.random() < 0.2,
-                pets_allowed=random.random() < 0.45,
-                photos=[
-                    _home_photo(i + k) for k in range(random.randint(1, 3))
-                ],
+                room_count=item["rooms"],
+                smoking_allowed=item["smoking"],
+                pets_allowed=item["pets"],
             )
         else:
-            mid = row["avg_price"] * factor / random.choice([2, 2, 3])
             listing = models.Listing(
-                owner_id=owner.id,
-                type="kisisel_ilan",
-                title=random.choice(KISISEL_TITLES).format(d=district),
-                description=random.choice(KISISEL_DESCS),
-                district=district,
-                budget_min=int(round(mid * 0.8, -2)),
-                budget_max=int(round(mid * 1.25, -2)),
-                # İlan görseli iç mekân olsun; sahibinin portresi profil/deste
-                # şeritlerinde zaten görünüyor (Evler sayfasında yüz garip duruyor)
-                photos=[_home_photo(i)],
+                **common,
+                budget_min=owner.budget_min,
+                budget_max=owner.budget_max,
             )
         db.add(listing)
-        created += 1
 
     db.commit()
-    print(f"✅ {len(users)} demo kullanıcı + {created} ilan eklendi "
+    print(f"✅ {len(users)} demo kullanıcı + {len(LISTINGS)} özenli ilan eklendi "
           f"(kiralar TÜFE x{factor:.4f} ile endeksli).")
     db.close()
 
