@@ -361,7 +361,7 @@ const Index = () => {
           {[
             { icon: Sparkles, title: "Adil fiyat danışmanı", desc: "LightGBM modeli, istenen kiranın piyasaya uygunluğunu mahalle bazında söyler — TÜFE ile bugüne endeksli." },
             { icon: Shield, title: ".edu.tr ile güvende", desc: "Sadece doğrulanmış üniversite öğrencileri. Sahte profil yok." },
-            { icon: MapPin, title: "Bütçe haritası", desc: "968 mahalle bütçene göre renklenir; pahalı semtlere raylı sistemle yakın alternatifler önerilir." },
+            { icon: MapPin, title: "Bütçe haritası", desc: "968 mahalle bütçene göre yeşil/sarı/kırmızı renklenir — hangi semtin bütçene uyduğunu tek bakışta gör." },
           ].map((f, i) => (
             <motion.div
               key={i}

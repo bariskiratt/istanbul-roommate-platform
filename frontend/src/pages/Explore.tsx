@@ -12,6 +12,11 @@ import {
   type StatusKey,
 } from "@/lib/api";
 
+// Alternatif semt önerisi (raylı ağ tabanlı) şu an arayüzde KAPALI —
+// çıktı kalitesi ayarlanana kadar inaktif. Backend ucu (/api/alternatives)
+// ve buradaki kod duruyor; geri açmak için bu bayrağı true yap.
+const ALTERNATIVES_ENABLED = false;
+
 // Durum -> renk. Backend /api/legend ile aynı; ağ hatasında yedek olsun diye
 // burada da sabit tutuluyor.
 const FALLBACK_COLORS: Record<StatusKey, string> = {
@@ -121,7 +126,7 @@ const Explore = () => {
     // Popup butonuna tıklamayı delege et (popup içeriği dinamik).
     map.getContainer().addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest?.(".popup-alt") as HTMLElement | null;
-      if (btn) runAlternatives(Number(btn.dataset.id));
+      if (btn && ALTERNATIVES_ENABLED) runAlternatives(Number(btn.dataset.id));
     });
 
     (async () => {
@@ -154,7 +159,7 @@ const Explore = () => {
               let html = `<div style="font-weight:650">${p.neighborhood || "Bilinmeyen"} Mah.</div>`;
               html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
               html += `<div style="font-size:16px;font-weight:650">${price}</div>`;
-              if (p.avg_price != null) {
+              if (ALTERNATIVES_ENABLED && p.avg_price != null) {
                 html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
               }
               return html;
@@ -190,7 +195,7 @@ const Explore = () => {
         <div>
           <h1 className="font-bold text-xl text-foreground">Bütçe Haritası</h1>
           <p className="text-xs text-muted-foreground">
-            Bütçene uygun mahalleleri gör, pahalı bir semte yakın uygun alternatifleri keşfet.
+            Bütçene uygun mahalleleri harita üzerinde gör.
           </p>
         </div>
       </div>
@@ -235,7 +240,7 @@ const Explore = () => {
       <div className="relative flex-1 min-h-[420px]">
         <div id="explore-map" className="absolute inset-0" />
 
-        {alt && (
+        {ALTERNATIVES_ENABLED && alt && (
           <div className="absolute top-3 right-3 z-[1000] w-[320px] max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] overflow-y-auto bg-card border border-border rounded-xl shadow-xl p-4">
             <button
               onClick={() => {

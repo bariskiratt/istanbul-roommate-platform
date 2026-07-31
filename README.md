@@ -17,7 +17,7 @@ advisor**, a **budget heatmap** of 968 neighborhoods, and rail-network-based
 | **Listings** | Two types: *house listing* (have a room, need a roommate) and *personal listing* (need a room). Stored in SQLite/Postgres with photo upload (5 MB, JPEG/PNG/WebP). |
 | **Fair rent advisor** | LightGBM quantile regression predicts a fair **range** (q25–q75) for the whole flat, then derives the **per-room share** — because listers rent out one room, not the flat. Estimates are indexed to today with monthly CPI (TÜFE). |
 | **Budget heatmap** | 968 neighborhood polygons colored green/yellow/red for a given budget; Turkish-aware address matching links polygons to price data. |
-| **Alternative districts** | Transfer-weighted shortest paths over the rail network (station = 1, transfer = +5) suggest affordable neighborhoods near an expensive target — network cost, not straight-line distance (the Bosphorus problem). |
+| **Alternative districts** | Transfer-weighted shortest paths over the rail network (station = 1, transfer = +5) suggest affordable neighborhoods near an expensive target — network cost, not straight-line distance (the Bosphorus problem). *Currently disabled in the UI pending output-quality tuning; the API and module remain.* |
 | **Swipe & match** | Swipes are persisted; a match is created on mutual like, or when a lister accepts from the "Likes" queue. |
 | **Chat** | Per-match messaging (participants only), 4-second polling. |
 | **Theming** | Hinge-inspired editorial design; light & dark themes (default dark). |
