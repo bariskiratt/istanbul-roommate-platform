@@ -5,12 +5,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
 
 /*
- * Tasarım dili: Hinge esinli, koyu editoryal tema — sıcak espresso zemin,
- * krem rengi birincil aksiyonlar, aydınlık mor ikincil vurgu, serif
- * başlıklar. Fotoğrafları öne çıkaran sakin, gece moduna yakın bir ton.
+ * Tasarım dili: Hinge esinli, iki tema.
+ * :root  — açık: sıcak krem zemin, mürekkep birincil düğmeler.
+ * .dark  — koyu: espresso zemin, krem birincil düğmeler.
+ * Tema next-themes ile <html class="dark"> üzerinden değişir (Ayarlar).
  */
 @layer base {
   :root {
+    --background: 36 30% 96%;
+    --foreground: 24 12% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 24 12% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 12% 10%;
+
+    /* Mürekkep — açık temada birincil düğmeler koyu */
+    --primary: 24 12% 12%;
+    --primary-foreground: 36 30% 97%;
+
+    --secondary: 263 45% 34%;
+    --secondary-foreground: 36 30% 97%;
+
+    --muted: 36 14% 90%;
+    --muted-foreground: 28 7% 44%;
+
+    --accent: 160 30% 40%;
+    --accent-foreground: 36 30% 97%;
+
+    --destructive: 4 62% 52%;
+    --destructive-foreground: 36 30% 97%;
+
+    --border: 32 14% 87%;
+    --input: 32 14% 85%;
+    --ring: 24 12% 12%;
+
+    --radius: 0.8rem;
+
+    --lavender: 263 30% 92%;
+    --sand: 33 24% 89%;
+    --coral: 4 62% 58%;
+    --mint: 160 30% 40%;
+    --indigo: 263 45% 34%;
+
+    --sidebar-background: 36 30% 96%;
+    --sidebar-foreground: 24 12% 10%;
+    --sidebar-primary: 24 12% 12%;
+    --sidebar-primary-foreground: 36 30% 97%;
+    --sidebar-accent: 36 20% 93%;
+    --sidebar-accent-foreground: 24 12% 10%;
+    --sidebar-border: 32 14% 87%;
+    --sidebar-ring: 24 12% 12%;
+  }
+
+  .dark {
     --background: 24 9% 8%;
     --foreground: 36 20% 92%;
 
@@ -20,7 +69,7 @@
     --popover: 24 7% 12%;
     --popover-foreground: 36 20% 92%;
 
-    /* Krem — koyu zeminde birincil düğmeler aydınlık (Hinge dark) */
+    /* Krem — koyu zeminde birincil düğmeler aydınlık */
     --primary: 36 26% 91%;
     --primary-foreground: 24 10% 10%;
 
@@ -31,7 +80,6 @@
     --muted: 24 6% 17%;
     --muted-foreground: 32 8% 62%;
 
-    /* Olumlu/beğeni: adaçayı yeşili */
     --accent: 160 32% 52%;
     --accent-foreground: 24 10% 8%;
 
@@ -42,11 +90,8 @@
     --input: 26 6% 22%;
     --ring: 36 26% 91%;
 
-    --radius: 0.8rem;
-
-    /* Brand tokens — koyu temaya çekildi */
-    --lavender: 263 30% 24%;   /* derin mor zemin tonu */
-    --sand: 28 8% 20%;         /* koyu kum */
+    --lavender: 263 30% 24%;
+    --sand: 28 8% 20%;
     --coral: 4 70% 60%;
     --mint: 160 32% 52%;
     --indigo: 263 45% 62%;
@@ -87,12 +132,18 @@
   /* Navigation — shadow only, no border */
   .nav-header {
     @apply bg-card/80 backdrop-blur-lg text-foreground;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  }
+  .dark .nav-header {
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
   }
 
-  /* Cards — koyu zeminde ince çizgi + derin yumuşak gölge */
+  /* Cards — ince çizgi + temaya göre yumuşak gölge */
   .card-listing {
     @apply bg-card rounded-xl overflow-hidden border border-border;
+    box-shadow: 0 1px 3px rgba(28, 25, 20, 0.05);
+  }
+  .dark .card-listing {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   }
 
@@ -165,6 +216,9 @@
   /* Glass card */
   .glass-card {
     @apply bg-card/60 backdrop-blur-xl rounded-2xl;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+  .dark .glass-card {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   }
 

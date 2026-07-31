@@ -1,12 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Lock, User, LogOut, ChevronRight } from "lucide-react";
+import { ArrowLeft, Bell, Lock, User, LogOut, ChevronRight, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
 import BottomNav from "@/components/layout/BottomNav";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
+const themeOptions = [
+  { value: "light", label: "Açık", icon: Sun },
+  { value: "dark", label: "Koyu", icon: Moon },
+  { value: "system", label: "Sistem", icon: Monitor },
+] as const;
+
 const Settings = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   const items = [
     { icon: User, label: "Hesap Bilgileri", action: () => toast("Bu sayfa yakında geliyor") },
@@ -25,6 +33,30 @@ const Settings = () => {
       </div>
 
       <div className="px-6 py-4 space-y-2">
+        {/* Tema seçimi */}
+        <div className="card-listing p-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <Sun className="w-5 h-5 text-foreground" />
+            <span className="flex-1 text-left font-medium text-sm text-foreground">Görünüm</span>
+          </div>
+          <div className="flex rounded-xl border border-border overflow-hidden">
+            {themeOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setTheme(opt.value)}
+                className={`flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                  theme === opt.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-foreground hover:bg-muted"
+                }`}
+              >
+                <opt.icon className="w-3.5 h-3.5" />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {items.map((item, i) => (
           <button
             key={i}
