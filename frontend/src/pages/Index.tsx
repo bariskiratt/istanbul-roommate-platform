@@ -3,36 +3,27 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Home, Shield, Sparkles, ChevronLeft, ChevronRight, MapPin, BedDouble,
-  ShieldCheck, User, Layers, Handshake, LogOut, GraduationCap, ArrowRight,
+  ShieldCheck, User, Layers, Handshake, LogOut, ArrowRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings } from "@/lib/api";
 
 const quickDistricts = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Sarıyer", "Ataşehir"];
 
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
-
 const fmt = new Intl.NumberFormat("tr-TR");
 
-const districtGrid = [
-  { name: "Kadıköy", photo: "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400&h=300&fit=crop" },
-  { name: "Beşiktaş", photo: "https://images.unsplash.com/photo-1527838832700-5059252407fa?w=400&h=300&fit=crop" },
-  { name: "Üsküdar", photo: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=400&h=300&fit=crop" },
-  { name: "Şişli", photo: "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=400&h=300&fit=crop" },
-  { name: "Sarıyer", photo: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=400&h=300&fit=crop" },
-  { name: "Ataşehir", photo: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&h=300&fit=crop" },
-  { name: "Fatih", photo: "https://images.unsplash.com/photo-1465447142348-e9952c393450?w=400&h=300&fit=crop" },
-  { name: "Bakırköy", photo: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop" },
-  { name: "Maltepe", photo: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=400&h=300&fit=crop" },
-  { name: "Beyoğlu", photo: "https://images.unsplash.com/photo-1523731407965-2430cd12f5e4?w=400&h=300&fit=crop" },
-];
+const median = (xs: number[]): number | null => {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+};
 
 const Index = () => {
   const navigate = useNavigate();
   const { isLoggedIn, logout } = useAuth();
-  const profilesRef = useRef<HTMLDivElement>(null);
   const listingsRef = useRef<HTMLDivElement>(null);
 
   // Vitrindeki her şey gerçek: canlı ilanlardan beslenir
@@ -41,8 +32,22 @@ const Index = () => {
     queryFn: () => fetchListings(),
     staleTime: 60_000,
   });
-  const roommates = listings.filter(l => l.type === "kisisel_ilan").slice(0, 10);
   const houses = listings.filter(l => l.type === "ev_ilani").slice(0, 10);
+
+  // Semt kartları: fotoğraf yerine gerçek veri — ilan sayısı ve medyan oda payı
+  const districtStats = useMemo(() => {
+    const acc = new Map<string, { count: number; rents: number[] }>();
+    for (const l of listings) {
+      const s = acc.get(l.district) ?? { count: 0, rents: [] };
+      s.count += 1;
+      if (l.type === "ev_ilani" && l.rent != null) s.rents.push(l.rent);
+      acc.set(l.district, s);
+    }
+    return [...acc.entries()]
+      .map(([name, s]) => ({ name, count: s.count, median: median(s.rents) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [listings]);
 
   const scroll = (ref: React.RefObject<HTMLDivElement>, dir: "left" | "right") => {
     ref.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
@@ -184,63 +189,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ─── Ev arkadaşı arayanlar — gerçek ilanlar ─── */}
-      {roommates.length > 0 && (
-        <section className="max-w-7xl mx-auto px-6 py-16">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Ev arkadaşı arayanlar</h2>
-              <p className="text-muted-foreground mt-1">Topluluktan gerçek ilanlar</p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => scroll(profilesRef, "left")} className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronLeft className="w-4 h-4 text-foreground" />
-              </button>
-              <button onClick={() => scroll(profilesRef, "right")} className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronRight className="w-4 h-4 text-foreground" />
-              </button>
-            </div>
-          </div>
-          <div ref={profilesRef} className="flex gap-5 overflow-x-auto scrollbar-hide pb-4 -mx-2 px-2 snap-x">
-            {roommates.map((l, i) => (
-              <motion.div
-                key={l.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: Math.min(i * 0.05, 0.3) }}
-                className="flex-shrink-0 w-56 snap-start"
-              >
-                <div onClick={() => navigate("/swipe")} className="card-listing overflow-hidden group cursor-pointer h-full">
-                  <div className="aspect-square overflow-hidden bg-muted">
-                    <img
-                      src={l.photos[0] ?? placeholderAvatar}
-                      alt={l.owner_name ?? l.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="p-4 space-y-1.5">
-                    <h3 className="font-bold text-foreground">{l.owner_name || "İsimsiz"}</h3>
-                    {l.owner_university && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3" /> {l.owner_university}
-                      </p>
-                    )}
-                    <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">{l.district}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{l.title}</p>
-                    {l.budget_min != null && l.budget_max != null && (
-                      <p className="text-xs font-bold text-accent pt-1">
-                        {fmt.format(l.budget_min)} — {fmt.format(l.budget_max)} ₺/ay
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ─── Öne çıkan evler — gerçek ilanlar ─── */}
       {houses.length > 0 && (
         <section className="max-w-7xl mx-auto px-6 py-16">
@@ -374,28 +322,38 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ─── Semtler ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-16">
-        <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-10">İstanbul'da ev ara</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {districtGrid.map((d, i) => (
-            <motion.div
-              key={d.name}
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: Math.min(i * 0.03, 0.2) }}
-              className="group cursor-pointer"
-              onClick={() => navigate("/listings")}
-            >
-              <div className="aspect-[4/3] rounded-xl overflow-hidden border border-border">
-                <img src={d.photo} alt={d.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-              </div>
-              <p className="text-sm font-bold text-foreground text-center mt-2">{d.name}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+      {/* ─── Semtler — gerçek verilerle ─── */}
+      {districtStats.length > 0 && (
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-semibold text-foreground">İstanbul'da ev ara</h2>
+            <p className="text-muted-foreground mt-1">En çok ilan olan semtler ve medyan oda payları</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {districtStats.map((d, i) => (
+              <motion.button
+                key={d.name}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: Math.min(i * 0.03, 0.2) }}
+                onClick={() => navigate("/listings")}
+                className="card-listing p-5 text-left hover:shadow-lg transition-shadow group"
+              >
+                <p className="text-lg font-bold text-foreground group-hover:text-secondary transition-colors" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+                  {d.name}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1.5">{d.count} ilan</p>
+                {d.median != null && (
+                  <p className="text-xs font-semibold text-accent mt-0.5 tabular-nums">
+                    ~{fmt.format(d.median)} ₺/ay oda
+                  </p>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ─── Neden RoomMatch ─── */}
       <section className="max-w-5xl mx-auto px-6 py-16">
