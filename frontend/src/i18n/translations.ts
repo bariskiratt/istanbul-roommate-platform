@@ -233,6 +233,22 @@ const tr = {
   "tag.night": "Gece kuşu",
   "tag.flexible": "Esnek",
 
+  // ---- bütçe haritası ----
+  "map.title": "Bütçe Haritası",
+  "map.sub": "Bütçene uygun mahalleleri harita üzerinde gör.",
+  "map.budgetLabel": "Aylık bütçe",
+  "map.loading": "Harita yükleniyor…",
+  "map.summary": "Veri bulunan {total} mahalleden {safe} tanesi bütçene uygun.",
+  "map.weak": " ({weak} mahalle az ilana dayanıyor, soluk gösteriliyor.)",
+  "map.heatFailed": "Isı haritası alınamadı: {error}",
+  "map.attribution": "&copy; OpenStreetMap katkıcıları",
+  "map.noData": "Yeterli ilan verisi yok",
+  "map.month": "ay",
+  "map.unknown": "Bilinmeyen mahalle",
+  "map.neighborhoodSuffix": " Mah.",
+  "map.fewListings": "Yalnızca {count} ilana dayanıyor — temsil gücü düşük",
+  "map.geoFailed": "Harita verisi yüklenemedi: {error}",
+
   // ---- bölüm seçici ----
   "dept.loading": "Bölümler yükleniyor…",
   "dept.select": "Bölümünü seç",
@@ -555,6 +571,22 @@ const en: Record<TranslationKey, string> = {
   "tag.early": "Early riser",
   "tag.night": "Night owl",
   "tag.flexible": "Flexible",
+
+  // ---- budget map ----
+  "map.title": "Budget map",
+  "map.sub": "See which neighborhoods fit your budget, on the map.",
+  "map.budgetLabel": "Monthly budget",
+  "map.loading": "Loading the map…",
+  "map.summary": "{safe} of the {total} neighborhoods with data fit your budget.",
+  "map.weak": " ({weak} rest on few listings and are shown faded.)",
+  "map.heatFailed": "Couldn't load the heatmap: {error}",
+  "map.attribution": "&copy; OpenStreetMap contributors",
+  "map.noData": "Not enough listing data",
+  "map.month": "mo",
+  "map.unknown": "Unknown neighborhood",
+  "map.neighborhoodSuffix": "",
+  "map.fewListings": "Based on only {count} listings — weak signal",
+  "map.geoFailed": "Couldn't load map data: {error}",
 
   // ---- department picker ----
   "dept.loading": "Loading departments…",

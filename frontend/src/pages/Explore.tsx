@@ -11,6 +11,7 @@ import {
   type AlternativesResponse,
   type StatusKey,
 } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 // Alternatif semt önerisi (raylı ağ tabanlı) şu an arayüzde KAPALI —
 // çıktı kalitesi ayarlanana kadar inaktif. Backend ucu (/api/alternatives)
@@ -26,10 +27,9 @@ const FALLBACK_COLORS: Record<StatusKey, string> = {
   nodata: "#95a5a6",
 };
 
-const fmt = new Intl.NumberFormat("tr-TR");
-
 const Explore = () => {
   const navigate = useNavigate();
+  const { t, n: fmtNum } = useI18n();
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.Path[]>([]);
   const statusesRef = useRef<StatusKey[]>([]);
@@ -40,8 +40,13 @@ const Explore = () => {
 
   const [budget, setBudget] = useState(25000);
   const [summary, setSummary] = useState<Record<StatusKey, number> | null>(null);
-  const [status, setStatus] = useState("Harita yükleniyor…");
+  const [status, setStatus] = useState(t("map.loading"));
   const [alt, setAlt] = useState<AlternativesResponse | null>(null);
+
+  // Harita bir kez kurulur; popup üreticileri ilk render'ın `t`'sini yakalar.
+  // Dil değişince güncel çeviriyi görebilmeleri için ref üzerinden okunur.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // Harita tıklama işleyicisi mount'ta bir kez kaydedildiği için `budget`
   // state'ini kapanışta (closure) yakalar ve güncel değeri görmez. Güncel
@@ -75,11 +80,11 @@ const Explore = () => {
       const total = data.summary.safe + data.summary.borderline + data.summary.expensive;
       const weak = data.summary.low_confidence ?? 0;
       setStatus(
-        `Veri bulunan ${total} mahalleden ${data.summary.safe} tanesi bütçene uygun.` +
-          (weak ? ` (${weak} mahalle az ilana dayanıyor, soluk gösteriliyor.)` : ""),
+        tRef.current("map.summary", { total, safe: data.summary.safe }) +
+          (weak ? tRef.current("map.weak", { weak }) : ""),
       );
     } catch (e) {
-      setStatus(`Isı haritası alınamadı: ${(e as Error).message}`);
+      setStatus(tRef.current("map.heatFailed", { error: (e as Error).message }));
     }
   };
 
@@ -113,7 +118,7 @@ const Explore = () => {
         data.recommendations.forEach((r) => {
           altMarkersRef.current.push(
             L.marker([r.lat, r.lon], { icon: pin("hsl(160 32% 52%)") })
-              .bindTooltip(`${r.name} · ${fmt.format(Math.round(r.price ?? 0))} TL`)
+              .bindTooltip(`${r.name} · ${fmtNum(Math.round(r.price ?? 0))} TL`)
               .addTo(mapRef.current!),
           );
         });
@@ -128,7 +133,7 @@ const Explore = () => {
     const map = L.map("explore-map").setView([41.02, 28.95], 10);
     mapRef.current = map;
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap katkıcıları",
+      attribution: tRef.current("map.attribution"),
       maxZoom: 18,
     }).addTo(map);
 
@@ -164,13 +169,16 @@ const Explore = () => {
             layer.bindPopup(() => {
               const price =
                 p.avg_price == null
-                  ? "Yeterli ilan verisi yok"
-                  : `${fmt.format(Math.round(p.avg_price))} TL / ay`;
-              let html = `<div style="font-weight:650">${p.neighborhood || "Bilinmeyen"} Mah.</div>`;
+                  ? tRef.current("map.noData")
+                  : `${fmtNum(Math.round(p.avg_price))} TL / ${tRef.current("map.month")}`;
+              const area = p.neighborhood
+                ? `${p.neighborhood}${tRef.current("map.neighborhoodSuffix")}`
+                : tRef.current("map.unknown");
+              let html = `<div style="font-weight:650">${area}</div>`;
               html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
               html += `<div style="font-size:16px;font-weight:650">${price}</div>`;
               if (p.avg_price != null && p.listing_count != null && p.listing_count < 8) {
-                html += `<div style="color:#b48a00;font-size:11px;margin-top:4px">⚠️ Yalnızca ${p.listing_count} ilana dayanıyor — temsil gücü düşük</div>`;
+                html += `<div style="color:#b48a00;font-size:11px;margin-top:4px">⚠️ ${tRef.current("map.fewListings", { count: p.listing_count })}</div>`;
               }
               if (ALTERNATIVES_ENABLED && p.avg_price != null) {
                 html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
@@ -181,9 +189,7 @@ const Explore = () => {
         }).addTo(map);
         await recolor(budget);
       } catch (e) {
-        setStatus(
-          `Harita verisi yüklenemedi: ${(e as Error).message}. Backend çalışıyor mu? (backend/ → python -m app.main)`,
-        );
+        setStatus(tRef.current("map.geoFailed", { error: (e as Error).message }));
       }
     })();
 
@@ -206,17 +212,15 @@ const Explore = () => {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="font-bold text-xl text-foreground">Bütçe Haritası</h1>
-          <p className="text-xs text-muted-foreground">
-            Bütçene uygun mahalleleri harita üzerinde gör.
-          </p>
+          <h1 className="font-bold text-xl text-foreground">{t("map.title")}</h1>
+          <p className="text-xs text-muted-foreground">{t("map.sub")}</p>
         </div>
       </div>
 
       {/* Bütçe kontrolü */}
       <div className="px-6 py-3 border-y border-border bg-card flex flex-wrap items-center gap-4">
         <div className="text-lg font-bold tabular-nums whitespace-nowrap">
-          {fmt.format(budget)} ₺
+          {fmtNum(budget)} ₺
         </div>
         <input
           type="range"
@@ -230,7 +234,7 @@ const Explore = () => {
             recolor(v);
           }}
           className="flex-1 min-w-[180px] accent-primary"
-          aria-label="Aylık bütçe"
+          aria-label={t("map.budgetLabel")}
         />
         {summary && (
           <div className="flex flex-wrap gap-3 text-xs">
@@ -278,7 +282,7 @@ const Explore = () => {
             ) : (
               <>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1">
-                  Bütçe {fmt.format(alt.budget ?? budget)} ₺ · raylı sistemle ulaşılabilir{" "}
+                  Bütçe {fmtNum(alt.budget ?? budget)} ₺ · raylı sistemle ulaşılabilir{" "}
                   {alt.recommendations.length} uygun mahalle
                 </p>
                 {alt.recommendations.map((r, i) => (
@@ -297,13 +301,13 @@ const Explore = () => {
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       <span className="font-semibold text-foreground">
-                        {fmt.format(Math.round(r.price ?? 0))} ₺
+                        {fmtNum(Math.round(r.price ?? 0))} ₺
                       </span>
                       {r.district ? ` · ${r.district}` : ""}
                       {r.saving != null && r.saving > 0 ? (
                         <span className="text-accent">
                           {" "}
-                          · {fmt.format(r.saving)} ₺ ucuz
+                          · {fmtNum(r.saving)} ₺ ucuz
                         </span>
                       ) : null}
                     </div>
