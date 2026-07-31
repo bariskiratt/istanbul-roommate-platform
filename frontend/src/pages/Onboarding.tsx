@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import PasswordInput from "@/components/PasswordInput";
+import DepartmentPicker from "@/components/DepartmentPicker";
 
 const steps = ["E-posta", "OTP", "Kişisel", "Üniversite", "Bütçe", "Yaşam Tarzı", "Fotoğraf"];
 
@@ -387,12 +388,7 @@ const Onboarding = () => {
                   </p>
                 )}
               </div>
-              <Input
-                placeholder="Bölümün? (ör. Bilgisayar Müh., Psikoloji)"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
-              />
+              <DepartmentPicker value={department} onChange={setDepartment} />
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Kaçıncı Sınıf?</p>
                 <div className="grid grid-cols-4 gap-3">

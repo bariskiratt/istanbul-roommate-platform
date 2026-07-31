@@ -255,6 +255,10 @@ export const loginWithPassword = (email: string, password: string) =>
 
 export const fetchMe = () => getJSON<ApiUser>("/api/auth/me");
 
+/** Bölüm listesi (grup adı -> bölümler). Sabit liste, uzun süre cache'lenir. */
+export const fetchDepartments = () =>
+  getJSON<Record<string, string[]>>("/api/auth/departments");
+
 export const updateMe = (payload: UserUpdate) =>
   request<ApiUser>("/api/auth/me", {
     method: "PATCH",

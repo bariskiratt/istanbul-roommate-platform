@@ -9,6 +9,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
+import DepartmentPicker from "@/components/DepartmentPicker";
 
 const DISTRICTS = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Bakırköy", "Beyoğlu", "Sarıyer", "Fatih", "Eyüpsultan", "Maltepe", "Ataşehir", "Pendik", "Kartal", "Bahçelievler", "Zeytinburnu", "Küçükçekmece", "Başakşehir"];
 
@@ -125,7 +126,7 @@ const ProfileEdit = () => {
               {me.university ?? "E-posta alan adından belirlenemedi"}
             </p>
           </div>
-          <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Bölüm" className="h-12 rounded-xl" />
+          <DepartmentPicker value={department} onChange={setDepartment} />
           <div className="flex gap-2">
             {[1, 2, 3, 4].map(y => (
               <button

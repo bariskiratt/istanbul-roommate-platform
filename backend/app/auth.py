@@ -15,6 +15,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.db import get_db
+from app.departments import DEPARTMENT_GROUPS, is_valid as is_valid_department
 from app.emailer import send_otp_email
 from app.universities import university_from_email
 
@@ -168,6 +170,14 @@ class UserUpdate(BaseModel):
     gender: str | None = Field(None, max_length=30)
     birth_year: int | None = Field(None, ge=1900, le=2100)
     department: str | None = Field(None, max_length=80)
+
+    @field_validator("department")
+    @classmethod
+    def _known_department(cls, v: str | None) -> str | None:
+        # Bölüm kapalı listeden seçilir (bkz. app/departments.py)
+        if not is_valid_department(v):
+            raise ValueError("Bölüm listeden seçilmelidir.")
+        return v
     year: int | None = Field(None, ge=1, le=10)
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
     budget_max: int | None = Field(None, gt=0, le=10_000_000)
@@ -315,6 +325,15 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     db.refresh(user)
 
     return {"token": token, "user": user}
+
+
+@router.get("/departments")
+def departments():
+    """Profilde seçilebilecek bölümler (gruplu). Sabit liste, uzun cache."""
+    return JSONResponse(
+        DEPARTMENT_GROUPS,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/me", response_model=UserOut)
