@@ -33,6 +33,9 @@ _bearer = HTTPBearer(auto_error=False)
 
 OTP_TTL = timedelta(minutes=10)
 TOKEN_TTL = timedelta(days=30)
+
+# Platform üniversite öğrencilerine yönelik
+MIN_AGE, MAX_AGE = 17, 30
 _SCRYPT_PARAMS = {"n": 2**14, "r": 8, "p": 1}
 
 # Basit bellek-içi hız limiti: (uç, e-posta) başına pencere içi istek sayısı.
@@ -168,8 +171,19 @@ class UserUpdate(BaseModel):
 
     name: str | None = Field(None, max_length=80)
     gender: str | None = Field(None, max_length=30)
-    birth_year: int | None = Field(None, ge=1900, le=2100)
+    birth_year: int | None = None
     department: str | None = Field(None, max_length=80)
+
+    @field_validator("birth_year")
+    @classmethod
+    def _student_age(cls, v: int | None) -> int | None:
+        # Platform üniversite öğrencilerine yönelik: 17-30 yaş
+        if v is None:
+            return v
+        year = datetime.now(timezone.utc).year
+        if not (year - MAX_AGE <= v <= year - MIN_AGE):
+            raise ValueError(f"Yaş {MIN_AGE}-{MAX_AGE} aralığında olmalı.")
+        return v
 
     @field_validator("department")
     @classmethod

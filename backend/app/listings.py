@@ -125,6 +125,32 @@ def get_listing(listing_id: int, db: Session = Depends(get_db)):
     return row
 
 
+@router.get("/{listing_id}/fair-price")
+def listing_fair_price(listing_id: int, db: Session = Depends(get_db)):
+    """İlanın istediği oda payını modelin adil aralığıyla karşılaştırır.
+
+    Ev arkadaşlığı dinamiği: yatak odaları kişiye özel, salon/mutfak/banyo
+    ortaktır. Bu yüzden daire kirası yatak odası sayısına bölünür — "2+1"de
+    iki kişi, salon kimseye fatura edilmez, ortak alan olarak paylaşılır.
+    """
+    from app.fairprice import estimate_for_listing  # döngüsel importu önler
+
+    row = db.get(models.Listing, listing_id)
+    if row is None or not row.is_active:
+        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+    if row.type != "ev_ilani" or row.rent is None:
+        raise HTTPException(
+            status_code=400, detail="Yalnızca ev ilanları için hesaplanır."
+        )
+
+    result = estimate_for_listing(row.district, row.room_count, row.rent)
+    if result is None:
+        raise HTTPException(
+            status_code=503, detail="Adil fiyat modeli yüklü değil."
+        )
+    return result
+
+
 class ListingUpdate(BaseModel):
     """PATCH — yalnızca gönderilen alanlar güncellenir; tip değiştirilemez."""
 

@@ -142,6 +142,26 @@ def test_listing_ownership_and_mine(client):
     assert client.delete(f"/api/listings/{owned_id}", headers=headers).status_code == 204
 
 
+def test_birth_year_age_limits(client):
+    from datetime import datetime, timezone
+
+    token, _ = _register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    year = datetime.now(timezone.utc).year
+
+    # 22 yaşında -> kabul
+    ok = client.patch("/api/auth/me", headers=headers, json={"birth_year": year - 22})
+    assert ok.status_code == 200
+
+    # 15 ve 45 yaşında -> reddedilir
+    assert client.patch(
+        "/api/auth/me", headers=headers, json={"birth_year": year - 15}
+    ).status_code == 422
+    assert client.patch(
+        "/api/auth/me", headers=headers, json={"birth_year": year - 45}
+    ).status_code == 422
+
+
 def test_password_login(client):
     _register_and_login(client)
 

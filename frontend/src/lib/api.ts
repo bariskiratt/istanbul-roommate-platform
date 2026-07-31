@@ -173,6 +173,29 @@ export const updateListing = (id: number, payload: Partial<ListingPayload>) =>
 export const deleteListing = (id: number) =>
   request<void>(`/api/listings/${id}`, { method: "DELETE" });
 
+/** İlanın istediği oda payının adil aralıkla kıyası (ev arkadaşlığı bazlı). */
+export interface ListingFairPrice {
+  asking_price: number;
+  verdict: "below" | "fair" | "above";
+  deviation_pct: number;
+  room_low: number;
+  room_mid: number;
+  room_high: number;
+  flat_low: number;
+  flat_mid: number;
+  flat_high: number;
+  bedrooms: number;
+  occupants: number;
+  shared_areas: string[];
+  median_error_pct: number;
+  data_period: string;
+  indexed_to: string;
+  district_level: boolean;
+}
+
+export const fetchListingFairPrice = (id: number) =>
+  getJSON<ListingFairPrice>(`/api/listings/${id}/fair-price`);
+
 export const fetchListings = (params?: {
   type?: ListingPayload["type"];
   district?: string;

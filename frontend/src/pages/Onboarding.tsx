@@ -361,13 +361,22 @@ const Onboarding = () => {
                   ))}
                 </div>
               </div>
-              <Input
-                type="number"
-                placeholder="Doğum yılın (ör. 2002)"
-                value={birthYear}
-                onChange={e => setBirthYear(e.target.value)}
-                className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
-              />
+              {/* Yaş 17-30 ile sınırlı (üniversite öğrencisi platformu) */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Doğum yılın</label>
+                <select
+                  value={birthYear}
+                  onChange={e => setBirthYear(e.target.value)}
+                  className="w-full h-14 rounded-2xl bg-card border border-border px-4 text-base text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Seç…</option>
+                  {Array.from({ length: 14 }, (_, i) => new Date().getFullYear() - 17 - i).map(y => (
+                    <option key={y} value={y}>
+                      {y} ({new Date().getFullYear() - y} yaşında)
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
 

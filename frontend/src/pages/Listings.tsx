@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import FilterModal, { type ListingFilters, defaultFilters } from "@/components/FilterModal";
 import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
+import FairPriceBadge from "@/components/FairPriceBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -327,12 +328,15 @@ const ListingDetailModal = ({ listing, onClose }: { listing: ApiListing | null; 
               </div>
             </div>
 
+            {/* Adil fiyat analizi (ev arkadaşlığı bazlı oda payı) */}
+            {isHouse && <FairPriceBadge listingId={listing.id} detailed />}
+
             <hr className="border-border" />
 
             {/* Description */}
             <div>
               <h3 className="text-sm font-bold text-foreground mb-2">Açıklama</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{listing.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{listing.description}</p>
             </div>
 
             {!isHouse && (

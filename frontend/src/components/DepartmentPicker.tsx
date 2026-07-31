@@ -16,10 +16,11 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const { data: groups = {}, isLoading } = useQuery({
+  const { data: groups = {}, isLoading, isError, refetch } = useQuery({
     queryKey: ["departments"],
     queryFn: fetchDepartments,
     staleTime: 24 * 60 * 60 * 1000,
+    retry: 2,
   });
 
   const filtered = useMemo(() => {
@@ -60,7 +61,26 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
           </div>
 
           <div className="max-h-64 overflow-y-auto py-1">
-            {Object.keys(filtered).length === 0 && (
+            {isLoading && (
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                Bölümler yükleniyor…
+              </p>
+            )}
+            {(isError || (!isLoading && Object.keys(groups).length === 0)) && (
+              <div className="px-4 py-6 text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Bölüm listesi yüklenemedi (sunucuya ulaşılamadı).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="text-sm font-semibold text-primary hover:underline"
+                >
+                  Tekrar dene
+                </button>
+              </div>
+            )}
+            {!isLoading && Object.keys(groups).length > 0 && Object.keys(filtered).length === 0 && (
               <p className="px-4 py-6 text-sm text-muted-foreground text-center">
                 Eşleşen bölüm yok. Farklı bir kelime dene ya da "Listede Yok" seç.
               </p>

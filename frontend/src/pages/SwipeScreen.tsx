@@ -11,6 +11,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import FilterModal, { type ListingFilters } from "@/components/FilterModal";
+import FairPriceBadge from "@/components/FairPriceBadge";
 import { useAuth } from "@/contexts/AuthContext";
 
 const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
@@ -281,7 +282,14 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
             <span className="font-bold text-white text-lg">
               {isHouse ? `${listing.rent?.toLocaleString("tr-TR")} ₺` : `${listing.budgetMin?.toLocaleString("tr-TR")}–${listing.budgetMax?.toLocaleString("tr-TR")} ₺`}
             </span>
+            {isHouse && <span className="text-white/70 text-xs">/ay oda payı</span>}
           </div>
+          {/* Gerçek ilanlarda modelin adil fiyat kıyası */}
+          {isHouse && listing.id.startsWith("api-") && (
+            <div className="mt-2">
+              <FairPriceBadge listingId={Number(listing.id.slice(4))} />
+            </div>
+          )}
           {listing.user.university && (
             <div className="flex items-center gap-1.5 mt-1.5 text-white/80 text-xs">
               <GraduationCap className="w-3.5 h-3.5" />{listing.user.university}
@@ -372,6 +380,9 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
                 </button>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{listing.description}</p>
+              {listing.type === "ev_ilani" && listing.id.startsWith("api-") && (
+                <FairPriceBadge listingId={Number(listing.id.slice(4))} detailed />
+              )}
               {listing.user.id !== "anon" && (
                 <div className="flex flex-wrap gap-2">
                   <LifestyleTag type="smoking" value={listing.user.smoking} />
