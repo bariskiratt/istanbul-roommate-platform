@@ -18,14 +18,24 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# print() çıktıları tamponlanmadan düşsün. Eğitim adımından ÖNCE tanımlanır:
+# aksi halde derleme logunda tüm çıktı en sonda tek seferde görünür ve
+# 17 dakikanın nereye gittiği anlaşılmaz.
+ENV PYTHONUNBUFFERED=1
+
+# joblib/loky bu konteynerde fiziksel çekirdek sayısını okuyamıyor
+# ("found 0 physical cores < 1") ve LightGBM iş parçacığı sayısını oradan
+# türetiyor. Sayıyı elle sabitlemek, eğitimin çekirdek algılamasına
+# takılmasını önler. Render ücretsiz derleme makinesi 2 çekirdeklidir.
+ENV OMP_NUM_THREADS=2 \
+    LOKY_MAX_CPU_COUNT=2
+
 # --fast: 4 modelli CV karşılaştırması atlanır (o rapor içindi, yerelde
 # `python -m scripts.train_model` ile koşulur); yalnızca servis edilen
 # çeyreklik modeller eğitilir.
 RUN python -m scripts.train_model --fast
 
 ENV HOST=0.0.0.0
-# print() çıktıları tamponlanmadan Render loglarına düşsün
-ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # --proxy-headers: Render proxy'si arkasında request.base_url https üretsin
