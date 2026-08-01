@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,8 @@ import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
+import { ApiError, fetchLocations, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
+import { filterByQuery } from "@/lib/search";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
@@ -49,6 +51,26 @@ const Onboarding = () => {
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   const progress = ((currentStep + 1) / STEP_COUNT) * 100;
+
+  // Tercih edilen semtler: liste sabit değil, /api/locations'tan gelir.
+  // Aynı queryKey konum seçicide de kullanılıyor; istek bir kez atılır.
+  const {
+    data: locations = [],
+    isLoading: locationsLoading,
+    isError: locationsError,
+    refetch: refetchLocations,
+  } = useQuery({
+    queryKey: ["locations"],
+    queryFn: fetchLocations,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 2,
+  });
+
+  // Türkçe karaktersiz arama ("besiktas" -> Beşiktaş), bkz. lib/search.ts.
+  const visibleDistricts = useMemo(
+    () => filterByQuery(locations.map(l => l.district), districtSearch, d => d),
+    [locations, districtSearch],
+  );
 
   const handleOtpChange = (index: number, value: string) => {
     // Yapıştırma: "123456" gibi çok haneli girdiyi kutulara dağıt
@@ -444,27 +466,45 @@ const Onboarding = () => {
                   placeholder={t("ob.districtSearch")}
                   value={districtSearch}
                   onChange={e => setDistrictSearch(e.target.value)}
+                  // Esc aramayı temizler; seçilen semtler korunur.
+                  onKeyDown={e => { if (e.key === "Escape") setDistrictSearch(""); }}
                   className="h-12 text-sm rounded-xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
                 />
                 <div className="max-h-[240px] overflow-y-auto pr-1">
+                  {locationsLoading && (
+                    <p className="py-4 text-sm text-muted-foreground">{t("loc.loading")}</p>
+                  )}
+                  {!locationsLoading && (locationsError || locations.length === 0) && (
+                    <div className="py-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">{t("loc.loadFailed")}</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchLocations()}
+                        className="text-sm font-semibold text-primary hover:underline"
+                      >
+                        {t("common.retry")}
+                      </button>
+                    </div>
+                  )}
+                  {locations.length > 0 && visibleDistricts.length === 0 && (
+                    <p className="py-4 text-sm text-muted-foreground">{t("loc.noDistrictMatch")}</p>
+                  )}
                   <div className="flex flex-wrap gap-2">
-                    {["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Bakırköy", "Beyoğlu", "Sarıyer", "Fatih", "Eyüpsultan", "Maltepe", "Ataşehir", "Pendik", "Kartal", "Bağcılar", "Bahçelievler", "Zeytinburnu", "Gaziosmanpaşa", "Sultangazi", "Esenler", "Güngören", "Bayrampaşa", "Küçükçekmece", "Büyükçekmece", "Silivri", "Arnavutköy", "Başakşehir"]
-                      .filter(d => d.toLowerCase().includes(districtSearch.toLowerCase()))
-                      .map(d => (
-                        <button
-                          key={d}
-                          onClick={() => setDistrict(prev =>
-                            prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
-                          )}
-                          className={`px-3.5 py-2 rounded-full text-sm font-medium transition-all ${
-                            district.includes(d)
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-card border border-[hsl(var(--muted-foreground)/0.3)] text-foreground hover:border-primary/40"
-                          }`}
-                        >
-                          {d}
-                        </button>
-                      ))}
+                    {visibleDistricts.map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setDistrict(prev =>
+                          prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
+                        )}
+                        className={`px-3.5 py-2 rounded-full text-sm font-medium transition-all ${
+                          district.includes(d)
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-card border border-[hsl(var(--muted-foreground)/0.3)] text-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 {district.length > 0 && (
@@ -551,7 +591,7 @@ const Onboarding = () => {
               ))}
               {photos.length < 6 && (
                 <button
-                  onClick={pickPhoto}
+                  onClick={() => pickPhoto(6 - photos.length)}
                   disabled={uploading}
                   className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm disabled:opacity-50"
                 >

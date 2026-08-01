@@ -124,6 +124,7 @@ const tr = {
   "fair.checkTitle": "Adil Fiyat Danışmanı",
   "fair.checkSub": "LightGBM modeli, kiranın piyasaya uygun olup olmadığını söyler",
   "fair.neighborhood": "Mahalle",
+  "fair.pickNeighborhood": "Yukarıdan mahalle seç",
   "fair.area": "Alan (m²)",
   "fair.buildingAge": "Bina yaşı",
   "fair.floor": "Kat",
@@ -420,10 +421,15 @@ const tr = {
   "create.locationSubHouse": "Evin hangi semtte?",
   "create.locationSubPersonal": "Hangi semti tercih ediyorsun?",
   "create.photosTitle": "Fotoğraflar",
-  "create.photosSubHouse": "Evin fotoğraflarını ekle (en az 1)",
-  "create.photosSubPersonal": "Profil fotoğrafını ekle (en az 1)",
+  "create.photosSubHouse": "Evin fotoğraflarını ekle (en az 3)",
+  "create.photosSubPersonal": "Fotoğraflarını ekle (en az 3)",
   "create.addPhoto": "Ekle",
-  "create.photoCount": "{count}/6 fotoğraf eklendi",
+  "create.photoCount": "{count}/{max} fotoğraf eklendi",
+  "create.photoMinHint":
+    "İlanı yayınlamak için en az {min} fotoğraf gerekiyor: birkaç kare, ilana bakanın mekân hakkında fikir edinmesini kolaylaştırır.",
+  "create.photoEnough": "Alt sınır tamam. İstersen {max} fotoğrafa kadar ekleyebilirsin.",
+  "create.photoMinError": "En az {min} fotoğraf gerekiyor.",
+  "create.goToPhotos": "Fotoğraflara dön",
   "create.publish": "İlanı Yayınla 🚀",
   "create.publishing": "Yayınlanıyor…",
   "create.successTitle": "İlan Oluşturuldu! 🎉",
@@ -503,6 +509,26 @@ const tr = {
   "dept.loadFailed": "Bölüm listesi yüklenemedi (sunucuya ulaşılamadı).",
   "dept.noMatch": "Eşleşen bölüm yok. Farklı bir kelime dene ya da \"Listede Yok\" seç.",
 
+  // ---- konum seçici (ilçe + mahalle) ----
+  "loc.districtLabel": "İlçe",
+  "loc.districtSelect": "İlçe seç",
+  "loc.districtSearch": "İlçe ara… (ör. besiktas)",
+  "loc.noDistrictMatch": "Eşleşen ilçe yok. Farklı bir kelime dene.",
+  "loc.neighborhoodLabel": "Mahalle (isteğe bağlı)",
+  "loc.neighborhoodSelect": "Mahalle seç",
+  "loc.neighborhoodSearch": "Mahalle ara… (ör. cafer)",
+  "loc.noNeighborhoodMatch": "Eşleşen mahalle yok. Farklı bir kelime dene.",
+  "loc.neighborhoodNone": "Mahalle belirtme",
+  "loc.pickDistrictFirst": "Önce ilçe seç",
+  // Backend gerçekten böyle çalışıyor: mahalle verilirse tahmin mahalle
+  // bazında, verilmezse ilçe geneline göre yapılır.
+  "loc.neighborhoodHint":
+    "Mahalle seçersen adil fiyat tahmini o mahalleye göre yapılır; seçmezsen ilçe geneline göre hesaplanır.",
+  "loc.loading": "Konumlar yükleniyor…",
+  "loc.fallbackNotice":
+    "Mahalle listesi yüklenemedi. İlçe seçerek devam edebilirsin; adil fiyat tahmini ilçe geneline dayanır.",
+  "loc.loadFailed": "Konum listesi yüklenemedi (sunucuya ulaşılamadı).",
+
   // ---- kayıt akışı ----
   "ob.step1Title": "Üniversite E-postan",
   "ob.step2Title": "Doğrulama Kodu",
@@ -545,7 +571,7 @@ const tr = {
   "ob.yearOption": "{year}. Sınıf",
   "ob.budgetLabel": "Aylık Kira Bütçesi",
   "ob.districts": "Tercih Edilen Semtler",
-  "ob.districtSearch": "İstanbul'da bir semt ara… (ör. Sarıyer, Maltepe)",
+  "ob.districtSearch": "İstanbul'da bir semt ara… (ör. sariyer, maltepe)",
   "ob.districtsSelected": "{count} semt seçildi",
   "ob.smoking": "Sigara",
   "ob.smokingDesc": "Sigara kullanıyor musun?",
@@ -863,6 +889,7 @@ const en: Record<TranslationKey, string> = {
   "fair.checkTitle": "Fair-price advisor",
   "fair.checkSub": "A LightGBM model tells you whether the rent is in line with the market",
   "fair.neighborhood": "Neighbourhood",
+  "fair.pickNeighborhood": "Pick a neighbourhood above",
   "fair.area": "Area (m²)",
   "fair.buildingAge": "Building age",
   "fair.floor": "Floor",
@@ -1158,10 +1185,15 @@ const en: Record<TranslationKey, string> = {
   "create.locationSubHouse": "Which district is the place in?",
   "create.locationSubPersonal": "Which district do you prefer?",
   "create.photosTitle": "Photos",
-  "create.photosSubHouse": "Add photos of the place (at least 1)",
-  "create.photosSubPersonal": "Add a profile photo (at least 1)",
+  "create.photosSubHouse": "Add photos of the place (at least 3)",
+  "create.photosSubPersonal": "Add your photos (at least 3)",
   "create.addPhoto": "Add",
-  "create.photoCount": "{count}/6 photos added",
+  "create.photoCount": "{count}/{max} photos added",
+  "create.photoMinHint":
+    "A listing needs at least {min} photos: a few shots make it easier for people to get a sense of the place.",
+  "create.photoEnough": "Minimum reached. You can add up to {max} photos if you like.",
+  "create.photoMinError": "At least {min} photos are required.",
+  "create.goToPhotos": "Back to photos",
   "create.publish": "Publish listing 🚀",
   "create.publishing": "Publishing…",
   "create.successTitle": "Listing created! 🎉",
@@ -1241,6 +1273,24 @@ const en: Record<TranslationKey, string> = {
   "dept.loadFailed": "Couldn't load the department list (server unreachable).",
   "dept.noMatch": "No matching department. Try another word or pick \"Listede Yok\".",
 
+  // ---- konum seçici (ilçe + mahalle) ----
+  "loc.districtLabel": "District",
+  "loc.districtSelect": "Choose a district",
+  "loc.districtSearch": "Search districts… (e.g. besiktas)",
+  "loc.noDistrictMatch": "No matching district. Try another word.",
+  "loc.neighborhoodLabel": "Neighborhood (optional)",
+  "loc.neighborhoodSelect": "Choose a neighborhood",
+  "loc.neighborhoodSearch": "Search neighborhoods… (e.g. cafer)",
+  "loc.noNeighborhoodMatch": "No matching neighborhood. Try another word.",
+  "loc.neighborhoodNone": "Leave the neighborhood unset",
+  "loc.pickDistrictFirst": "Choose a district first",
+  "loc.neighborhoodHint":
+    "Pick a neighborhood and the fair price estimate is made for that neighborhood; leave it empty and it is calculated across the whole district.",
+  "loc.loading": "Loading locations…",
+  "loc.fallbackNotice":
+    "Couldn't load the neighbourhood list. You can continue with a district; the fair-price estimate will then be district-wide.",
+  "loc.loadFailed": "Couldn't load the location list (server unreachable).",
+
   // ---- onboarding ----
   "ob.step1Title": "Your university email",
   "ob.step2Title": "Verification code",
@@ -1283,7 +1333,7 @@ const en: Record<TranslationKey, string> = {
   "ob.yearOption": "Year {year}",
   "ob.budgetLabel": "Monthly rent budget",
   "ob.districts": "Preferred districts",
-  "ob.districtSearch": "Search a district in Istanbul… (e.g. Sarıyer, Maltepe)",
+  "ob.districtSearch": "Search a district in Istanbul… (e.g. sariyer, maltepe)",
   "ob.districtsSelected": "{count} districts selected",
   "ob.smoking": "Smoking",
   "ob.smokingDesc": "Do you smoke?",

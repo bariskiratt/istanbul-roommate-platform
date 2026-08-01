@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sparkles, TrendingUp, TrendingDown, Check } from "lucide-react";
-import {
-  estimatePrice,
-  fetchLocations,
-  type EstimateResponse,
-} from "@/lib/api";
+import { estimatePrice, type EstimateResponse } from "@/lib/api";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 
@@ -16,6 +12,16 @@ type FieldError = { key: TranslationKey } | { text: string } | null;
 
 interface Props {
   district: string;
+  /**
+   * Formda seçilmiş mahalle. Panelin TEK mahalle kaynağıdır.
+   *
+   * Eskiden panelin kendi mahalle listesi vardı ve seçim boşken ilçenin İLK
+   * mahallesine düşüyordu: kullanıcı "Kadıköy" bandına baktığını sanırken
+   * panel sessizce bir mahalleyi hesaplıyor, yayınlanan ilan ise mahallesiz
+   * olduğu için ilçe geneline düşüp BAŞKA bir bant gösteriyordu. Artık panel
+   * ile ilanın fiyatı aynı girdiden çıkıyor.
+   */
+  neighborhood?: string;
   /** İlan verenin istediği kira; adil bantla karşılaştırmak için. */
   askingPrice?: number;
   /** "2+1" gibi oda bilgisi; oda sayısını buradan türetiriz. */
@@ -47,10 +53,13 @@ const fmtPeriod = (p: string, locale: string) => {
  * (/api/estimate) kullanarak adil kira aralığını gösterir ve ilan verenin
  * istediği kirayı bu bantla karşılaştırır.
  */
-const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
+const FairPriceCheck = ({
+  district,
+  neighborhood = "",
+  askingPrice,
+  roomCount,
+}: Props) => {
   const { t, n: fmt, locale } = useI18n();
-  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [neighborhood, setNeighborhood] = useState("");
   const [area, setArea] = useState("90");
   const [age, setAge] = useState("15");
   const [floor, setFloor] = useState("3");
@@ -58,29 +67,11 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
   const [error, setError] = useState<FieldError>(null);
   const [result, setResult] = useState<EstimateResponse | null>(null);
 
-  // İlçe seçilince o ilçenin mahallelerini yükle.
+  // Konum değişince eldeki sonuç artık o konuma ait değil.
   useEffect(() => {
-    let active = true;
     setResult(null);
     setError(null);
-    if (!district) return;
-    fetchLocations()
-      .then((locs) => {
-        if (!active) return;
-        const list = locs[district] ?? [];
-        setNeighborhoods(list);
-        setNeighborhood(list[0] ?? "");
-      })
-      .catch(() => {
-        if (active) setError({ key: "fair.connectFailed" });
-      });
-    return () => {
-      active = false;
-    };
-    // `t` bağımlılığa eklenmiyor: dil değişince mahalle listesini yeniden çekip
-    // kullanıcının seçimini sıfırlamanın anlamı yok.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [district]);
+  }, [district, neighborhood]);
 
   const analyze = async () => {
     setLoading(true);
@@ -123,20 +114,17 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        {/* Mahalle yukarıdaki konum seçicisinden gelir; panelin ayrı bir
+            listesi yoktur (bkz. Props.neighborhood). Seçilmemişse tahmin
+            yapılmaz: sessizce bir mahalle varsaymak, yayınlanacak ilanın
+            fiyatından farklı bir bant göstermek olurdu. */}
         <div className="col-span-2 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t("fair.neighborhood")}</label>
-          <select
-            value={neighborhood}
-            onChange={(e) => setNeighborhood(e.target.value)}
-            className="w-full h-11 rounded-xl bg-card border border-border px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            {neighborhoods.length === 0 && <option value="">—</option>}
-            {neighborhoods.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+          <div className="h-11 rounded-xl bg-muted/50 border border-border px-3 flex items-center text-sm text-foreground">
+            {neighborhood || (
+              <span className="text-muted-foreground">{t("fair.pickNeighborhood")}</span>
+            )}
+          </div>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t("fair.area")}</label>

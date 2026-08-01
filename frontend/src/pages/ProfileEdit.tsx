@@ -107,7 +107,7 @@ const ProfileEdit = () => {
             ))}
             {photos.length < 6 && (
               <button
-                onClick={pickPhoto}
+                onClick={() => pickPhoto(6 - photos.length)}
                 disabled={uploading}
                 className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:border-primary/40 transition-all disabled:opacity-50"
               >

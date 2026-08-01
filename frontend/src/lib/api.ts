@@ -7,6 +7,7 @@
  */
 
 import { translate } from "@/i18n";
+import { describeApiError } from "@/lib/apiError";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
@@ -24,19 +25,40 @@ function authHeaders(): Record<string, string> {
 }
 
 /**
- * Sunucunun döndürdüğü hata. `message` her zaman kullanıcıya gösterilebilir
- * (sunucu `detail` alanı ya da genel bir metin); `status` çağıranın hatayı
- * ayırt etmesi için taşınır — ör. 422 = moderasyon reddi.
+ * Sunucunun döndürdüğü hata. `message` her zaman kullanıcıya gösterilebilir:
+ * sunucunun `detail` alanı üç ayrı biçimde gelebildiği için (düz metin,
+ * denetim sözlüğü, Pydantic listesi) metin `describeApiError` ile üretilir —
+ * bkz. lib/apiError.ts. `status` çağıranın hatayı ayırt etmesi için taşınır.
  */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * Hatanın ait olduğu form alanı ("title", "description", "photos" …).
+   * Sunucu alan bilgisi vermediyse null.
+   */
+  readonly field: string | null;
+  /** Denetimin gerekçe kodları ("kufur:siktir" gibi); yoksa boş dizi. */
+  readonly reasons: string[];
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    field: string | null = null,
+    reasons: string[] = [],
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.field = field;
+    this.reasons = reasons;
   }
 }
+
+/** Yanıt gövdesinden ApiError üretir (üç `detail` biçimini de tanır). */
+const apiErrorFrom = (body: unknown, status: number, fallbackKey: "common.requestFailed" | "common.uploadFailed") => {
+  const info = describeApiError(body, translate(fallbackKey, { status }));
+  return new ApiError(info.message, status, info.field, info.reasons);
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -49,13 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new ApiError(
-      (data && typeof data.detail === "string" && data.detail) ||
-        translate("common.requestFailed", { status: res.status }),
-      res.status,
-    );
-  }
+  if (!res.ok) throw apiErrorFrom(data, res.status, "common.requestFailed");
   return data as T;
 }
 
@@ -105,9 +121,19 @@ export interface EstimateResponse {
 export const estimatePrice = (payload: EstimateRequest) =>
   postJSON<EstimateResponse>("/api/estimate", payload);
 
-// İlçe -> mahalle listesi (form doldurmak için)
-export const fetchLocations = () =>
-  getJSON<Record<string, string[]>>("/api/locations");
+// ---- İlçe / mahalle listesi ----
+
+/** Tek bir ilçe ve modelin tanıdığı mahalleleri (adlar "… Mah." ekiyle gelir). */
+export interface DistrictLocations {
+  district: string;
+  neighborhoods: string[];
+}
+
+/**
+ * Form doldurmak için ilçe → mahalle listesi (38 ilçe, 539 mahalle).
+ * Yanıt süreç boyunca sabittir; çağıranlar uzun süre önbellekleyebilir.
+ */
+export const fetchLocations = () => getJSON<DistrictLocations[]>("/api/locations");
 
 // ---- Bütçe ısı haritası ----
 
@@ -179,6 +205,12 @@ export interface ListingPayload {
   title: string;
   description: string;
   district: string;
+  /**
+   * İsteğe bağlı mahalle ("Caferağa Mah."). Verilirse adil fiyat MAHALLE
+   * bazında hesaplanır (fair-price yanıtında district_level=false); yoksa ya
+   * da model mahalleyi tanımıyorsa ilçe geneline düşer.
+   */
+  neighborhood?: string | null;
   photos: string[];
   // Ev ilanı
   rent?: number;
@@ -201,6 +233,8 @@ export interface ListingPayload {
 
 export interface ApiListing extends ListingPayload {
   id: number;
+  /** Sunucu her zaman alanı döndürür; seçilmemişse null. */
+  neighborhood: string | null;
   is_active: boolean;
   created_at: string;
   owner_id: number | null;
@@ -759,11 +793,8 @@ export const uploadPhoto = async (file: File): Promise<{ url: string }> => {
     body: form,
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(
-      (data && typeof data.detail === "string" && data.detail) ||
-        translate("common.uploadFailed", { status: res.status }),
-    );
-  }
+  // Yükleme ucu da doğrulama hatası (liste biçimi) döndürebiliyor; aynı
+  // ayrıştırıcıdan geçer ki kullanıcı okunabilir bir metin görsün.
+  if (!res.ok) throw apiErrorFrom(data, res.status, "common.uploadFailed");
   return data as { url: string };
 };
