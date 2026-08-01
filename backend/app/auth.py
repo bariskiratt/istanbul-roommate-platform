@@ -434,7 +434,14 @@ def delete_account(
             (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
         )
     ]
+    message_ids: list[int] = []
     if match_ids:
+        message_ids = [
+            m.id
+            for m in db.query(models.Message.id).filter(
+                models.Message.match_id.in_(match_ids)
+            )
+        ]
         db.query(models.Message).filter(
             models.Message.match_id.in_(match_ids)
         ).delete(synchronize_session=False)
@@ -455,6 +462,33 @@ def delete_account(
     db.query(models.Listing).filter_by(owner_id=uid).delete(
         synchronize_session=False
     )
+
+    # Raporlar: reporter_id users.id'ye yabancı anahtarla bağlı — temizlenmezse
+    # Postgres kısıtı hesabın silinmesini engeller (SQLite'ta FK varsayılan
+    # kapalı olduğu için bu sessizce gözden kaçabiliyordu).
+    db.query(models.Report).filter_by(reporter_id=uid).delete(
+        synchronize_session=False
+    )
+    # Hedefi bu kullanıcı olan raporlar da silinir. target_id'de yabancı anahtar
+    # YOK, yani teknik bir zorunluluk değil; karar şu gerekçeyle verildi:
+    # inceleme konusu içerik artık yok, rapor açıldığında hedefi bulunamıyor.
+    # Temizlenmezse yönetici kuyruğunda var olmayan bir kullanıcıyı/ilanı/mesajı
+    # gösteren, tıklanınca 404 veren ölü kayıtlar birikir. Aynı gerekçeyle
+    # kullanıcının silinen ilan ve mesajlarına açılmış raporlar da temizlenir.
+    db.query(models.Report).filter(
+        models.Report.target_type == "user", models.Report.target_id == uid
+    ).delete(synchronize_session=False)
+    if listing_ids:
+        db.query(models.Report).filter(
+            models.Report.target_type == "listing",
+            models.Report.target_id.in_(listing_ids),
+        ).delete(synchronize_session=False)
+    if message_ids:
+        db.query(models.Report).filter(
+            models.Report.target_type == "message",
+            models.Report.target_id.in_(message_ids),
+        ).delete(synchronize_session=False)
+
     db.query(models.AuthToken).filter_by(user_id=uid).delete(
         synchronize_session=False
     )

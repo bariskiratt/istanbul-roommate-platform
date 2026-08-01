@@ -1,6 +1,7 @@
 import { useState, forwardRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/i18n";
 
 type Props = React.InputHTMLAttributes<HTMLInputElement>;
 
@@ -13,6 +14,7 @@ type Props = React.InputHTMLAttributes<HTMLInputElement>;
 const PasswordInput = forwardRef<HTMLInputElement, Props>(
   ({ className, ...props }, ref) => {
     const [show, setShow] = useState(false);
+    const { t } = useI18n();
     return (
       <div className="relative">
         <Input
@@ -25,7 +27,7 @@ const PasswordInput = forwardRef<HTMLInputElement, Props>(
         <button
           type="button"
           tabIndex={-1}
-          aria-label={show ? "Şifreyi gizle" : "Şifreyi göster"}
+          aria-label={t(show ? "common.hidePassword" : "common.showPassword")}
           onMouseDown={e => e.preventDefault()}
           onClick={() => setShow(v => !v)}
           className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-1 text-muted-foreground hover:text-foreground transition-colors"

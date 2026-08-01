@@ -1,8 +1,10 @@
+/* @import, CSS gereği tüm kurallardan önce gelmeli; @tailwind'in altında kalırsa
+   derleyici bu satırı atıyor ve üretim derlemesinde yazı tipleri hiç yüklenmiyordu. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
 
 /*
  * Tasarım dili: Hinge esinli, iki tema.

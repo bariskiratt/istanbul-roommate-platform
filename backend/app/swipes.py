@@ -13,9 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app import models
+from app import crypto, models
 from app.auth import get_current_user
 from app.db import get_db
+from app.reports import require_admin
 
 router = APIRouter(tags=["swipes"])
 
@@ -51,6 +52,10 @@ class SwipeIn(BaseModel):
 class SwipeResult(BaseModel):
     matched: bool
     match_id: int | None = None
+
+
+class DeckReset(BaseModel):
+    deleted: int
 
 
 class ReceivedLike(BaseModel):
@@ -156,6 +161,29 @@ def swipe(
     return {"matched": matched, "match_id": match_id}
 
 
+@router.delete("/api/swipes/mine", response_model=DeckReset)
+def reset_my_deck(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_admin),
+):
+    """Kendi kaydırma geçmişini siler; deste baştan gelir — yalnızca yönetici.
+
+    Demo ve elde test için: kararlar silinince /api/listings?unswiped=1 tüm
+    ilanları yeniden döndürür.
+
+    EŞLEŞMELER VE SOHBETLER KORUNUR — silinen yalnızca Swipe kayıtlarıdır.
+    Kullanıcı aynı ilanı tekrar beğenirse _get_or_create_match var olan
+    eşleşmeyi bulur, ikinci bir eşleşme doğmaz ve mesaj geçmişi yerinde kalır.
+    """
+    deleted = (
+        db.query(models.Swipe)
+        .filter(models.Swipe.swiper_id == user.id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted": deleted}
+
+
 @router.get("/api/swipes/received", response_model=list[ReceivedLike])
 def received_likes(
     db: Session = Depends(get_db),
@@ -251,7 +279,8 @@ def my_matches(
                 "listing_id": m.listing_id,
                 "listing_title": m.listing.title if m.listing else None,
                 "created_at": m.created_at,
-                "last_message": last.content if last else None,
+                # Mesajlar şifreli saklanır; önizleme için çözülür.
+                "last_message": crypto.decrypt(last.content) if last else None,
                 "last_message_at": last.created_at if last else None,
             }
         )

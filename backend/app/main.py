@@ -27,6 +27,7 @@ from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
 from app.indexing import DATA_PERIOD, rent_index
 from app.listings import router as listings_router
 from app.messages import router as messages_router
+from app.reports import router as reports_router
 from app.swipes import router as swipes_router
 from app.uploads import router as uploads_router
 from app.pricing import BOUNDS, build_features
@@ -63,6 +64,9 @@ STATE: dict = {}
 async def lifespan(_app: FastAPI):
     """Ağır veriyi süreç başına bir kez yükler ve indeksler."""
     print("🚀 Veriler yükleniyor...")
+    # Yeni tablolar create_all ile doğar; var olan tablolara eksik sütunlar
+    # init_db içinden çağrılan run_migrations ile eklenir (üretimde canlı
+    # Postgres var, veri kaybı olmadan).
     init_db()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
@@ -132,6 +136,7 @@ app.include_router(auth_router)
 app.include_router(swipes_router)
 app.include_router(messages_router)
 app.include_router(uploads_router)
+app.include_router(reports_router)
 
 # Yüklenen fotoğrafların statik servisi
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -185,6 +190,7 @@ async def index():
             "/api/auth",
             "/api/swipes",
             "/api/matches",
+            "/api/reports",
         ],
     }
 

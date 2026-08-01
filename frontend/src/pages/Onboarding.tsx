@@ -7,7 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Mail, KeyRound, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, User, GraduationCap, MapPin, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
+import { ApiError, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
@@ -167,8 +167,9 @@ const Onboarding = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast.error(message);
-      // Kayıtlı e-posta ile tekrar denenmişse girişe yönlendir
-      if (message.includes("zaten kayıtlı")) navigate("/login");
+      // Kayıtlı e-posta ile tekrar denenmişse girişe yönlendir. Hata metnine
+      // değil HTTP koduna bakılır: metin backend'in dilinden bağımsız değil.
+      if (err instanceof ApiError && err.status === 409) navigate("/login");
     } finally {
       setBusy(false);
     }

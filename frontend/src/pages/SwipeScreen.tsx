@@ -1,33 +1,63 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchListings, postSwipe, type ApiListing } from "@/lib/api";
+import {
+  fetchListings,
+  postSwipe,
+  resetMyDeck,
+  LISTING_FEATURES,
+  type ApiListing,
+  type ListingFeature,
+} from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { SlidersHorizontal, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon } from "lucide-react";
+import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon, Flag } from "lucide-react";
 import { type Listing, type UserProfile } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
-import FilterModal, { type ListingFilters } from "@/components/FilterModal";
+import FilterModal, { defaultFilters, type ListingFilters } from "@/components/FilterModal";
 import FairPriceBadge from "@/components/FairPriceBadge";
+import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 
-const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
+// Deste kartı: mock tipine ek olarak gerçek ilanın ev özelliklerini taşır.
+type DeckListing = Listing & {
+  features?: Partial<Record<ListingFeature, boolean>>;
+};
+
+const matchesFilters = (l: DeckListing, f: ListingFilters): boolean => {
   if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
   if (f.listingType === "Kişisel İlan" && l.type !== "kisisel_ilan") return false;
 
-  // Ev ilanında kira, kişisel ilanda bütçe aralığı kesişimi
+  // Ev ilanında kira, kişisel ilanda bütçe aralığı kesişimi.
+  // Varsayılan aralığa (1000-30000) dokunulmadıysa "filtre yok" demektir;
+  // aksi halde aralık dışındaki ilanlar kullanıcı istemeden elenirdi.
   const [min, max] = f.priceRange;
-  if (l.type === "ev_ilani") {
-    if (l.rent != null && (l.rent < min || l.rent > max)) return false;
-  } else if (l.budgetMin != null && l.budgetMax != null) {
-    if (l.budgetMax < min || l.budgetMin > max) return false;
+  const rangeTouched =
+    min !== defaultFilters.priceRange[0] || max !== defaultFilters.priceRange[1];
+  if (rangeTouched) {
+    if (l.type === "ev_ilani") {
+      if (l.rent != null && (l.rent < min || l.rent > max)) return false;
+    } else if (l.budgetMin != null && l.budgetMax != null) {
+      if (l.budgetMax < min || l.budgetMin > max) return false;
+    }
   }
 
   if (f.rooms > 0 && (!l.roomCount || parseInt(l.roomCount) < f.rooms)) return false;
+
+  // Ev özellikleri: yalnızca ilanda açıkça "var" diyen alanlar geçer;
+  // bilinmeyen (null) alan eşleşme sayılmaz — sunucudaki `features`
+  // filtresiyle aynı kural. Koşul yalnızca ev ilanlarına uygulanır: kişisel
+  // ilanda (ev arayan kişi) asansör/otopark gibi alanlar hiç olamayacağı için
+  // filtre onları elemek yerine kapsam dışı bırakır — sunucu da böyle yapıyor.
+  if (l.type === "ev_ilani") {
+    for (const key of f.features) {
+      if (l.features?.[key] !== true) return false;
+    }
+  }
 
   // API ilanlarında kullanıcı profili yer tutucu ("anon"); bilinmeyen alan
   // üzerinden eleme yapılmaz, yoksa cinsiyet filtresi tüm desteyi boşaltır.
@@ -48,6 +78,16 @@ const matchesFilters = (l: Listing, f: ListingFilters): boolean => {
 
   return true;
 };
+
+/** Seçim varsayılanla aynı mı (yani gerçekte hiçbir filtre yok mu)? */
+const isDefaultFilters = (f: ListingFilters): boolean =>
+  f.listingType === defaultFilters.listingType &&
+  f.priceRange[0] === defaultFilters.priceRange[0] &&
+  f.priceRange[1] === defaultFilters.priceRange[1] &&
+  f.rooms === defaultFilters.rooms &&
+  f.gender === defaultFilters.gender &&
+  f.lifestyle.length === 0 &&
+  f.features.length === 0;
 
 // API ilanlarının henüz sahibi yok (auth sonraki dilim); kart altındaki
 // profil şeridi için nötr bir yer tutucu kullanılır.
@@ -70,7 +110,7 @@ const anonUser: UserProfile = {
   photos: ["https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch"],
 };
 
-const toDeckListing = (a: ApiListing, ownerFallback: string): Listing => ({
+const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
   id: `api-${a.id}`,
   userId: "anon",
   type: a.type,
@@ -83,6 +123,10 @@ const toDeckListing = (a: ApiListing, ownerFallback: string): Listing => ({
   roomCount: a.room_count ?? undefined,
   smokingAllowed: a.smoking_allowed ?? undefined,
   petsAllowed: a.pets_allowed ?? undefined,
+  // Sunucu belirtilmemiş özellikler için null döner; yalnızca true "var"dır.
+  features: Object.fromEntries(
+    LISTING_FEATURES.map(key => [key, a[key] === true]),
+  ) as Partial<Record<ListingFeature, boolean>>,
   photos: a.photos.length > 0 ? a.photos : anonUser.photos,
   isActive: a.is_active,
   createdAt: a.created_at,
@@ -97,16 +141,42 @@ const SwipeScreen = () => {
   const { isLoggedIn, user: me } = useAuth();
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [cards, setCards] = useState<Listing[]>([]);
+  const [cards, setCards] = useState<DeckListing[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  // Deste sıfırlama ucu sunucuda yalnızca yöneticiye açık; düğmeyi de öyle
+  // gösteriyoruz ki kimse kesin 403 alacak bir işlem görmesin.
+  const isAdmin = me?.is_admin === true;
+
+  // Rapor kutusu kartın DIŞINDA durur: kart sürüklenirken transform aldığı
+  // için içine konan `position: fixed` panel karta göre konumlanır ve ekranı
+  // kaplayamaz. Hedef, kutu kapandıktan sonra da tutulur (çıkış animasyonu).
+  const [reportTarget, setReportTarget] = useState<{ id: number; title: string } | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const openReport = (id: number, title: string) => {
+    setReportTarget({ id, title });
+    setReportOpen(true);
+  };
+
+  // Filtre state'te tutulur; liste yenilense de seçim kaybolmaz
+  const [activeFilters, setActiveFilters] = useState<ListingFilters | null>(null);
+
+  // Ev özellikleri sunucuda da elenir; seçim değişince sorgu anahtarı
+  // değiştiği için react-query desteyi yeniden çeker.
+  const selectedFeatures = activeFilters?.features ?? [];
+  const featureKey = selectedFeatures.join(",");
 
   // Deste: karar verilmemiş ilanlar (girişliyse kaydırdıkları ve kendi
   // ilanları sunucuda elenir; girişsizken tüm ilanlar gösterilir)
   const { data: apiListings, isPending } = useQuery({
-    queryKey: ["listings", "deck", isLoggedIn],
-    queryFn: () => fetchListings({ unswiped: isLoggedIn }),
+    queryKey: ["listings", "deck", isLoggedIn, featureKey],
+    queryFn: () =>
+      fetchListings({
+        unswiped: isLoggedIn,
+        features: featureKey ? (featureKey.split(",") as ListingFeature[]) : undefined,
+      }),
     staleTime: 60_000,
   });
 
@@ -123,9 +193,6 @@ const SwipeScreen = () => {
     [apiListings, me, ownerFallback],
   );
 
-  // Filtre state'te tutulur; liste yenilense de seçim kaybolmaz
-  const [activeFilters, setActiveFilters] = useState<ListingFilters | null>(null);
-
   useEffect(() => {
     const base = activeFilters
       ? allListings.filter(l => matchesFilters(l, activeFilters))
@@ -133,7 +200,10 @@ const SwipeScreen = () => {
     setCards([...base].reverse());
   }, [allListings, activeFilters]);
 
-  const applyFilters = (f: ListingFilters) => setActiveFilters(f);
+  // Hiçbir şey seçilmemişse (ör. modaldaki "Temizle") filtre yok sayılır;
+  // boş deste metni ve "filtreleri temizle" düğmesi böylece doğru çıkar.
+  const applyFilters = (f: ListingFilters) =>
+    setActiveFilters(isDefaultFilters(f) ? null : f);
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
     // Gerçek (API'den gelen) ilanlarda karar sunucuya yazılır; mock kartlar
@@ -159,6 +229,25 @@ const SwipeScreen = () => {
     }, 300);
   }, [isLoggedIn, cards, queryClient, t]);
 
+  // Kaydırma geçmişini siler: sunucudaki kararlar gidince deste baştan gelir.
+  // Eşleşmeler ve sohbetler silinmez (sunucu yalnızca Swipe satırlarını siler),
+  // bu yüzden onay metninde de böyle yazıyor.
+  const handleResetDeck = async () => {
+    if (!window.confirm(t("swipe.resetConfirm"))) return;
+    setResetting(true);
+    try {
+      const { deleted } = await resetMyDeck();
+      // Deste sorgusu yeniden çekilmeli; "unswiped" sonucu tamamen değişti.
+      await queryClient.invalidateQueries({ queryKey: ["listings"] });
+      toast.success(t("swipe.resetDone", { count: deleted }));
+    } catch (err) {
+      // Sunucunun açıklaması (ör. 403 "yönetici yetkisi gerekiyor") olduğu gibi.
+      toast.error(err instanceof Error ? err.message : t("swipe.resetFailed"));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const currentCard = cards[cards.length - 1];
   const nextCard = cards[cards.length - 2];
   const thirdCard = cards[cards.length - 3];
@@ -168,13 +257,30 @@ const SwipeScreen = () => {
       <AppHeader
         title="RoomMatch"
         rightAction={
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Deste sıfırlama — yalnızca yönetici (sunucu ucu da öyle) */}
+            {isAdmin && (
+              <button
+                onClick={handleResetDeck}
+                disabled={resetting}
+                title={t("swipe.resetDeck")}
+                aria-label={t("swipe.resetDeck")}
+                className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              >
+                <RotateCcw className={`w-5 h-5 ${resetting ? "animate-spin" : ""}`} />
+              </button>
+            )}
+            <button
+              onClick={() => setFilterOpen(true)}
+              title={t("filter.title")}
+              aria-label={t("filter.title")}
+              className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+            </button>
+          </div>
         }
       />
 
@@ -219,6 +325,7 @@ const SwipeScreen = () => {
                   expanded={expandedCard === currentCard.id}
                   onToggleExpand={() => setExpandedCard(e => e === currentCard.id ? null : currentCard.id)}
                   direction={swipeDirection}
+                  onReport={openReport}
                 />
               )}
             </AnimatePresence>
@@ -239,6 +346,15 @@ const SwipeScreen = () => {
 
       <AuthGate show={!isLoggedIn} onClose={() => {}} />
       <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} onApply={applyFilters} />
+      {reportTarget && (
+        <ReportDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="listing"
+          targetId={reportTarget.id}
+          targetLabel={reportTarget.title}
+        />
+      )}
       <BottomNav />
     </div>
   );
@@ -312,10 +428,15 @@ interface SwipeCardDraggableProps {
   expanded: boolean;
   onToggleExpand: () => void;
   direction: "left" | "right" | null;
+  /** Genişletilmiş karttaki "bu ilanı bildir" bağlantısı. */
+  onReport: (listingId: number, title: string) => void;
 }
 
-const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direction }: SwipeCardDraggableProps) => {
+const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direction, onReport }: SwipeCardDraggableProps) => {
   const { t } = useI18n();
+  const { isLoggedIn } = useAuth();
+  // Yalnızca sunucudaki ilanların id'si vardır; mock kart raporlanamaz.
+  const apiListingId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
@@ -386,6 +507,16 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
                   <p className="text-xs text-muted-foreground">{listing.user.university} • {listing.user.department}</p>
                 </div>
               </div>
+              {/* Bildirme girişli kullanıcıya açıktır (sunucu 401 döner) */}
+              {isLoggedIn && apiListingId !== null && (
+                <button
+                  onClick={() => onReport(apiListingId, listing.title)}
+                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  {t("report.reportListing")}
+                </button>
+              )}
             </div>
           </motion.div>
         )}

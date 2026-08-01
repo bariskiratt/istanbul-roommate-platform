@@ -11,16 +11,17 @@ import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 // API beğenisini kartın beklediği görünüme çevirir
-const toNotification = (r: ReceivedLike) => ({
+const toNotification = (r: ReceivedLike, unnamed: string) => ({
   id: String(r.swipe_id),
   swipeId: r.swipe_id,
   listingTitle: r.listing_title,
   user: {
-    name: r.user.name || "İsimsiz",
+    name: r.user.name || unnamed,
     university: r.user.university ?? "—",
     budgetMin: r.user.budget_min ?? 0,
     budgetMax: r.user.budget_max ?? 0,
@@ -35,6 +36,7 @@ type Notification = ReturnType<typeof toNotification>;
 
 const Notifications = () => {
   const { isLoggedIn, user: me } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -47,9 +49,10 @@ const Notifications = () => {
     enabled: isLoggedIn,
   });
 
+  const unnamed = t("messages.unnamed");
   useEffect(() => {
-    setNotifications(received.map(toNotification));
-  }, [received]);
+    setNotifications(received.map(r => toNotification(r, unnamed)));
+  }, [received, unnamed]);
 
   const handleSwipe = (notifId: string, direction: "left" | "right") => {
     const notif = notifications.find(n => n.id === notifId);
@@ -66,7 +69,7 @@ const Notifications = () => {
         }
       })
       .catch(err =>
-        toast.error(err instanceof Error ? err.message : "Cevap kaydedilemedi"),
+        toast.error(err instanceof Error ? err.message : t("likes.responseFailed")),
       );
 
     setNotifications(prev => prev.filter(n => n.id !== notifId));
@@ -80,7 +83,7 @@ const Notifications = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title="Bildirimler" />
+      <AppHeader title={t("notif.title")} />
 
       <div className="px-6 py-4 space-y-6">
         {Object.entries(groupedByListing).map(([listingTitle, notifs]) => (
@@ -89,7 +92,9 @@ const Notifications = () => {
             <div className="card-listing p-4 flex items-center gap-3 border-l-4 border-l-primary">
               <div>
                 <p className="text-sm font-bold text-foreground">🏠 {listingTitle}</p>
-                <p className="text-xs text-primary font-medium">{notifs.length} kişi evinizi beğendi</p>
+                <p className="text-xs text-primary font-medium">
+                  {t("notif.likedYourHouse", { count: notifs.length })}
+                </p>
               </div>
             </div>
 
@@ -108,7 +113,7 @@ const Notifications = () => {
             <div className="w-20 h-20 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto mb-4">
               <Heart className="w-10 h-10 text-primary" />
             </div>
-            <p className="text-muted-foreground font-medium">Henüz yeni bildirim yok</p>
+            <p className="text-muted-foreground font-medium">{t("notif.empty")}</p>
           </div>
         )}
       </div>
@@ -143,7 +148,7 @@ const Notifications = () => {
               >
                 🎉
               </motion.p>
-              <h2 className="text-3xl font-extrabold text-foreground">Eşleştin!</h2>
+              <h2 className="text-3xl font-extrabold text-foreground">{t("likes.matched")}</h2>
               
               {/* Avatar merge */}
               <div className="flex items-center justify-center gap-[-8px]">
@@ -174,7 +179,7 @@ const Notifications = () => {
               </div>
 
               <p className="text-muted-foreground text-sm">
-                {matchPopup.user.name} ile eşleştin! Artık mesajlaşabilirsiniz.
+                {t("likes.matchedWith", { name: matchPopup.user.name })}
               </p>
               
               <div className="space-y-3 pt-2">
@@ -183,14 +188,14 @@ const Notifications = () => {
                   className="w-full h-14 bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg font-bold text-base"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
-                  Mesaj Gönder
+                  {t("likes.sendMessage")}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setMatchPopup(null)}
                   className="w-full h-12 text-foreground font-medium"
                 >
-                  Keşfetmeye Devam Et
+                  {t("landing.ctaContinue")}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -232,6 +237,7 @@ const Notifications = () => {
 
 const NotificationCard = ({ notification, onSwipe }: { notification: Notification; onSwipe: (dir: "left" | "right") => void }) => {
   const { user } = notification;
+  const { t, n } = useI18n();
   return (
     <div className="card-listing p-5 flex items-center gap-4">
       <img src={user.photos[0]} alt={user.name} className="w-14 h-14 rounded-full object-cover" />
@@ -243,7 +249,7 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
           <DollarSign className="w-3.5 h-3.5" />
-          {user.budgetMin.toLocaleString("tr-TR")} — {user.budgetMax.toLocaleString("tr-TR")} ₺
+          {n(user.budgetMin)} — {n(user.budgetMax)} {t("common.currency")}
         </div>
         <div className="flex flex-wrap gap-1 mt-2">
           <LifestyleTag type="smoking" value={user.smoking} compact />

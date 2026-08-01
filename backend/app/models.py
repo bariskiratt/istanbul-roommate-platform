@@ -103,11 +103,24 @@ class Listing(Base):
     smoking_allowed: Mapped[bool | None] = mapped_column(Boolean)
     pets_allowed: Mapped[bool | None] = mapped_column(Boolean)
 
+    # Ev özellikleri (yalnızca ev ilanı). Hepsi üç durumlu:
+    # True = var, False = yok, None = belirtilmemiş.
+    furnished: Mapped[bool | None] = mapped_column(Boolean)
+    elevator: Mapped[bool | None] = mapped_column(Boolean)
+    parking: Mapped[bool | None] = mapped_column(Boolean)
+    internet_included: Mapped[bool | None] = mapped_column(Boolean)
+    heating_included: Mapped[bool | None] = mapped_column(Boolean)
+    balcony: Mapped[bool | None] = mapped_column(Boolean)
+    natural_gas: Mapped[bool | None] = mapped_column(Boolean)
+
     # Kişisel ilan alanları
     budget_min: Mapped[int | None] = mapped_column(Integer)
     budget_max: Mapped[int | None] = mapped_column(Integer)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # İçerik denetimi "flag" dediğinde işaretlenir; ilan yayında kalır ama
+    # yönetici incelemesine düşer.
+    is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     owner: Mapped[User | None] = relationship(back_populates="listings")
@@ -165,7 +178,12 @@ class Match(Base):
 
 
 class Message(Base):
-    """Eşleşme içindeki tek mesaj."""
+    """Eşleşme içindeki tek mesaj.
+
+    `content` sunucuda şifreli saklanır (app.crypto, AES-256-GCM). Anahtar
+    sunucuda olduğu için bu UÇTAN UCA şifreleme DEĞİLDİR. Anahtar tanımlı
+    değilken ve eski kayıtlarda düz metin bulunabilir.
+    """
 
     __tablename__ = "messages"
 
@@ -173,7 +191,39 @@ class Message(Base):
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     content: Mapped[str] = mapped_column(Text)
+    # İçerik denetimi "flag" dediğinde işaretlenir; mesaj iletilir ama
+    # yönetici incelemesine düşer.
+    is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     match: Mapped[Match] = relationship()
     sender: Mapped[User] = relationship()
+
+
+class Report(Base):
+    """Kullanıcı şikâyeti (ilan / kullanıcı / mesaj).
+
+    Aynı kullanıcının aynı hedefi tekrar tekrar raporlamasını UniqueConstraint
+    engeller; ikinci istek 409 ile reddedilir (bkz. app/reports.py).
+    """
+
+    __tablename__ = "reports"
+    __table_args__ = (
+        UniqueConstraint("reporter_id", "target_type", "target_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # "listing" | "user" | "message"
+    target_type: Mapped[str] = mapped_column(String(20), index=True)
+    target_id: Mapped[int] = mapped_column(Integer, index=True)
+    # Kapalı liste: spam | dolandiricilik | taciz | uygunsuz_icerik |
+    # sahte_ilan | diger
+    reason: Mapped[str] = mapped_column(String(30))
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    resolution_note: Mapped[str | None] = mapped_column(String(500))
+
+    reporter: Mapped[User] = relationship()

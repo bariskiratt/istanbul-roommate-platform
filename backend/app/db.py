@@ -6,10 +6,32 @@ verilirse (ör. Render/Railway Postgres'i: postgresql://...) o kullanılır.
 
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import DB_PATH
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_enable_foreign_keys(dbapi_connection, connection_record):
+    """Her SQLite bağlantısında yabancı anahtar kısıtlarını açar.
+
+    SQLite'ta FK zorlaması VARSAYILAN OLARAK KAPALIDIR ve bağlantı başına
+    ayarlanır; üretimdeki Postgres ise her zaman zorlar. Kapalı bırakılırsa
+    iki ortam sessizce ayrışır: silme sırası yanlış olan bir akış (ör. rapor
+    göndermiş kullanıcının hesabını silmek) yerelde çalışır, üretimde
+    IntegrityError verir.
+
+    Dinleyici tek bir motora değil Engine sınıfına bağlanır; böylece
+    uygulamanın motoru da testlerin kendi kurduğu motorlar da aynı kuralla
+    çalışır ve "yerelde geçti" ile "üretimde patladı" arası fark kapanır.
+    Postgres/MySQL bağlantılarında koşulsuz atlanır.
+    """
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 _url = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 # SQLAlchemy 2 + psycopg3 sürücüsü "postgresql+psycopg://" ister;
@@ -37,25 +59,18 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
-    """Tabloları (yoksa) oluşturur. Sunucu açılışında çağrılır."""
+    """Tabloları (yoksa) oluşturur ve şema farklarını kapatır.
+
+    create_all yalnızca OLMAYAN tabloyu doğurur; var olan tabloya sütun
+    eklemez. Eksik sütunlar tek bir yerde, app.migrate içinde tanımlıdır —
+    ikinci bir migrasyon yolu tutulursa iki liste kaçınılmaz olarak birbirinden
+    ayrışır.
+    """
     from app import models  # noqa: F401 — tabloların Base'e kaydolması için
+    from app.migrate import run_migrations  # geç import: döngüyü önler
 
     Base.metadata.create_all(engine)
-    _migrate(engine)
-
-
-def _migrate(target) -> None:
-    """create_all mevcut tabloya kolon eklemez; küçük şema farklarını burada
-    kapatıyoruz. (Alembic bu proje ölçeği için fazla.)"""
-    from sqlalchemy import inspect, text
-
-    columns = {c["name"] for c in inspect(target).get_columns("listings")}
-    if "owner_id" not in columns:
-        with target.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE listings ADD COLUMN owner_id INTEGER "
-                     "REFERENCES users(id)")
-            )
+    run_migrations(engine)
 
 
 def get_db():

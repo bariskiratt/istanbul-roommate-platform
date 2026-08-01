@@ -2,6 +2,10 @@
 
 Gerçek zamanlılık için istemci kısa aralıkla listeyi yeniler (polling);
 WebSocket bu ölçek için henüz gerekmedi.
+
+Mesajlar veritabanına şifreli yazılır (app.crypto) ve yanıtta çözülerek
+düz metin döner. Şifreleme sunucuda saklanan veriyi korur; anahtar
+sunucuda olduğu için UÇTAN UCA şifreleme değildir.
 """
 
 from datetime import datetime
@@ -11,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import models
+from app import crypto, models, moderation
 from app.auth import get_current_user
 from app.db import get_db
 
@@ -30,6 +34,17 @@ class MessageOut(BaseModel):
     sender_id: int
     content: str
     created_at: datetime
+
+
+def _to_out(row: models.Message) -> dict:
+    """Satırı yanıt sözlüğüne çevirir; içerik burada çözülür."""
+    return {
+        "id": row.id,
+        "match_id": row.match_id,
+        "sender_id": row.sender_id,
+        "content": crypto.decrypt(row.content) or "",
+        "created_at": row.created_at,
+    }
 
 
 def _require_participant(
@@ -67,14 +82,14 @@ def list_messages(
             .order_by(models.Message.created_at, models.Message.id)
             .limit(limit)
         ).all()
-        return rows
+        return [_to_out(row) for row in rows]
 
     # Son N mesaj: tersten al, kronolojik sırala
     rows = db.scalars(
         stmt.order_by(models.Message.created_at.desc(), models.Message.id.desc())
         .limit(limit)
     ).all()
-    return list(reversed(rows))
+    return [_to_out(row) for row in reversed(rows)]
 
 
 @router.post("/{match_id}/messages", status_code=201, response_model=MessageOut)
@@ -85,10 +100,28 @@ def send_message(
     user: models.User = Depends(get_current_user),
 ):
     _require_participant(match_id, user, db)
+
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(status_code=422, detail="Mesaj boş olamaz.")
+
+    result = moderation.check(content, kind="message")
+    if result.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{moderation.describe(result.reasons)} "
+                "Mesajını düzenleyip tekrar gönder."
+            ),
+        )
+
     row = models.Message(
-        match_id=match_id, sender_id=user.id, content=payload.content.strip()
+        match_id=match_id,
+        sender_id=user.id,
+        content=crypto.encrypt(content),
+        is_flagged=result.flagged,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
-    return row
+    return _to_out(row)

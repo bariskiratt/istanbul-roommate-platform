@@ -1,18 +1,18 @@
 import { useState } from "react";
-import { X, Minus, Plus, ShowerHead, Zap, Dog, Wifi } from "lucide-react";
+import { X, Minus, Plus, Sofa, CigaretteOff, Dog, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
+import type { ListingFeature } from "@/lib/api";
 
 export interface ListingFilters {
   listingType: string;
   priceRange: [number, number];
   rooms: number;
-  people: number;
-  bathrooms: number;
   lifestyle: string[];
-  features: string[];
+  /** Backend `features` parametresiyle aynı anahtarlar. */
+  features: ListingFeature[];
   gender: string;
 }
 
@@ -20,8 +20,6 @@ export const defaultFilters: ListingFilters = {
   listingType: "Hepsi",
   priceRange: [1000, 30000],
   rooms: 0,
-  people: 0,
-  bathrooms: 0,
   lifestyle: [],
   features: [],
   gender: "Hepsi",
@@ -50,14 +48,16 @@ const lifestyleChips: Chip[] = [
   { value: "Sosyal", key: "filter.social" },
   { value: "Sessiz", key: "filter.quiet" },
 ];
-const featureChips: Chip[] = [
-  { value: "Eşyalı", key: "filter.furnished" },
-  { value: "Asansörlü", key: "filter.elevator" },
-  { value: "Otoparkı Var", key: "filter.parking" },
-  { value: "İnternet Dahil", key: "filter.internet" },
-  { value: "Isıtma Dahil", key: "filter.heating" },
-  { value: "Balkonlu", key: "filter.balcony" },
-  { value: "Doğalgaz", key: "filter.gas" },
+// Ev özellikleri: `value` doğrudan backend sütun adıdır, böylece seçim hem
+// istemcide hem `GET /api/listings?features=` sorgusunda aynı anlama gelir.
+const featureChips: { value: ListingFeature; key: TranslationKey }[] = [
+  { value: "furnished", key: "filter.furnished" },
+  { value: "elevator", key: "filter.elevator" },
+  { value: "parking", key: "filter.parking" },
+  { value: "internet_included", key: "filter.internet" },
+  { value: "heating_included", key: "filter.heating" },
+  { value: "balcony", key: "filter.balcony" },
+  { value: "natural_gas", key: "filter.gas" },
 ];
 const genderOptions: Chip[] = [
   { value: "Hepsi", key: "filter.all" },
@@ -70,11 +70,19 @@ const listingTypeOptions: Chip[] = [
   { value: "Kişisel İlan", key: "common.personalListing" },
 ];
 
-const recommendedFilters: { icon: typeof ShowerHead; value: string; key: TranslationKey }[] = [
-  { icon: ShowerHead, value: "Banyo sayısı", key: "filter.bathroomCount" },
-  { icon: Zap, value: "Hızlı Eşleşme", key: "filter.fastMatch" },
-  { icon: Dog, value: "Hayvan Dostu", key: "filter.petFriendly" },
-  { icon: Wifi, value: "İnternet Dahil", key: "filter.internet" },
+// Kısayollar ayrı bir filtre havuzu DEĞİLDİR: aşağıdaki gerçek çiplerin
+// (özellik ya da yaşam tarzı) seçimini paylaşırlar, biri değişince diğeri de
+// değişir. Yalnızca gerçekten veriye dayanan filtreler burada yer alabilir.
+type QuickChip = { icon: typeof Sofa; key: TranslationKey } & (
+  | { kind: "feature"; value: ListingFeature }
+  | { kind: "lifestyle"; value: string }
+);
+
+const quickFilters: QuickChip[] = [
+  { icon: Sofa, kind: "feature", value: "furnished", key: "filter.furnished" },
+  { icon: Wifi, kind: "feature", value: "internet_included", key: "filter.internet" },
+  { icon: Dog, kind: "lifestyle", value: "Hayvan Dostu", key: "filter.petFriendly" },
+  { icon: CigaretteOff, kind: "lifestyle", value: "Sigara İçmez", key: "filter.noSmoke" },
 ];
 
 const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
@@ -82,22 +90,30 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
   const [listingType, setListingType] = useState("Hepsi");
   const [priceRange, setPriceRange] = useState([1000, 30000]);
   const [rooms, setRooms] = useState(0);
-  const [people, setPeople] = useState(0);
-  const [bathrooms, setBathrooms] = useState(0);
   const [selectedLifestyle, setSelectedLifestyle] = useState<string[]>([]);
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [selectedFeatures, setSelectedFeatures] = useState<ListingFeature[]>([]);
   const [gender, setGender] = useState("Hepsi");
-  const [selectedRecommended, setSelectedRecommended] = useState<string[]>([]);
 
-  const toggleChip = (arr: string[], setArr: (v: string[]) => void, val: string) => {
+  const toggleChip = <T extends string>(arr: T[], setArr: (v: T[]) => void, val: T) => {
     setArr(arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]);
+  };
+
+  // Kısayol çipi, karşılığı olan gerçek çipin state'ini değiştirir.
+  const isQuickActive = (q: QuickChip) =>
+    q.kind === "feature"
+      ? selectedFeatures.includes(q.value)
+      : selectedLifestyle.includes(q.value);
+
+  const toggleQuick = (q: QuickChip) => {
+    if (q.kind === "feature") toggleChip(selectedFeatures, setSelectedFeatures, q.value);
+    else toggleChip(selectedLifestyle, setSelectedLifestyle, q.value);
   };
 
   const clearAll = () => {
     setListingType("Hepsi"); setPriceRange([1000, 30000]);
-    setRooms(0); setPeople(0); setBathrooms(0);
+    setRooms(0);
     setSelectedLifestyle([]); setSelectedFeatures([]);
-    setGender("Hepsi"); setSelectedRecommended([]);
+    setGender("Hepsi");
     onApply?.(defaultFilters);
   };
 
@@ -106,10 +122,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
       listingType,
       priceRange: [priceRange[0], priceRange[1]],
       rooms,
-      people,
-      bathrooms,
-      // Önerilen filtrelerden çip karşılığı olanlar aynı havuzda değerlendirilir.
-      lifestyle: [...new Set([...selectedLifestyle, ...selectedRecommended])],
+      lifestyle: selectedLifestyle,
       features: selectedFeatures,
       gender,
     });
@@ -147,12 +160,12 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
               <div>
                 <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.recommended")}</h3>
                 <div className="grid grid-cols-4 gap-3">
-                  {recommendedFilters.map(f => {
-                    const active = selectedRecommended.includes(f.value);
+                  {quickFilters.map(f => {
+                    const active = isQuickActive(f);
                     return (
                       <button
                         key={f.value}
-                        onClick={() => toggleChip(selectedRecommended, setSelectedRecommended, f.value)}
+                        onClick={() => toggleQuick(f)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
                           active ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
                         }`}
@@ -239,36 +252,32 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               <hr className="border-border" />
 
-              {/* Rooms and beds */}
+              {/* Rooms — ilanlarda yalnızca oda sayısı var; kişi/banyo verisi
+                  toplanmadığı için o sayaçlar kaldırıldı. */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-4">{t("filter.roomsSection")}</h3>
-                {[
-                  { label: t("filter.rooms"), value: rooms, set: setRooms },
-                  { label: t("filter.people"), value: people, set: setPeople },
-                  { label: t("filter.bathrooms"), value: bathrooms, set: setBathrooms },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                    <span className="text-sm text-foreground">{row.label}</span>
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => row.set(Math.max(0, row.value - 1))}
-                        disabled={row.value === 0}
-                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground disabled:opacity-30 hover:bg-muted"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-sm font-medium text-foreground w-8 text-center">
-                        {row.value === 0 ? t("filter.any") : row.value}
-                      </span>
-                      <button
-                        onClick={() => row.set(row.value + 1)}
-                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.rooms")}</h3>
+                <p className="text-xs text-muted-foreground mb-2">{t("filter.roomsSub")}</p>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-sm text-foreground">{t("filter.roomsMin")}</span>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setRooms(Math.max(0, rooms - 1))}
+                      disabled={rooms === 0}
+                      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground disabled:opacity-30 hover:bg-muted"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-sm font-medium text-foreground w-8 text-center">
+                      {rooms === 0 ? t("filter.any") : rooms}
+                    </span>
+                    <button
+                      onClick={() => setRooms(rooms + 1)}
+                      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                ))}
+                </div>
               </div>
 
               <hr className="border-border" />
@@ -298,7 +307,13 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Features */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.features")}</h3>
+                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.features")}</h3>
+                <p className="text-xs text-muted-foreground mb-1">{t("filter.featuresSub")}</p>
+                {/* Kapsam notu: bu koşul yalnızca ev ilanlarına uygulanır,
+                    kişisel ilanlar (ev arayan kişiler) listede kalır. Hem
+                    sunucudaki `features` filtresi hem de istemcideki eşleştirme
+                    böyle çalışıyor — metin gerçek davranışı anlatıyor. */}
+                <p className="text-xs text-muted-foreground mb-3">{t("filter.featuresScope")}</p>
                 <div className="flex flex-wrap gap-2">
                   {featureChips.map(c => {
                     const active = selectedFeatures.includes(c.value);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { uploadPhoto } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 /**
  * Dosya seçtirip backend'e yükler; başarılı olunca URL'yi geri verir.
@@ -8,6 +9,7 @@ import { uploadPhoto } from "@/lib/api";
  */
 export function usePhotoUpload(onUploaded: (url: string) => void) {
   const [uploading, setUploading] = useState(false);
+  const { t } = useI18n();
 
   const pick = () => {
     if (uploading) return;
@@ -22,7 +24,7 @@ export function usePhotoUpload(onUploaded: (url: string) => void) {
         const { url } = await uploadPhoto(file);
         onUploaded(url);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fotoğraf yüklenemedi");
+        toast.error(err instanceof Error ? err.message : t("common.photoUploadFailed"));
       } finally {
         setUploading(false);
       }

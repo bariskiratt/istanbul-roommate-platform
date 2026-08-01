@@ -10,12 +10,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import DepartmentPicker from "@/components/DepartmentPicker";
+import { useI18n } from "@/i18n";
 
 const DISTRICTS = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Bakırköy", "Beyoğlu", "Sarıyer", "Fatih", "Eyüpsultan", "Maltepe", "Ataşehir", "Pendik", "Kartal", "Bahçelievler", "Zeytinburnu", "Küçükçekmece", "Başakşehir"];
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
   const { user: me, setUser } = useAuth();
+  const { t, n } = useI18n();
 
   const [name, setName] = useState(me?.name ?? "");
   const [department, setDepartment] = useState(me?.department ?? "");
@@ -40,7 +42,7 @@ const ProfileEdit = () => {
   if (!me) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Profilini düzenlemek için giriş yap</p>
+        <p className="text-muted-foreground">{t("pedit.loginRequired")}</p>
       </div>
     );
   }
@@ -63,10 +65,10 @@ const ProfileEdit = () => {
         photos,
       });
       setUser(updated);
-      toast.success("Profilin güncellendi");
+      toast.success(t("pedit.saved"));
       navigate("/profile");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kaydedilemedi");
+      toast.error(err instanceof Error ? err.message : t("pedit.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -82,13 +84,13 @@ const ProfileEdit = () => {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-bold text-foreground">Profili Düzenle</h1>
+        <h1 className="text-lg font-bold text-foreground">{t("pedit.title")}</h1>
       </div>
 
       <div className="px-6 py-6 space-y-8 max-w-lg mx-auto">
         {/* Fotoğraflar */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-foreground">Fotoğraflar</h2>
+          <h2 className="text-sm font-bold text-foreground">{t("profile.tabPhotos")}</h2>
           <div className="grid grid-cols-3 gap-3">
             {photos.map((photo, i) => (
               <div key={i} className="aspect-square rounded-2xl overflow-hidden border-2 border-border relative group">
@@ -96,7 +98,8 @@ const ProfileEdit = () => {
                 <button
                   onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
                   className="absolute top-2 right-2 w-6 h-6 rounded-full bg-destructive/90 flex items-center justify-center"
-                  title="Fotoğrafı kaldır"
+                  title={t("pedit.removePhoto")}
+                  aria-label={t("pedit.removePhoto")}
                 >
                   <X className="w-3 h-3 text-destructive-foreground" />
                 </button>
@@ -109,7 +112,9 @@ const ProfileEdit = () => {
                 className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 bg-card hover:border-primary/40 transition-all disabled:opacity-50"
               >
                 <ImagePlus className={`w-7 h-7 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
-                <span className="text-xs text-muted-foreground">{uploading ? "Yükleniyor…" : "Ekle"}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t(uploading ? "ob.uploading" : "ob.addPhoto")}
+                </span>
               </button>
             )}
           </div>
@@ -117,13 +122,18 @@ const ProfileEdit = () => {
 
         {/* Temel bilgiler */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-foreground">Temel Bilgiler</h2>
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Adın" className="h-12 rounded-xl" />
+          <h2 className="text-sm font-bold text-foreground">{t("pedit.basics")}</h2>
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder={t("pedit.namePlaceholder")}
+            className="h-12 rounded-xl"
+          />
           {/* Üniversite e-postadan otomatik atanır; elle değiştirilemez */}
           <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
-            <p className="text-[10px] text-muted-foreground">Üniversite — e-postandan doğrulandı</p>
+            <p className="text-[10px] text-muted-foreground">{t("ob.universityLabel")}</p>
             <p className="text-sm font-medium text-foreground">
-              {me.university ?? "E-posta alan adından belirlenemedi"}
+              {me.university ?? t("ob.universityUnknown")}
             </p>
           </div>
           <DepartmentPicker value={department} onChange={setDepartment} />
@@ -136,7 +146,7 @@ const ProfileEdit = () => {
                   year === y ? "border-secondary bg-lavender/30" : "border-border bg-card hover:border-primary/30"
                 }`}
               >
-                {y}. Sınıf
+                {t("ob.yearOption", { year: y })}
               </button>
             ))}
           </div>
@@ -144,16 +154,16 @@ const ProfileEdit = () => {
 
         {/* Bütçe */}
         <section className="space-y-4">
-          <h2 className="text-sm font-bold text-foreground">Aylık Bütçe</h2>
+          <h2 className="text-sm font-bold text-foreground">{t("pedit.budget")}</h2>
           <p className="text-center text-xl font-bold text-foreground tabular-nums">
-            {budget[0].toLocaleString("tr-TR")} — {budget[1].toLocaleString("tr-TR")} ₺
+            {n(budget[0])} — {n(budget[1])} {t("common.currency")}
           </p>
           <Slider value={budget} onValueChange={setBudget} min={1000} max={50000} step={500} />
         </section>
 
         {/* Semtler */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-foreground">Tercih Ettiğin Semtler</h2>
+          <h2 className="text-sm font-bold text-foreground">{t("pedit.districts")}</h2>
           <div className="flex flex-wrap gap-2">
             {DISTRICTS.map(d => (
               <button
@@ -175,31 +185,32 @@ const ProfileEdit = () => {
 
         {/* Yaşam tarzı */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-foreground">Yaşam Tarzı</h2>
-          {[
-            { label: "Sigara kullanıyorum", value: smoking, set: setSmoking },
-            { label: "Alkol kullanıyorum", value: alcohol, set: setAlcohol },
-            { label: "Evcil hayvan dostuyum", value: pets, set: setPets },
-          ].map(item => (
+          <h2 className="text-sm font-bold text-foreground">{t("pedit.lifestyle")}</h2>
+          {([
+            { id: "smoking", key: "pedit.smoking", value: smoking, set: setSmoking },
+            { id: "alcohol", key: "pedit.alcohol", value: alcohol, set: setAlcohol },
+            { id: "pets", key: "pedit.pets", value: pets, set: setPets },
+          ] as const).map(item => (
             <button
-              key={item.label}
+              key={item.id}
               onClick={() => item.set(!item.value)}
               className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
                 item.value ? "border-primary bg-primary/5" : "border-border bg-card"
               }`}
             >
-              <span className="text-sm font-medium text-foreground">{item.label}</span>
+              <span className="text-sm font-medium text-foreground">{t(item.key)}</span>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${item.value ? "bg-primary" : "bg-muted"}`}>
                 {item.value && <Check className="w-4 h-4 text-primary-foreground" />}
               </div>
             </button>
           ))}
           <div className="flex gap-2 pt-1">
-            {[
-              { value: "erken", label: "🌅 Erken" },
-              { value: "gece", label: "🌙 Gece" },
-              { value: "esnek", label: "⏰ Esnek" },
-            ].map(s => (
+            {/* value'lar API sözleşmesi — çevrilmez, yalnızca etiketler çevrilir. */}
+            {([
+              { value: "erken", key: "pedit.sleepEarly" },
+              { value: "gece", key: "pedit.sleepNight" },
+              { value: "esnek", key: "pedit.sleepFlexible" },
+            ] as const).map(s => (
               <button
                 key={s.value}
                 onClick={() => setSleep(s.value)}
@@ -207,7 +218,7 @@ const ProfileEdit = () => {
                   sleep === s.value ? "border-secondary bg-lavender/30" : "border-border bg-card"
                 }`}
               >
-                {s.label}
+                {t(s.key)}
               </button>
             ))}
           </div>
@@ -215,13 +226,13 @@ const ProfileEdit = () => {
 
         {/* Bio */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-foreground">Hakkında</h2>
+          <h2 className="text-sm font-bold text-foreground">{t("pedit.about")}</h2>
           <textarea
             value={bio}
             onChange={e => setBio(e.target.value)}
             rows={4}
             maxLength={2000}
-            placeholder="Kendinden bahset..."
+            placeholder={t("pedit.bioPlaceholder")}
             className="w-full rounded-xl bg-card border border-border px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 resize-none"
           />
         </section>
@@ -235,7 +246,7 @@ const ProfileEdit = () => {
             disabled={saving || name.trim().length === 0}
             className="w-full h-12 rounded-full bg-primary text-primary-foreground font-bold disabled:opacity-50"
           >
-            {saving ? "Kaydediliyor…" : "Kaydet"}
+            {t(saving ? "common.saving" : "common.save")}
           </Button>
         </div>
       </div>

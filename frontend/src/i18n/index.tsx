@@ -24,6 +24,24 @@ interface I18nValue {
   locale: string;
 }
 
+/** {isim} yer tutucularını doldurur; vars'ta olmayan yer tutucu olduğu gibi kalır. */
+const format = (raw: string, vars?: Record<string, string | number>) => {
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
+};
+
+/**
+ * React ağacı dışından çeviri okumak için (ör. lib/api.ts'teki hata metinleri).
+ * Bileşenlerde useI18n().t kullanılmalı — bu yardımcı yeniden render tetiklemez.
+ */
+export const translate = (
+  key: TranslationKey,
+  vars?: Record<string, string | number>,
+): string => {
+  const lang = detectLang();
+  return format(translations[lang][key] ?? translations.tr[key] ?? key, vars);
+};
+
 const I18nContext = createContext<I18nValue | null>(null);
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
@@ -46,15 +64,10 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
       setLang,
       locale,
       n: (v: number) => numberFormat.format(v),
-      t: (key, vars) => {
+      t: (key, vars) =>
         // Anahtar eksikse Türkçe'ye, o da yoksa anahtarın kendisine düşer —
         // eksik çeviri arayüzü boş bırakmaz.
-        const raw = translations[lang][key] ?? translations.tr[key] ?? key;
-        if (!vars) return raw;
-        return raw.replace(/\{(\w+)\}/g, (m, name) =>
-          name in vars ? String(vars[name]) : m,
-        );
-      },
+        format(translations[lang][key] ?? translations.tr[key] ?? key, vars),
     };
   }, [lang, setLang]);
 

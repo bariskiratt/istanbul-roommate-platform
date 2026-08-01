@@ -6,8 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import ADMIN_EMAILS
 from app.db import Base, get_db
 from app.main import app
+
+# config.ADMIN_EMAILS ortamdan okunur; kurulum farkı testi kırmasın diye
+# listeden birini alıyoruz.
+ADMIN_EMAIL = sorted(ADMIN_EMAILS)[0]
 
 
 @pytest.fixture()
@@ -216,3 +221,93 @@ def test_duplicate_match_prevented(client):
             json={"accept": True},
         )
     assert len(client.get("/api/matches", headers=ali["headers"]).json()) == 1
+
+
+# ---- DELETE /api/swipes/mine (deste sıfırlama, yalnız yönetici) ----
+
+def test_deste_sifirlama_yalniz_admin(client):
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    assert client.delete("/api/swipes/mine", headers=ali["headers"]).status_code == 403
+    # Giriş yapmadan da erişilemez
+    assert client.delete("/api/swipes/mine").status_code == 401
+
+
+def test_admin_destesini_sifirlar(client):
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ayse = _make_user(client, "ayse@uni.edu.tr", "Ayşe")
+    l1 = _make_listing(client, ayse["headers"], "Ev 1")
+    l2 = _make_listing(client, ayse["headers"], "Ev 2")
+
+    for lid, yon in ((l1, "like"), (l2, "pass")):
+        client.post(
+            "/api/swipes",
+            headers=admin["headers"],
+            json={"listing_id": lid, "direction": yon},
+        )
+    # Kararlar verildi: deste boşaldı
+    assert client.get(
+        "/api/listings", headers=admin["headers"], params={"unswiped": True}
+    ).json() == []
+
+    res = client.delete("/api/swipes/mine", headers=admin["headers"])
+    assert res.status_code == 200, res.text
+    assert res.json() == {"deleted": 2}
+
+    # Deste geri geldi
+    ids = [
+        i["id"]
+        for i in client.get(
+            "/api/listings", headers=admin["headers"], params={"unswiped": True}
+        ).json()
+    ]
+    assert sorted(ids) == [l1, l2]
+
+    # İkinci sıfırlama silecek kayıt bulamaz
+    assert client.delete(
+        "/api/swipes/mine", headers=admin["headers"]
+    ).json() == {"deleted": 0}
+
+
+def test_deste_sifirlama_eslesmeyi_ve_sohbeti_korur(client):
+    """Kaydırmalar silinse de eşleşme ve mesaj geçmişi yerinde kalmalı."""
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ayse = _make_user(client, "ayse@uni.edu.tr", "Ayşe")
+    admin_listing = _make_listing(client, admin["headers"], "Yöneticinin evi")
+    ayse_listing = _make_listing(client, ayse["headers"], "Ayşe'nin evi")
+
+    client.post(
+        "/api/swipes",
+        headers=admin["headers"],
+        json={"listing_id": ayse_listing, "direction": "like"},
+    )
+    match_id = client.post(
+        "/api/swipes",
+        headers=ayse["headers"],
+        json={"listing_id": admin_listing, "direction": "like"},
+    ).json()["match_id"]
+    client.post(
+        f"/api/matches/{match_id}/messages",
+        headers=admin["headers"],
+        json={"content": "Merhaba, ev müsait mi?"},
+    )
+
+    assert client.delete(
+        "/api/swipes/mine", headers=admin["headers"]
+    ).json() == {"deleted": 1}
+
+    # Eşleşme ve mesaj duruyor
+    matches = client.get("/api/matches", headers=admin["headers"]).json()
+    assert [m["id"] for m in matches] == [match_id]
+    msgs = client.get(
+        f"/api/matches/{match_id}/messages", headers=ayse["headers"]
+    ).json()
+    assert [m["content"] for m in msgs] == ["Merhaba, ev müsait mi?"]
+
+    # Tekrar beğeni ikinci bir eşleşme doğurmaz
+    res = client.post(
+        "/api/swipes",
+        headers=admin["headers"],
+        json={"listing_id": ayse_listing, "direction": "like"},
+    )
+    assert res.json() == {"matched": True, "match_id": match_id}
+    assert len(client.get("/api/matches", headers=admin["headers"]).json()) == 1

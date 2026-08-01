@@ -12,6 +12,7 @@ import {
   type StatusKey,
 } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import type { TranslationKey } from "@/i18n/translations";
 
 // Alternatif semt önerisi (raylı ağ tabanlı) şu an arayüzde KAPALI —
 // çıktı kalitesi ayarlanana kadar inaktif. Backend ucu (/api/alternatives)
@@ -27,6 +28,11 @@ const FALLBACK_COLORS: Record<StatusKey, string> = {
   nodata: "#95a5a6",
 };
 
+// Durum çubuğu metni: parçalar render sırasında çevrilir, böylece dil
+// değiştiğinde ekrandaki metin de anında güncellenir.
+type StatusPart = { key: TranslationKey; vars?: Record<string, string | number> };
+type StatusMsg = StatusPart[] | null;
+
 const Explore = () => {
   const navigate = useNavigate();
   const { t, n: fmtNum } = useI18n();
@@ -40,13 +46,17 @@ const Explore = () => {
 
   const [budget, setBudget] = useState(25000);
   const [summary, setSummary] = useState<Record<StatusKey, number> | null>(null);
-  const [status, setStatus] = useState(t("map.loading"));
+  // Durum metni çevrilmiş dize olarak DEĞİL, anahtar + değişken olarak tutulur:
+  // çevrilmiş dize saklansaydı dil değiştirildiğinde eski dilde donup kalırdı.
+  const [status, setStatus] = useState<StatusMsg>([{ key: "map.loading" }]);
   const [alt, setAlt] = useState<AlternativesResponse | null>(null);
 
-  // Harita bir kez kurulur; popup üreticileri ilk render'ın `t`'sini yakalar.
-  // Dil değişince güncel çeviriyi görebilmeleri için ref üzerinden okunur.
+  // Harita bir kez kurulur; popup üreticileri ilk render'ın `t`/`n`'ini yakalar.
+  // Dil değişince güncel çeviriyi ve sayı biçimini görebilmeleri için ref üzerinden okunur.
   const tRef = useRef(t);
   tRef.current = t;
+  const fmtNumRef = useRef(fmtNum);
+  fmtNumRef.current = fmtNum;
 
   // Harita tıklama işleyicisi mount'ta bir kez kaydedildiği için `budget`
   // state'ini kapanışta (closure) yakalar ve güncel değeri görmez. Güncel
@@ -79,12 +89,12 @@ const Explore = () => {
       setSummary(data.summary);
       const total = data.summary.safe + data.summary.borderline + data.summary.expensive;
       const weak = data.summary.low_confidence ?? 0;
-      setStatus(
-        tRef.current("map.summary", { total, safe: data.summary.safe }) +
-          (weak ? tRef.current("map.weak", { weak }) : ""),
-      );
+      setStatus([
+        { key: "map.summary", vars: { total, safe: data.summary.safe } },
+        ...(weak ? [{ key: "map.weak" as TranslationKey, vars: { weak } }] : []),
+      ]);
     } catch (e) {
-      setStatus(tRef.current("map.heatFailed", { error: (e as Error).message }));
+      setStatus([{ key: "map.heatFailed", vars: { error: (e as Error).message } }]);
     }
   };
 
@@ -101,30 +111,30 @@ const Explore = () => {
     });
 
   const runAlternatives = async (id: number) => {
-    setStatus("Alternatifler hesaplanıyor…");
+    setStatus([{ key: "map.altCalculating" }]);
     try {
       const data = await fetchAlternatives(id, budgetRef.current);
       clearAltMarkers();
       setAlt(data);
       mapRef.current?.closePopup();
-      setStatus("");
+      setStatus(null);
       if (data.reachable) {
-        const t = data.target;
+        const target = data.target;
         altMarkersRef.current.push(
-          L.marker([t.lat, t.lon], { icon: pin("hsl(263 45% 62%)") })
-            .bindTooltip(`${t.name} (hedef)`)
+          L.marker([target.lat, target.lon], { icon: pin("hsl(263 45% 62%)") })
+            .bindTooltip(tRef.current("map.altTarget", { name: target.name }))
             .addTo(mapRef.current!),
         );
         data.recommendations.forEach((r) => {
           altMarkersRef.current.push(
             L.marker([r.lat, r.lon], { icon: pin("hsl(160 32% 52%)") })
-              .bindTooltip(`${r.name} · ${fmtNum(Math.round(r.price ?? 0))} TL`)
+              .bindTooltip(`${r.name} · ${fmtNumRef.current(Math.round(r.price ?? 0))} TL`)
               .addTo(mapRef.current!),
           );
         });
       }
     } catch (e) {
-      setStatus(`Alternatifler alınamadı: ${(e as Error).message}`);
+      setStatus([{ key: "map.altFailed", vars: { error: (e as Error).message } }]);
     }
   };
 
@@ -170,9 +180,9 @@ const Explore = () => {
               const price =
                 p.avg_price == null
                   ? tRef.current("map.noData")
-                  : `${fmtNum(Math.round(p.avg_price))} TL / ${tRef.current("map.month")}`;
+                  : `${fmtNumRef.current(Math.round(p.avg_price))} TL / ${tRef.current("map.month")}`;
               const area = p.neighborhood
-                ? `${p.neighborhood}${tRef.current("map.neighborhoodSuffix")}`
+                ? tRef.current("map.neighborhoodLabel", { name: p.neighborhood })
                 : tRef.current("map.unknown");
               let html = `<div style="font-weight:650">${area}</div>`;
               html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
@@ -181,7 +191,7 @@ const Explore = () => {
                 html += `<div style="color:#b48a00;font-size:11px;margin-top:4px">⚠️ ${tRef.current("map.fewListings", { count: p.listing_count })}</div>`;
               }
               if (ALTERNATIVES_ENABLED && p.avg_price != null) {
-                html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">🚇 Yakın uygun alternatifler</button>`;
+                html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">${tRef.current("map.altButton")}</button>`;
               }
               return html;
             });
@@ -189,7 +199,7 @@ const Explore = () => {
         }).addTo(map);
         await recolor(budget);
       } catch (e) {
-        setStatus(tRef.current("map.geoFailed", { error: (e as Error).message }));
+        setStatus([{ key: "map.geoFailed", vars: { error: (e as Error).message } }]);
       }
     })();
 
@@ -251,7 +261,11 @@ const Explore = () => {
         )}
       </div>
 
-      {status && <div className="px-6 py-2 text-xs text-muted-foreground">{status}</div>}
+      {status && status.length > 0 && (
+        <div className="px-6 py-2 text-xs text-muted-foreground">
+          {status.map((part) => t(part.key, part.vars)).join("")}
+        </div>
+      )}
 
       {/* Harita + öneri paneli */}
       <div className="relative flex-1 min-h-[420px]">
@@ -265,25 +279,27 @@ const Explore = () => {
                 clearAltMarkers();
               }}
               className="absolute top-3 right-3 text-muted-foreground hover:text-foreground text-xl leading-none"
-              aria-label="Kapat"
+              aria-label={t("common.close")}
             >
               ×
             </button>
-            <h3 className="font-semibold text-sm pr-6">{alt.target.name} Mah. yakını</h3>
+            <h3 className="font-semibold text-sm pr-6">
+              {t("map.altPanelTitle", { name: alt.target.name })}
+            </h3>
 
             {!alt.reachable ? (
               <p className="text-xs text-muted-foreground mt-1">
-                {alt.target.message ?? "Bu mahalle için ulaşım tabanlı öneri üretilemedi."}
+                {alt.target.message ?? t("map.altUnreachable")}
               </p>
             ) : alt.recommendations.length === 0 ? (
-              <p className="text-xs text-muted-foreground mt-1">
-                Bu bütçeyle ağ üzerinde uygun alternatif bulunamadı. Bütçeyi artırmayı dene.
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{t("map.altNone")}</p>
             ) : (
               <>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1">
-                  Bütçe {fmtNum(alt.budget ?? budget)} ₺ · raylı sistemle ulaşılabilir{" "}
-                  {alt.recommendations.length} uygun mahalle
+                  {t("map.altSummary", {
+                    budget: fmtNum(alt.budget ?? budget),
+                    count: alt.recommendations.length,
+                  })}
                 </p>
                 {alt.recommendations.map((r, i) => (
                   <div
@@ -292,22 +308,20 @@ const Explore = () => {
                     className="py-2.5 border-t border-border cursor-pointer hover:opacity-80"
                   >
                     <div className="text-sm font-semibold flex items-center gap-2">
-                      <span>
-                        {i + 1}. {r.name} Mah.
-                      </span>
+                      <span>{t("map.altItem", { index: i + 1, name: r.name })}</span>
                       <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground">
-                        {r.network_cost} durak
+                        {t("map.altStops", { count: r.network_cost })}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       <span className="font-semibold text-foreground">
-                        {fmtNum(Math.round(r.price ?? 0))} ₺
+                        {fmtNum(Math.round(r.price ?? 0))} {t("common.currency")}
                       </span>
                       {r.district ? ` · ${r.district}` : ""}
                       {r.saving != null && r.saving > 0 ? (
                         <span className="text-accent">
                           {" "}
-                          · {fmtNum(r.saving)} ₺ ucuz
+                          · {t("map.altCheaper", { amount: fmtNum(r.saving) })}
                         </span>
                       ) : null}
                     </div>

@@ -1,14 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, Home, ArrowLeft } from "lucide-react";
+import { Send, Home, ArrowLeft, Flag } from "lucide-react";
 import BottomNav from "@/components/layout/BottomNav";
+import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMatches, fetchMessages, sendMessage } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
+
+// Mesaj şifreli yazılmış ama sunucu onu çözemediğinde backend içerik yerine bu
+// sabit ASCII dizeyi döner (backend/app/crypto.py: UNREADABLE). Dile bağlı
+// olmadığı için birebir karşılaştırıp kendi çevirimizi basıyoruz.
+const UNREADABLE = "[unreadable]";
 
 const ChatScreen = () => {
   const { matchId } = useParams();
@@ -17,6 +23,7 @@ const ChatScreen = () => {
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const id = Number(matchId);
@@ -90,10 +97,21 @@ const ChatScreen = () => {
           alt=""
           className="w-10 h-10 rounded-full object-cover"
         />
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="font-bold text-sm text-foreground">{other?.name || t("messages.unnamed")}</p>
           <p className="text-[11px] text-muted-foreground">{other?.university ?? ""}</p>
         </div>
+        {/* Karşı kullanıcıyı bildir; eşleşme yüklenmeden hedef id bilinmez */}
+        {other && (
+          <button
+            onClick={() => setReportOpen(true)}
+            aria-label={t("report.reportUser")}
+            title={t("report.reportUser")}
+            className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors shrink-0"
+          >
+            <Flag className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Eşleşme ilanı */}
@@ -120,10 +138,13 @@ const ChatScreen = () => {
         )}
         {messages.map(msg => {
           const isMine = me !== null && msg.sender_id === me.id;
+          const unreadable = msg.content === UNREADABLE;
           return (
             <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[80%] ${isMine ? "message-sent" : "message-received"}`}>
-                <p className="text-[15px] leading-relaxed">{msg.content}</p>
+                <p className={`text-[15px] leading-relaxed${unreadable ? " italic opacity-70" : ""}`}>
+                  {unreadable ? t("chat.unreadable") : msg.content}
+                </p>
                 <p className={`text-[10px] mt-1.5 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                   {parseUtc(msg.created_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
                 </p>
@@ -153,6 +174,16 @@ const ChatScreen = () => {
           <Send className="w-5 h-5" />
         </button>
       </div>
+
+      {other && (
+        <ReportDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="user"
+          targetId={other.id}
+          targetLabel={other.name || t("messages.unnamed")}
+        />
+      )}
 
       <BottomNav />
     </div>

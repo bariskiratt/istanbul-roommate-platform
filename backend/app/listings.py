@@ -1,7 +1,7 @@
 """İlan CRUD uçları.
 
-Auth henüz yok: ilanlar anonim oluşturulur. Kullanıcı sistemi geldiğinde
-create ucu kimlik doğrulaması isteyecek ve owner_id yazacak.
+İlan oluşturma ve güncelleme giriş ister; metinler yayına girmeden önce
+içerik denetiminden (app.moderation) geçer.
 """
 
 from datetime import datetime
@@ -14,13 +14,62 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
 
-from app import models
+from app import models, moderation
 from app.auth import get_current_user, get_optional_user
 from app.db import get_db
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
 
 ListingType = Literal["ev_ilani", "kisisel_ilan"]
+
+# Ev özellikleri — şemalar ve "features" filtresi aynı listeden beslenir ki
+# yeni bir özellik eklenince filtre kendiliğinden tanısın.
+FEATURE_FIELDS: tuple[str, ...] = (
+    "furnished",
+    "elevator",
+    "parking",
+    "internet_included",
+    "heating_included",
+    "balcony",
+    "natural_gas",
+)
+
+
+def _moderate(title: str, description: str) -> bool:
+    """İlan metnini denetler.
+
+    "block" → 422 ile reddedilir. Dönüş değeri "işaretlensin mi" bilgisidir:
+    True ise ilan yayına girer ama is_flagged=True ile yönetici incelemesine
+    düşer.
+    """
+    result = moderation.check(f"{title}\n{description}", kind="listing")
+    if result.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{moderation.describe(result.reasons)} "
+                "İlan başlığını ve açıklamasını düzenleyip tekrar deneyin."
+            ),
+        )
+    return result.flagged
+
+
+def _parse_features(raw: str | None) -> list[str]:
+    """"features" sorgu parametresini ayrıştırır; geçersiz anahtarda 422 verir."""
+    if not raw or not raw.strip():
+        return []
+    keys = [part.strip() for part in raw.split(",") if part.strip()]
+    invalid = [k for k in keys if k not in FEATURE_FIELDS]
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Geçersiz özellik: {', '.join(invalid)}. "
+                f"Geçerli anahtarlar: {', '.join(FEATURE_FIELDS)}."
+            ),
+        )
+    # Tekrar eden anahtar aynı koşulu iki kez eklemesin.
+    return list(dict.fromkeys(keys))
 
 
 class ListingIn(BaseModel):
@@ -35,6 +84,15 @@ class ListingIn(BaseModel):
     room_count: str | None = Field(None, max_length=10)
     smoking_allowed: bool | None = None
     pets_allowed: bool | None = None
+
+    # Ev özellikleri — üç durumlu: True = var, False = yok, None = belirtilmemiş.
+    furnished: bool | None = None
+    elevator: bool | None = None
+    parking: bool | None = None
+    internet_included: bool | None = None
+    heating_included: bool | None = None
+    balcony: bool | None = None
+    natural_gas: bool | None = None
 
     # Kişisel ilan alanları
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
@@ -68,6 +126,13 @@ class ListingOut(BaseModel):
     room_count: str | None
     smoking_allowed: bool | None
     pets_allowed: bool | None
+    furnished: bool | None = None
+    elevator: bool | None = None
+    parking: bool | None = None
+    internet_included: bool | None = None
+    heating_included: bool | None = None
+    balcony: bool | None = None
+    natural_gas: bool | None = None
     budget_min: int | None
     budget_max: int | None
     is_active: bool
@@ -84,7 +149,10 @@ def create_listing(
     user: models.User = Depends(get_current_user),
 ):
     """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı."""
-    row = models.Listing(**payload.model_dump(), owner_id=user.id)
+    flagged = _moderate(payload.title, payload.description)
+    row = models.Listing(
+        **payload.model_dump(), owner_id=user.id, is_flagged=flagged
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -98,6 +166,13 @@ def list_listings(
     mine: bool = Query(False, description="Sadece kendi ilanlarım (giriş ister)"),
     unswiped: bool = Query(
         False, description="Daha önce kaydırdıklarımı ve kendi ilanlarımı gizle"
+    ),
+    features: str | None = Query(
+        None,
+        description=(
+            "Virgülle ayrılmış ev özellikleri; hepsi işaretli olan ilanlar "
+            "döner. Geçerli anahtarlar: " + ", ".join(FEATURE_FIELDS)
+        ),
     ),
     db: Session = Depends(get_db),
     user: models.User | None = Depends(get_optional_user),
@@ -126,6 +201,16 @@ def list_listings(
         stmt = stmt.where(models.Listing.type == listing_type)
     if district is not None:
         stmt = stmt.where(models.Listing.district == district)
+    for key in _parse_features(features):
+        # AND mantığı: istenen her özellik açıkça True olmalı; None
+        # (belirtilmemiş) eşleşmez — kullanıcı "var" diyene bakıyor.
+        # Ancak bu koşul YALNIZCA ev ilanlarına uygulanır: kişisel ilanlarda
+        # (ev arayan kişi) asansör/otopark gibi ev özellikleri hiç olamaz,
+        # dolayısıyla filtre onları elemek yerine kapsam dışı bırakır.
+        stmt = stmt.where(
+            (models.Listing.type != "ev_ilani")
+            | getattr(models.Listing, key).is_(True)
+        )
     return db.scalars(stmt).all()
 
 
@@ -174,6 +259,13 @@ class ListingUpdate(BaseModel):
     room_count: str | None = Field(None, max_length=10)
     smoking_allowed: bool | None = None
     pets_allowed: bool | None = None
+    furnished: bool | None = None
+    elevator: bool | None = None
+    parking: bool | None = None
+    internet_included: bool | None = None
+    heating_included: bool | None = None
+    balcony: bool | None = None
+    natural_gas: bool | None = None
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
     budget_max: int | None = Field(None, gt=0, le=10_000_000)
 
@@ -205,6 +297,18 @@ def update_listing(
         raise HTTPException(
             status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
         )
+
+    # Denetim YALNIZCA metin gerçekten değişiyorsa çalışır.
+    # Aksi hâlde: denetim kuralları ilan yayımlandıktan sonra sıkılaştığında,
+    # eski metni bugünün kurallarına takılan bir ilanın sahibi kirasını,
+    # fotoğrafını, hiçbir alanını güncelleyemez hâle geliyordu (422 kilidi).
+    # Kullanıcı metne dokunmuyorsa yeni kuralı ona geriye dönük uygulamıyoruz;
+    # başlık veya açıklama değişirse yeni hâl bir bütün olarak denetlenir.
+    new_title = updates.get("title", row.title)
+    new_description = updates.get("description", row.description)
+    if new_title != row.title or new_description != row.description:
+        row.is_flagged = _moderate(new_title, new_description)
+
     for key, value in updates.items():
         setattr(row, key, value)
     db.commit()

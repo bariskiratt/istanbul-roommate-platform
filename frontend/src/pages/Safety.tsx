@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Shield, ShieldCheck, MessageCircle, KeyRound, Home } from "lucide-react";
+import { Shield, ShieldCheck, ScanSearch, MessageCircle, Lock, Flag, KeyRound, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
@@ -11,13 +11,25 @@ const Safety = () => {
   const { isLoggedIn } = useAuth();
   const { t } = useI18n();
 
-  // NOT: Bu sayfa yalnızca üründe gerçekten var olan güvenceleri anlatır.
-  // "Yapay zeka moderasyonu" ve "uçtan uca şifreli mesajlaşma" iddiaları
-  // kaldırıldı — ikisi de uygulanmış değil.
+  // NOT: Bu sayfa yalnızca üründe gerçekten uygulanmış güvenceleri anlatır.
+  // Metindeki hassas noktalar bilerek sınırlandırıldı — değiştirirken bozma:
+  //  - card2 (denetim): kural katmanı her zaman açık, yapay zeka katmanı yalnızca
+  //    ANTHROPIC_API_KEY tanımlıysa çalışır. O katman açıkken metnin TAMAMI
+  //    Anthropic'e gidiyor (moderation_ai.py); bu, kullanıcıya açıkça söylenir.
+  //    Ayrıca denetim şifrelemeden ÖNCE düz metin üzerinde çalışır — card4 ile
+  //    yan yana okununca çelişki doğmasın diye bu da yazılıdır.
+  //  - card4 (şifreleme): koşulludur. crypto.py MESSAGE_KEY yoksa sessizce DÜZ
+  //    METİN yazar, bu yüzden cümle "anahtar yapılandırıldığında" diye kurulur.
+  //    Anahtar sunucuda olduğu için bu UÇTAN UCA şifreleme DEĞİLDİR.
+  //  - card6 (silme): ilan silme aslında yayından kaldırmadır (is_active=False),
+  //    satır veritabanında kalır; yalnızca HESAP silme kalıcıdır (auth.delete_account).
   const cards = [
     { icon: ShieldCheck, title: t("safety.card1Title"), desc: t("safety.card1Desc") },
-    { icon: MessageCircle, title: t("safety.card2Title"), desc: t("safety.card2Desc") },
-    { icon: KeyRound, title: t("safety.card3Title"), desc: t("safety.card3Desc") },
+    { icon: ScanSearch, title: t("safety.card2Title"), desc: t("safety.card2Desc") },
+    { icon: MessageCircle, title: t("safety.card3Title"), desc: t("safety.card3Desc") },
+    { icon: Lock, title: t("safety.card4Title"), desc: t("safety.card4Desc") },
+    { icon: Flag, title: t("safety.card5Title"), desc: t("safety.card5Desc") },
+    { icon: KeyRound, title: t("safety.card6Title"), desc: t("safety.card6Desc") },
   ];
 
   return (
@@ -53,7 +65,7 @@ const Safety = () => {
           <p className="text-muted-foreground max-w-xl mx-auto">{t("safety.sub")}</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-10">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-12">
           {cards.map((section, i) => (
             <div key={i} className="text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">

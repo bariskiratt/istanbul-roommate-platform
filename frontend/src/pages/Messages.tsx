@@ -11,6 +11,10 @@ import { useI18n } from "@/i18n";
 
 const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
+// Çözülemeyen mesaj için backend sabit ASCII dize döner (app/crypto.py: UNREADABLE).
+// Son mesaj önizlemesinde de ham gösterilmemeli — ChatScreen ile aynı davranış.
+const UNREADABLE = "[unreadable]";
+
 const fmtTime = (iso: string | null, locale: string) => {
   if (!iso) return "";
   const d = parseUtc(iso);
@@ -63,7 +67,11 @@ const Messages = () => {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground truncate mt-0.5">
-                  {match.last_message ?? t("messages.firstMessage")}
+                  {match.last_message == null
+                    ? t("messages.firstMessage")
+                    : match.last_message === UNREADABLE
+                      ? t("chat.unreadable")
+                      : match.last_message}
                 </p>
                 {match.listing_title && (
                   <span className="inline-block mt-2 text-[10px] px-2.5 py-1 rounded-full font-medium bg-lavender/50 text-foreground">

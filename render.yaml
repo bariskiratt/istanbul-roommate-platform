@@ -12,6 +12,17 @@ services:
         sync: false        # Vercel adresini elle gir (ör. https://roommatch.vercel.app)
       - key: DEV_OTP
         sync: false        # Panelden yönetilir: e-posta servisi yokken 1, bağlanınca 0
+      # Mesajların veritabanında AES-256-GCM ile şifrelenmesi için gereken anahtar.
+      # Tanımlı değilse (ya da biçimi bozuksa) app/crypto.py sessizce DÜZ METİN
+      # yazmaya döner — bu yüzden bu değişkenin üretimde dolu olması şart.
+      # Render değeri bir kez üretip kalıcı saklar; SONRAKİ DAĞITIMLARDA DEĞİŞMEZ.
+      # UYARI: anahtar kaybolur ya da değişirse onunla şifrelenmiş TÜM mesajlar
+      # kalıcı olarak okunamaz hale gelir. İlk dağıtımdan sonra panelden kopyalayıp
+      # yedekle. Beklenen biçim: base64(32 bayt). Render'ın ürettiği değer bu
+      # biçimde değilse elle üret (python -m app.crypto --genkey) ve panele yapıştır.
+      # Doğrulama adımları: DEPLOY.md.
+      - key: MESSAGE_KEY
+        generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: roommatch-db

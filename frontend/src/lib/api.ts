@@ -6,6 +6,8 @@
  * VITE_API_URL ile ayarlanır (bkz. .env.example).
  */
 
+import { translate } from "@/i18n";
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 // ---- Token saklama ----
@@ -21,6 +23,21 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * Sunucunun döndürdüğü hata. `message` her zaman kullanıcıya gösterilebilir
+ * (sunucu `detail` alanı ya da genel bir metin); `status` çağıranın hatayı
+ * ayırt etmesi için taşınır — ör. 422 = moderasyon reddi.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -33,9 +50,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(
+    throw new ApiError(
       (data && typeof data.detail === "string" && data.detail) ||
-        `İstek başarısız (${res.status})`,
+        translate("common.requestFailed", { status: res.status }),
+      res.status,
     );
   }
   return data as T;
@@ -138,6 +156,22 @@ export const fetchAlternatives = (neighborhoodId: number, budget: number) =>
 
 // ---- İlanlar ----
 
+/**
+ * Ev özellikleri. Anahtarlar backend sütunlarıyla birebir aynıdır; hem
+ * `GET /api/listings?features=` filtresi hem de ilan gövdesi bunları kullanır.
+ */
+export const LISTING_FEATURES = [
+  "furnished",
+  "elevator",
+  "parking",
+  "internet_included",
+  "heating_included",
+  "balcony",
+  "natural_gas",
+] as const;
+
+export type ListingFeature = (typeof LISTING_FEATURES)[number];
+
 export interface ListingPayload {
   type: "ev_ilani" | "kisisel_ilan";
   title: string;
@@ -149,6 +183,15 @@ export interface ListingPayload {
   room_count?: string;
   smoking_allowed?: boolean;
   pets_allowed?: boolean;
+  // Ev özellikleri — belirtilmezse sunucuda null kalır ("bilinmiyor").
+  // Yanıtta da null gelebilir, bu yüzden okurken `=== true` ile karşılaştır.
+  furnished?: boolean;
+  elevator?: boolean;
+  parking?: boolean;
+  internet_included?: boolean;
+  heating_included?: boolean;
+  balcony?: boolean;
+  natural_gas?: boolean;
   // Kişisel ilan
   budget_min?: number;
   budget_max?: number;
@@ -204,12 +247,15 @@ export const fetchListings = (params?: {
   mine?: boolean;
   /** Kaydırılmış ve kendi ilanlarını gizler (deste için). */
   unswiped?: boolean;
+  /** Hepsi işaretli olan ilanlar döner (VE mantığı). */
+  features?: ListingFeature[];
 }) => {
   const query = new URLSearchParams();
   if (params?.type) query.set("type", params.type);
   if (params?.district) query.set("district", params.district);
   if (params?.mine) query.set("mine", "true");
   if (params?.unswiped) query.set("unswiped", "true");
+  if (params?.features?.length) query.set("features", params.features.join(","));
   const qs = query.toString();
   return getJSON<ApiListing[]>(`/api/listings${qs ? `?${qs}` : ""}`);
 };
@@ -367,6 +413,14 @@ export const respondToLike = (swipeId: number, accept: boolean) =>
 
 export const fetchMatches = () => getJSON<Match[]>("/api/matches");
 
+/**
+ * Kendi kaydırma geçmişini siler; deste baştan gelir. Sunucu bu ucu YALNIZCA
+ * yöneticilere açar (aksi halde 403). Eşleşmeler ve mesajlar korunur; silinen
+ * yalnızca "like/pass" kararlarıdır.
+ */
+export const resetMyDeck = () =>
+  request<{ deleted: number }>("/api/swipes/mine", { method: "DELETE" });
+
 // ---- Mesajlaşma ----
 
 export interface ChatMessage {
@@ -383,6 +437,42 @@ export const fetchMessages = (matchId: number) =>
 export const sendMessage = (matchId: number, content: string) =>
   postJSON<ChatMessage>(`/api/matches/${matchId}/messages`, { content });
 
+// ---- Raporlama ----
+
+export type ReportTargetType = "listing" | "user" | "message";
+
+export interface ApiReport {
+  id: number;
+  reporter_id: number;
+  target_type: string;
+  target_id: number;
+  reason: string;
+  note: string | null;
+  created_at: string;
+  resolved: boolean;
+  resolution_note: string | null;
+}
+
+/**
+ * Sunucudaki kapalı sebep listesi ("spam", "taciz" …). Arayüz etiketleri
+ * i18n'den gelir; listenin kendisi tek doğruluk kaynağı olarak sunucudadır.
+ */
+export const fetchReportReasons = () => getJSON<string[]>("/api/reports/reasons");
+
+/** Not boşsa hiç gönderilmez; sunucu tarafında null kalır. */
+export const postReport = (
+  targetType: ReportTargetType,
+  targetId: number,
+  reason: string,
+  note?: string,
+) =>
+  postJSON<ApiReport>("/api/reports", {
+    target_type: targetType,
+    target_id: targetId,
+    reason,
+    ...(note?.trim() ? { note: note.trim() } : {}),
+  });
+
 // ---- Fotoğraf yükleme ----
 
 export const uploadPhoto = async (file: File): Promise<{ url: string }> => {
@@ -398,7 +488,7 @@ export const uploadPhoto = async (file: File): Promise<{ url: string }> => {
   if (!res.ok) {
     throw new Error(
       (data && typeof data.detail === "string" && data.detail) ||
-        `Yükleme başarısız (${res.status})`,
+        translate("common.uploadFailed", { status: res.status }),
     );
   }
   return data as { url: string };
