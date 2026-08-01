@@ -25,7 +25,7 @@ from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.db import init_db
 from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
-from app.indexing import DATA_PERIOD, rent_index
+from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.listings import router as listings_router
 from app.messages import router as messages_router
 from app.reports import router as reports_router
@@ -301,6 +301,7 @@ async def estimate(payload: EstimateRequest):
         "index_factor": round(factor, 4),
         "data_period": DATA_PERIOD,
         "indexed_to": indexed_to,
+        "indexed": is_configured(),
         "basis": payload.basis,
     }
 

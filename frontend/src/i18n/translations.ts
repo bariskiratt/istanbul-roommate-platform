@@ -119,6 +119,8 @@ const tr = {
   "fair.shared":
     "{bedrooms} yatak odası = {occupants} kişi; {areas} ortak kullanılıyor. Daire geneli {flatLow}–{flatHigh} ₺, kişi payı bu sayının {occupants}'e bölünmüşü.",
   "fair.footnote": "İlçe geneli tahmin · model medyan sapması %{err} · TÜFE ile güncellendi",
+  "fair.footnoteNotIndexed":
+    "İlçe geneli tahmin · model medyan sapması %{err} · {period} fiyat düzeyi, güncellenmedi",
   "fair.checkTitle": "Adil Fiyat Danışmanı",
   "fair.checkSub": "LightGBM modeli, kiranın piyasaya uygun olup olmadığını söyler",
   "fair.neighborhood": "Mahalle",
@@ -137,6 +139,8 @@ const tr = {
   "fair.deviation": "İstenen {asking} ₺, oda payı orta tahmininden {sign}{dev}% farklı.",
   "fair.disclaimer":
     "{period} piyasa verisi, TÜFE ile {indexed} düzeyine endekslendi (×{factor}). Modelin medyan sapması %{err}. Bu bir tahmindir, ekspertiz değildir.",
+  "fair.disclaimerNotIndexed":
+    "{period} piyasa verisi — güncel fiyat düzeyine ENDEKSLENMEDİ, bugünkü kiraların altında kalabilir. Modelin medyan sapması %{err}. Bu bir tahmindir, ekspertiz değildir.",
   "fair.unknownNeighborhood":
     " Bu mahalle eğitim verisinde yok; tahmin ilçe geneline dayanıyor.",
 
@@ -854,6 +858,8 @@ const en: Record<TranslationKey, string> = {
   "fair.shared":
     "{bedrooms} bedrooms = {occupants} people; {areas} are shared. The whole flat runs {flatLow}–{flatHigh} ₺, and each share is that divided by {occupants}.",
   "fair.footnote": "District-level estimate · model median error {err}% · CPI-indexed",
+  "fair.footnoteNotIndexed":
+    "District-level estimate · model median error {err}% · {period} price level, not updated",
   "fair.checkTitle": "Fair-price advisor",
   "fair.checkSub": "A LightGBM model tells you whether the rent is in line with the market",
   "fair.neighborhood": "Neighbourhood",
@@ -872,6 +878,8 @@ const en: Record<TranslationKey, string> = {
   "fair.deviation": "The asking price of {asking} ₺ is {sign}{dev}% off the mid room-share estimate.",
   "fair.disclaimer":
     "Market data from {period}, CPI-indexed to {indexed} (×{factor}). The model's median error is {err}%. This is an estimate, not a professional appraisal.",
+  "fair.disclaimerNotIndexed":
+    "Market data from {period} — NOT indexed to current prices, so it may sit below today's rents. The model's median error is {err}%. This is an estimate, not a professional appraisal.",
   "fair.unknownNeighborhood":
     " This neighbourhood isn't in the training data; the estimate falls back to the district as a whole.",
 

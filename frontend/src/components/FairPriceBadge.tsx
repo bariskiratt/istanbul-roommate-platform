@@ -108,7 +108,10 @@ const FairPriceBadge = ({ listingId, detailed = false, onPhoto = false }: FairPr
         </span>
       </p>
       <p className="text-[10px] opacity-70">
-        {t("fair.footnote", { err: data.median_error_pct })}
+        {t(data.indexed ? "fair.footnote" : "fair.footnoteNotIndexed", {
+          err: data.median_error_pct,
+          period: data.data_period,
+        })}
       </p>
     </div>
   );

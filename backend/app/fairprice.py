@@ -16,7 +16,7 @@ yok. Fark varsa ilan sahibi kirayı elle ayarlar.
 import numpy as np
 import pandas as pd
 
-from app.indexing import DATA_PERIOD, rent_index
+from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.pricing import build_features
 
 # Model tahmini için ilçe geneli varsayılanları (ilanlarda m²/yaş/kat yok)
@@ -99,5 +99,6 @@ def estimate_for_listing(district: str, room_count: str | None, asking_rent: int
         "median_error_pct": round(model["served_medape"], 1),
         "data_period": DATA_PERIOD,
         "indexed_to": indexed_to,
+        "indexed": is_configured(),
         "district_level": True,  # mahalle değil, ilçe geneline dayanıyor
     }

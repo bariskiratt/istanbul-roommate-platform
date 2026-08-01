@@ -210,10 +210,18 @@ const SwipeScreen = () => {
     // yalnızca demo malzemesi olduğundan atlanır.
     const card = cards[cards.length - 1];
     if (card && isLoggedIn && card.id.startsWith("api-")) {
-      postSwipe(Number(card.id.slice(4)), direction === "right" ? "like" : "pass")
+      const listingId = Number(card.id.slice(4));
+      postSwipe(listingId, direction === "right" ? "like" : "pass")
         .then(res => {
-          // Deste sorgusu tazelenmesin: kart zaten elden çıktı, yeniden
-          // çekilirse liste sıfırlanır. Yalnızca eşleşme ekranları tazelenir.
+          // Deste sorgusu YENİDEN ÇEKİLMEZ (çekilirse elde kalan kartlar
+          // sıfırlanır), ama önbellekteki kayıt da öylece bırakılamaz:
+          // başka sekmeye geçip dönünce bileşen yeniden kurulur ve desteyi
+          // bu önbellekten inşa eder — kaydırılan kartlar geri gelirdi.
+          // Bu yüzden karar verilen ilan önbellekten tek tek düşürülür.
+          queryClient.setQueriesData<ApiListing[]>(
+            { queryKey: ["listings", "deck"] },
+            old => old?.filter(l => l.id !== listingId),
+          );
           queryClient.invalidateQueries({ queryKey: ["matches"] });
           queryClient.invalidateQueries({ queryKey: ["received-likes"] });
           if (res.matched) {

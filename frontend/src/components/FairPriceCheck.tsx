@@ -210,12 +210,19 @@ const FairPriceCheck = ({ district, askingPrice, roomCount }: Props) => {
           })()}
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            {t("fair.disclaimer", {
-              period: fmtPeriod(result.data_period, locale),
-              indexed: fmtPeriod(result.indexed_to, locale),
-              factor: result.index_factor.toFixed(3),
-              err: result.median_error_pct,
-            })}
+            {/* Endeksleme kapalıyken "bugüne güncellendi" demek yanlış olur;
+                tahmin veri döneminin fiyat düzeyinde kalır ve bu söylenir. */}
+            {result.indexed
+              ? t("fair.disclaimer", {
+                  period: fmtPeriod(result.data_period, locale),
+                  indexed: fmtPeriod(result.indexed_to, locale),
+                  factor: result.index_factor.toFixed(3),
+                  err: result.median_error_pct,
+                })
+              : t("fair.disclaimerNotIndexed", {
+                  period: fmtPeriod(result.data_period, locale),
+                  err: result.median_error_pct,
+                })}
             {!result.known_neighborhood && t("fair.unknownNeighborhood")}
           </p>
         </div>

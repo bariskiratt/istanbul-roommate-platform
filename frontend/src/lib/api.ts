@@ -94,6 +94,8 @@ export interface EstimateResponse {
   index_factor: number;
   data_period: string;
   indexed_to: string;
+  /** Endeksleme yapılandırılmış mı; false ise fiyatlar veri dönemi düzeyinde. */
+  indexed: boolean;
   basis: "flat" | "room";
   asking_price?: number;
   verdict?: "below" | "fair" | "above";
@@ -235,6 +237,8 @@ export interface ListingFairPrice {
   median_error_pct: number;
   data_period: string;
   indexed_to: string;
+  /** Endeksleme yapılandırılmış mı; false ise fiyatlar veri dönemi düzeyinde. */
+  indexed: boolean;
   district_level: boolean;
 }
 
