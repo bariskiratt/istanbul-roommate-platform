@@ -232,7 +232,7 @@ const tr = {
   "login.greet": "Hoş geldin{name}!",
   "login.devCode": "Giriş kodun: {code}",
   "login.codeSent": "Giriş kodu e-postana gönderildi!",
-  "login.codeSentDesc": "Gelmesi birkaç saniye sürebilir; spam klasörünü de kontrol et.",
+  "login.codeSentDesc": "Gelmesi 1-2 dakikayı bulabilir; spam klasörünü de kontrol et.",
 
   // ---- mesajlar / sohbet ----
   "messages.title": "Mesajlar",
@@ -997,7 +997,7 @@ const en: Record<TranslationKey, string> = {
   "login.greet": "Welcome{name}!",
   "login.devCode": "Your login code: {code}",
   "login.codeSent": "Login code sent to your email!",
-  "login.codeSentDesc": "It may take a few seconds; check your spam folder too.",
+  "login.codeSentDesc": "It can take a minute or two; check your spam folder too.",
 
   // ---- messages / chat ----
   "messages.title": "Messages",
