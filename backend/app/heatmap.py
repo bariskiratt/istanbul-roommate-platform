@@ -145,3 +145,25 @@ def build_budget_heatmap(feature_prices, user_budget, feature_counts=None):
         "low_confidence": low_confidence,
         "summary": counts | {"low_confidence": sum(low_confidence)},
     }
+
+
+def index_market_prices(geojson: dict, factor: float) -> int:
+    """Mahalle ortalama fiyatlarını verilen çarpanla bugüne taşır.
+
+    Endeksleme bir dönem yalnızca adil fiyat uçlarına uygulanıyordu; harita
+    veri döneminin (2025-02) fiyatlarını gösterdiği için iki özellik farklı
+    fiyat düzeyinde konuşuyor ve harita kullanıcının bütçesini olduğundan
+    yeterli gösteriyordu. Veri yüklenirken bir kez uygulanır, böylece
+    /api/geojson ve /api/heatmap aynı sayıyı görür.
+
+    Değiştirilen mahalle sayısını döner.
+    """
+    if factor == 1.0:
+        return 0
+    changed = 0
+    for feature in geojson.get("features", []):
+        price = feature.get("properties", {}).get("avg_price")
+        if price is not None:
+            feature["properties"]["avg_price"] = round(price * factor)
+            changed += 1
+    return changed

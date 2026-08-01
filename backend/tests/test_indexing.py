@@ -99,3 +99,37 @@ def test_bozuk_ortam_degiskeni_cipaya_duser(monkeypatch):
 
     assert factor == pytest.approx(indexing.ANCHOR_FACTOR)
     assert indexed_to == indexing.ANCHOR_PERIOD
+
+
+def test_harita_fiyatlari_da_endekslenir():
+    """Harita ve adil fiyat aynı fiyat düzeyinde konuşmalı.
+
+    Endeksleme bir dönem yalnızca adil fiyat uçlarına uygulanıyordu: danışman
+    bugünün lirasıyla konuşurken bütçe haritası veri dönemi (2025-02)
+    fiyatlarını gösteriyor, yani kullanıcının bütçesini olduğundan yeterli
+    gösteriyordu. Bu test o ayrışmanın geri gelmesini engeller.
+    """
+    from app.heatmap import index_market_prices
+
+    geojson = {
+        "features": [
+            {"properties": {"avg_price": 20000.0}},
+            {"properties": {"avg_price": None}},   # veri yok: dokunulmamalı
+            {"properties": {}},                     # alan hiç yok
+        ]
+    }
+
+    changed = index_market_prices(geojson, 1.5)
+
+    assert changed == 1
+    assert geojson["features"][0]["properties"]["avg_price"] == 30000
+    assert geojson["features"][1]["properties"]["avg_price"] is None
+
+
+def test_carpan_bir_ise_harita_fiyatlarina_dokunulmaz():
+    from app.heatmap import index_market_prices
+
+    geojson = {"features": [{"properties": {"avg_price": 20000.0}}]}
+
+    assert index_market_prices(geojson, 1.0) == 0
+    assert geojson["features"][0]["properties"]["avg_price"] == 20000.0

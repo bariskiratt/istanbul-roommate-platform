@@ -24,7 +24,12 @@ from app.config import (
 from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.db import init_db
-from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
+from app.heatmap import (
+    STATUS_STYLES,
+    annotate_features,
+    build_budget_heatmap,
+    index_market_prices,
+)
 from app import locations
 from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.listings import router as listings_router
@@ -76,6 +81,14 @@ async def lifespan(_app: FastAPI):
     df = pd.read_csv(MARKET_VALUES_CSV)
     matched = annotate_features(geojson, df)
     total = len(geojson.get("features", []))
+
+    # Harita fiyatları da bugüne endekslenir. Endeksleme yalnızca adil fiyat
+    # uçlarına uygulandığı sürece iki özellik birbiriyle çelişiyordu: danışman
+    # Kadıköy'de oda payını bugünün lirasıyla söylerken harita aynı semti
+    # DATA_PERIOD (2025-02) fiyatıyla boyuyor, yani bütçeyi olduğundan yeterli
+    # gösteriyordu. Tek yerde, veri yüklenirken uygulanır ki /api/geojson ve
+    # /api/heatmap aynı sayıyı görsün.
+    index_market_prices(geojson, rent_index()[0])
 
     STATE["geojson"] = geojson
     # Sıcak yolda pandas'a hiç dokunmamak için fiyatları düz listeye alıyoruz.
