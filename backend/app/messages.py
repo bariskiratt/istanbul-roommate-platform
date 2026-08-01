@@ -58,6 +58,11 @@ def _require_participant(
     return match
 
 
+def _other_user(match: models.Match, user: models.User, db: Session) -> models.User | None:
+    other_id = match.user_b_id if match.user_a_id == user.id else match.user_a_id
+    return db.get(models.User, other_id)
+
+
 @router.get("/{match_id}/messages", response_model=list[MessageOut])
 def list_messages(
     match_id: int,
@@ -99,11 +104,30 @@ def send_message(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    _require_participant(match_id, user, db)
+    match = _require_participant(match_id, user, db)
+
+    # Askıdaki kullanıcıya yeni mesaj gitmez. Sohbet /api/matches listesinde
+    # zaten görünmüyor; buna rağmen mesaj kabul etmek karşı tarafın hiç
+    # okumayacağı (giriş yapamıyor) bir mesajı gönderene "iletildi" göstermek
+    # olurdu. GEÇMİŞİN OKUNMASI ENGELLENMEZ — yalnızca yeni mesaj engellenir.
+    other = _other_user(match, user, db)
+    if other is not None and other.is_suspended:
+        raise HTTPException(
+            status_code=403,
+            detail="Bu hesap askıya alındı; şu an mesaj gönderilemiyor.",
+        )
 
     content = payload.content.strip()
     if not content:
         raise HTTPException(status_code=422, detail="Mesaj boş olamaz.")
+
+    # Kullanıcı sistemin ağzından konuşamaz: "[removed_by_moderation]" ya da
+    # "[unreadable]" yazan bir mesaj arayüzde sistem metni olarak basılırdı
+    # (bkz. moderation.SYSTEM_MARKERS).
+    if moderation.is_system_marker(content):
+        raise HTTPException(
+            status_code=422, detail=moderation.SYSTEM_MARKER_REJECTION
+        )
 
     result = moderation.check(content, kind="message")
     if result.blocked:
@@ -120,6 +144,7 @@ def send_message(
         sender_id=user.id,
         content=crypto.encrypt(content),
         is_flagged=result.flagged,
+        flag_reasons=moderation.reasons_csv(result),
     )
     db.add(row)
     db.commit()

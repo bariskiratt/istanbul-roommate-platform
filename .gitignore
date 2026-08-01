@@ -25,3 +25,6 @@ frontend/.vite/
 
 # Eski backend-only reponun local klonu (eski geçmişin yedeği)
 istanbul-real-estate-heatmap/
+
+# yerel yardımcı: iş akışı durumu (depoya girmez)
+.workflow-status.sh

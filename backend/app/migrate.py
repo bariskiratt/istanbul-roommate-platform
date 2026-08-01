@@ -36,6 +36,18 @@ class _Column:
 # Tablo -> eklenecek sütunlar. Yeni bir alan eklerken hem models.py'ye hem
 # buraya yazılmalı.
 _SCHEMA: dict[str, tuple[_Column, ...]] = {
+    "users": (
+        # Askıya alma — eski satırlar aktif sayılır.
+        _Column("is_suspended", "BOOLEAN", default=False),
+        _Column("suspended_at", "TIMESTAMP"),
+        _Column("suspended_reason", "VARCHAR(500)"),
+        _Column("suspended_by", "INTEGER", references="users(id)"),
+        # Askının kaldırılmasının izi — eski satırlarda NULL ("hiç
+        # askıya alınmamış" ile "askısı kaldırılmış" ayrımı korunur).
+        _Column("unsuspended_at", "TIMESTAMP"),
+        _Column("unsuspended_by", "INTEGER", references="users(id)"),
+        _Column("last_suspension_reason", "VARCHAR(500)"),
+    ),
     "listings": (
         # Auth öncesi dönemden kalan tablolarda olmayabilir.
         _Column("owner_id", "INTEGER", references="users(id)"),
@@ -49,8 +61,38 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
         _Column("natural_gas", "BOOLEAN"),
         # Denetim işareti — eski satırlar temiz sayılır.
         _Column("is_flagged", "BOOLEAN", default=False),
+        # Denetim gerekçeleri ve yönetici incelemesi — eski satırlarda NULL.
+        _Column("flag_reasons", "TEXT"),
+        _Column("reviewed_by", "INTEGER", references="users(id)"),
+        _Column("reviewed_at", "TIMESTAMP"),
+        _Column("review_note", "VARCHAR(500)"),
+        # Yönetici kaldırması — eski satırlar "yönetici kaldırmadı" sayılır
+        # (sahibin kendi kapattığı ilanlar da böylece ayrık kalır).
+        _Column("moderation_removed", "BOOLEAN", default=False),
+        # Kaldırma anındaki yayın durumu; geri alma buraya döner.
+        # VARSAYILAN YOK (NULL): bu sütun gelmeden önce kaldırılmış kayıtlarda
+        # önceki durum gerçekten bilinmiyor. False yazsaydık o ilanlar geri
+        # alındığında sessizce kapalı kalırdı.
+        _Column("active_before_removal", "BOOLEAN"),
     ),
-    "messages": (_Column("is_flagged", "BOOLEAN", default=False),),
+    "messages": (
+        _Column("is_flagged", "BOOLEAN", default=False),
+        _Column("flag_reasons", "TEXT"),
+        _Column("reviewed_by", "INTEGER", references="users(id)"),
+        _Column("reviewed_at", "TIMESTAMP"),
+        _Column("review_note", "VARCHAR(500)"),
+        # Yönetici kaldırması ve kaldırılan metnin saklandığı yer.
+        # DİKKAT: bu sütunlar gelmeden önce kaldırılmış mesajların metni
+        # üzerine yazıldığı için geri getirilemez; yalnızca bundan sonraki
+        # kaldırmalar geri alınabilir.
+        _Column("moderation_removed", "BOOLEAN", default=False),
+        _Column("original_content", "TEXT"),
+    ),
+    "reports": (
+        # Raporu kimin, ne zaman kapattığı — eski satırlarda NULL.
+        _Column("resolved_by", "INTEGER", references="users(id)"),
+        _Column("resolved_at", "TIMESTAMP"),
+    ),
 }
 
 
@@ -124,4 +166,36 @@ def run_migrations(engine: Engine | None = None) -> list[str]:
 
     if applied:
         print(f"🛠  Şema güncellendi: {', '.join(applied)}", flush=True)
+
+    _warn_on_drift(engine)
     return applied
+
+
+def _warn_on_drift(engine: Engine) -> None:
+    """Modelde olup veritabanında olmayan sütunları açılışta yüksek sesle bildirir.
+
+    _SCHEMA elle tutulan bir listedir: modele yeni bir sütun eklenip buraya
+    yazılmazsa yerelde (create_all ile sıfırdan doğan şema) her şey çalışır,
+    ama üretimdeki eski tabloda sütun eksik kalır ve ilk istekte patlar.
+    Bu kontrol o sessiz hatayı açılışta görünür bir uyarıya çevirir.
+    """
+    from app.db import Base
+
+    inspector = inspect(engine)
+    missing: list[str] = []
+    for table_name, table in Base.metadata.tables.items():
+        if not inspector.has_table(table_name):
+            continue  # create_all bu tabloyu son hâliyle oluşturacak
+        existing = {c["name"] for c in inspector.get_columns(table_name)}
+        missing += [
+            f"{table_name}.{c.name}" for c in table.columns if c.name not in existing
+        ]
+
+    if missing:
+        print(
+            "⚠️  ŞEMA UYUŞMAZLIĞI — bu sütunlar modelde var, veritabanında yok: "
+            f"{', '.join(sorted(missing))}. app/migrate.py içindeki _SCHEMA "
+            "listesine eklenmeleri gerekiyor; aksi halde bu sütunlara dokunan "
+            "her istek hata verecek.",
+            flush=True,
+        )

@@ -28,8 +28,34 @@ MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
 # Uygulama veritabanı (ilanlar; ileride kullanıcı/eşleşme/mesaj)
 DB_PATH = DATA_DIR / "app.db"
 
-# Yönetici hesaplar (virgülle ayrılmış e-postalar). Şimdilik yalnızca
-# "Evler" sekmesinin görünürlüğünü belirler; ileride moderasyon için.
+# Yönetici hesaplar (virgülle ayrılmış e-postalar).
+#
+# Bu liste artık yalnızca "Evler" sekmesinin görünürlüğünü değil, TÜM
+# moderasyon yetkisini belirler. Buradaki bir adresle giriş yapan hesap
+# models.User.is_admin ile yönetici sayılır (ayrı bir rol sütunu ya da ikinci
+# bir doğrulama adımı YOKTUR) ve require_admin'e bağlı her uca erişir:
+#   GET  /api/reports                  ham bildirim listesi
+#   GET  /api/admin/summary            kuyruk sayaçları
+#   GET  /api/admin/reports            karar bağlamıyla bildirim kuyruğu
+#   PATCH /api/admin/reports/{id}      bildirimi kapatma / yeniden açma
+#   GET  /api/admin/users?suspended=.. kullanıcı listesi (filtre ZORUNLU;
+#                                      e-posta yalnız askıdaki hesaplar için)
+#   POST /api/admin/users/{id}/suspend   askıya alma, oturumlarını düşürme
+#   POST /api/admin/users/{id}/unsuspend askıyı kaldırma
+#   GET  /api/admin/flagged            işaretli ilan VE ÖZEL MESAJ metinleri
+#   GET  /api/admin/flagged?status=removed  kaldırılmış içerik (metinleriyle)
+#   POST /api/admin/flagged/{kind}/{id}/review  ilanı yayından kaldırma,
+#                                      mesaj metnini sabitle örtme
+#   POST /api/admin/{kind}/{id}/restore  kaldırılanı yayına geri alma
+#
+# RİSK: yetki tek başına e-posta eşleşmesine dayandığı için, bu adreslerden
+# birinin hesabını ele geçiren kişi doğrudan moderatör olur. İki sonucu var:
+#   1. Kendi dağıtımında ADMIN_EMAILS'i MUTLAKA kendi adreslerinle ez;
+#      aşağıdaki varsayılanlar bu repoda açıkça yazılı.
+#   2. DEV_OTP üretimde 0 olmalı. 1 iken /auth/request-otp doğrulama kodunu
+#      API yanıtında döndürür; buradaki bir adres için kod isteyip
+#      /auth/verify-otp'a vermek yeterlidir — şifre hiç gerekmez. Adres henüz
+#      kayıtlı değilse saldırgan önce onunla kayıt olabilir. Ayrıntı: DEPLOY.md.
 ADMIN_EMAILS = {
     e.strip().lower()
     for e in os.getenv(

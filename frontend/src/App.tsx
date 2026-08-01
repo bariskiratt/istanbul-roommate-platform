@@ -22,6 +22,7 @@ import Explore from "./pages/Explore";
 import Safety from "./pages/Safety";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,10 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/account" element={<AccountSettings />} />
+            {/* Moderasyon paneli. Sayfa kendi içinde is_admin denetler ve
+                yönetici olmayanı ana sayfaya gönderir; sunucu tarafında da
+                tüm /api/admin/* uçları require_admin ile korunuyor. */}
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

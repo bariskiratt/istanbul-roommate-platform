@@ -53,9 +53,31 @@ class User(Base):
     otp_hash: Mapped[str | None] = mapped_column(String(64))
     otp_expires: Mapped[datetime | None] = mapped_column(DateTime)
 
+    # Yönetici askıya alması. Kalıcı silme yerine geri alınabilir bir kapı:
+    # askıdaki kullanıcı giriş yapamaz ve ilanları genel listelerde görünmez,
+    # ama hiçbir verisi silinmez (is_active'e de dokunulmaz).
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    suspended_reason: Mapped[str | None] = mapped_column(String(500))
+    # Hesap verebilirlik: askıya alan yöneticinin id'si.
+    suspended_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    # Askının KALDIRILMASI da bir eylemdir ve iz bırakır (bkz. admin.py ilke 4).
+    # Eskiden askı kalkınca suspended_* alanları NULL'a çekiliyordu; geriye
+    # hiçbir kayıt kalmadığı için "bu hesap neden askıya alınmıştı, kim geri
+    # aldı" sorusu cevapsızdı. Artık gerekçe silinmez, GEÇMİŞE TAŞINIR.
+    unsuspended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    unsuspended_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Askı kalkarken suspended_reason buraya taşınır. Aktif kullanıcıda
+    # suspended_reason dolu kalsaydı arayüz yürürlükte olmayan bir gerekçeyi
+    # yürürlükteymiş gibi gösterirdi.
+    last_suspension_reason: Mapped[str | None] = mapped_column(String(500))
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
-    listings: Mapped[list["Listing"]] = relationship(back_populates="owner")
+    listings: Mapped[list["Listing"]] = relationship(
+        back_populates="owner", foreign_keys="Listing.owner_id"
+    )
 
     @property
     def is_admin(self) -> bool:
@@ -118,12 +140,41 @@ class Listing(Base):
     budget_max: Mapped[int | None] = mapped_column(Integer)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Yönetici "yayından kaldır" dediğinde True olur (is_active da False olur).
+    # Sahibin kendi kapattığı ilandan ayırt etmek için ŞART: ikisinde de
+    # is_active False'tur, ama yalnız bunu yönetici geri alabilir
+    # (POST /api/admin/listing/{id}/restore) ve yalnız bu
+    # /api/admin/flagged?status=removed kuyruğunda görünür.
+    moderation_removed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Yönetici kaldırdığı AN ilan yayında mıydı. Geri alma buraya döner.
+    #
+    # Neden gerekli: işaretlenmiş bir ilanı sahibi kendi kapatmışsa
+    # (is_active False, moderation_removed False) kayıt inceleme kuyruğunda
+    # durmaya devam eder; yönetici oradan "kaldır" derse moderation_removed
+    # True olur. Bu sütun olmadan geri alma is_active'i KOŞULSUZ True yapıyor
+    # ve sahibin kendi kapatma kararını eziyordu — ilan sahibi hiç istemeden
+    # yeniden yayına giriyordu. Artık geri alma, kaldırmadan önceki hâle
+    # döner: yayındaysa yayına, kapalıysa kapalı.
+    #
+    # NULL = bu sütun eklenmeden önce kaldırılmış eski kayıt; o kayıtlarda
+    # önceki durum bilinmiyor, geri alma eski davranışa (yayına al) düşer.
+    active_before_removal: Mapped[bool | None] = mapped_column(Boolean)
     # İçerik denetimi "flag" dediğinde işaretlenir; ilan yayında kalır ama
     # yönetici incelemesine düşer.
     is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Denetimin verdiği sebep kodları, virgülle ayrılmış ("kufur,taciz:tehdit").
+    # İşaretlemenin gerekçesi kaydedilmezse yönetici neye baktığını bilemez.
+    # Bu sütun eklenmeden önce işaretlenmiş kayıtlarda NULL kalır.
+    flag_reasons: Mapped[str | None] = mapped_column(Text)
+    # Yönetici incelemesi (temizle / yayından kaldır)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    review_note: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
-    owner: Mapped[User | None] = relationship(back_populates="listings")
+    owner: Mapped[User | None] = relationship(
+        back_populates="listings", foreign_keys=[owner_id]
+    )
 
     @property
     def owner_name(self) -> str | None:
@@ -191,13 +242,26 @@ class Message(Base):
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     content: Mapped[str] = mapped_column(Text)
+    # Yönetici "içeriği kaldır" dediğinde: mevcut content OLDUĞU GİBİ (yani
+    # şifreliyse şifreli hâliyle) buraya taşınır, content sabitle değiştirilir.
+    # "restore" metni buradan geri koyar ve alanı boşaltır. Alan doluyken
+    # yalnızca yönetici uçları okur; sohbet uçları her zaman content'i döner.
+    original_content: Mapped[str | None] = mapped_column(Text)
+    # Yönetici "içeriği kaldır" dediğinde True; "restore" ile False olur.
+    moderation_removed: Mapped[bool] = mapped_column(Boolean, default=False)
     # İçerik denetimi "flag" dediğinde işaretlenir; mesaj iletilir ama
     # yönetici incelemesine düşer.
     is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    # bkz. Listing.flag_reasons — aynı biçim (virgülle ayrılmış sebep kodları).
+    flag_reasons: Mapped[str | None] = mapped_column(Text)
+    # Yönetici incelemesi (temizle / içeriği kaldır)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    review_note: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     match: Mapped[Match] = relationship()
-    sender: Mapped[User] = relationship()
+    sender: Mapped[User] = relationship(foreign_keys=[sender_id])
 
 
 class Report(Base):
@@ -225,5 +289,8 @@ class Report(Base):
 
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     resolution_note: Mapped[str | None] = mapped_column(String(500))
+    # Hesap verebilirlik: raporu kim, ne zaman kapattı.
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    reporter: Mapped[User] = relationship()
+    reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])

@@ -220,7 +220,12 @@ const SwipeScreen = () => {
             toast.success(t("swipe.matched"), { description: t("swipe.matchedDesc") });
           }
         })
-        .catch(() => {}); // kart zaten kaydı; sessizce geç
+        // Sunucu kaydırmayı reddedebilir: ilan sahibi askıya alındıysa ya da
+        // ilan yayından kalktıysa 404 döner. Sessizce yutmak kullanıcıya
+        // kararı kaydedilmiş gibi gösteriyordu; artık sebebini görüyor.
+        .catch(err => {
+          toast.error(err instanceof Error ? err.message : t("swipe.failed"));
+        });
     }
     setSwipeDirection(direction);
     setTimeout(() => {

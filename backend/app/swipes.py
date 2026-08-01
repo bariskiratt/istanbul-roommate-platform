@@ -99,6 +99,11 @@ def _get_or_create_match(
     return match, True
 
 
+def _suspended_user_ids():
+    """Askıdaki kullanıcı id'leri — beğeni/eşleşme listelerinden elenirler."""
+    return select(models.User.id).where(models.User.is_suspended.is_(True))
+
+
 def _has_reverse_like(db: Session, from_user: int, toward_user: int) -> bool:
     """from_user, toward_user'ın herhangi bir ilanını beğenmiş mi?"""
     return db.scalar(
@@ -122,7 +127,13 @@ def swipe(
     user: models.User = Depends(get_current_user),
 ):
     listing = db.get(models.Listing, payload.listing_id)
-    if listing is None or not listing.is_active:
+    # Askıdaki sahibin ilanı listede görünmüyor; doğrudan id ile de
+    # kaydırılamamalı, aksi hâlde askı yeni eşleşme doğurur.
+    if (
+        listing is None
+        or not listing.is_active
+        or (listing.owner is not None and listing.owner.is_suspended)
+    ):
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
     if listing.owner_id == user.id:
         raise HTTPException(status_code=400, detail="Kendi ilanını kaydıramazsın.")
@@ -201,6 +212,8 @@ def received_likes(
             models.Listing.owner_id == user.id,
             models.Swipe.direction == "like",
             models.Swipe.responded.is_(False),
+            # Askıya alınan kullanıcının beğenisi kuyrukta durmaz.
+            models.Swipe.swiper_id.not_in(_suspended_user_ids()),
         )
         .order_by(models.Swipe.created_at.desc(), models.Swipe.id.desc())
     ).all()
@@ -223,12 +236,31 @@ def respond_to_like(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """Beğeniler ekranından kabul/ret. Kabul eşleşme yaratır."""
+    """Beğeniler ekranından kabul/ret. Kabul eşleşme yaratır.
+
+    Askıdaki kullanıcının beğenisi bu uçtan İŞLENEMEZ (404). Gerekçe:
+
+    - /api/swipes/received bu beğeniyi zaten listelemiyor; uç "yok" diyen
+      listeyle tutarlı davranıyor. 403 seçilmedi, çünkü 403 "senin yetkin
+      yok" demektir — oysa ilan sahibinin yetkisi var, ORTADA İŞLENECEK
+      GEÇERLİ BİR BEĞENİ YOK.
+    - Karşı tarafın askıda olduğu bilgisi sızmıyor (bkz. admin.py ilke 2-3).
+    - Kabul kadar RET de engelleniyor: askı geri alınabilir bir karardır;
+      ret responded=True yazıp beğeniyi kalıcı olarak yok etseydi, askı
+      kalktığında geri gelmesi gereken beğeni geri gelmezdi.
+
+    Eskiden bu kontrol yoktu: eski bir swipe_id ile askıdaki kullanıcıyla
+    eşleşme yaratılabiliyordu. Kullanıcı "Eşleştiniz!" yanıtı alıyor ama
+    eşleşme /api/matches'ten elendiği için hiçbir listede görünmüyordu
+    (ölü eşleşme). /api/swipes ucu (swipe) bu kontrole zaten sahipti.
+    """
     row = db.get(models.Swipe, swipe_id)
     if row is None or row.direction != "like":
         raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
     if row.listing.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Bu beğeni senin ilanına değil.")
+    if row.swiper is not None and row.swiper.is_suspended:
+        raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
 
     row.responded = True
     matched, match_id = False, None
@@ -256,7 +288,13 @@ def my_matches(
             or_(
                 models.Match.user_a_id == user.id,
                 models.Match.user_b_id == user.id,
-            )
+            ),
+            # Askıdaki karşı tarafla sohbet listede görünmez; askı kalkınca
+            # eşleşme de mesajlar da yerinde durur. Sohbetin kendisi id ile
+            # hâlâ OKUNABİLİR (geçmiş kaybolmasın), ama yeni mesaj kabul
+            # edilmez — bkz. app/messages.py send_message (403).
+            models.Match.user_a_id.not_in(_suspended_user_ids()),
+            models.Match.user_b_id.not_in(_suspended_user_ids()),
         )
         .order_by(models.Match.created_at.desc(), models.Match.id.desc())
     ).all()

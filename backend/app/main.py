@@ -21,6 +21,7 @@ from app.config import (
     NEIGHBORHOOD_GEOJSON,
     UPLOADS_DIR,
 )
+from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.db import init_db
 from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
@@ -137,6 +138,7 @@ app.include_router(swipes_router)
 app.include_router(messages_router)
 app.include_router(uploads_router)
 app.include_router(reports_router)
+app.include_router(admin_router)
 
 # Yüklenen fotoğrafların statik servisi
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -191,6 +193,7 @@ async def index():
             "/api/swipes",
             "/api/matches",
             "/api/reports",
+            "/api/admin",
         ],
     }
 

@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app import models
@@ -56,6 +56,48 @@ def _rate_limit(action: str, email: str) -> None:
             detail="Çok fazla deneme yapıldı. 15 dakika sonra tekrar dene.",
         )
     bucket.append(now)
+
+
+# Askıya alınmış hesap için verilen yanıt. Sebebi gizlemek kullanıcıyı neyi
+# düzelteceğini bilmez hâlde bırakırdı; ama sebep YALNIZCA kimliğini
+# kanıtlayana söylenir (bkz. _reject_if_suspended).
+SUSPENDED_DETAIL = "Hesabın yönetici tarafından askıya alındı."
+
+
+def _reject_if_suspended(user: models.User, *, include_reason: bool = False) -> None:
+    """Askıdaki hesabın yeni oturum açmasını engeller (403).
+
+    GEREKÇE YALNIZCA KİMLİĞİNİ KANITLAYANA GÖSTERİLİR (include_reason=True).
+
+    suspended_reason yöneticinin kendi notudur ve serbest metindir: şüphenin
+    ayrıntısını, hangi ihbara dayandığını, hatta IP/kimlik bilgisi
+    taşıyabilir. Eskiden bu not KOŞULSUZ yanıta ekleniyordu; /request-otp ve
+    /verify-otp ise kimlik doğrulamadan ÖNCE bu kontrolü çalıştırdığı için
+    yalnızca e-posta adresini bilen bir yabancı, şifre ya da kod olmadan
+    notun tamamını okuyabiliyordu:
+
+        POST /api/auth/request-otp {"email": "..."}
+        403 {"detail": "... Sebep: Dolandırıcılık şüphesi — IP Romanya"}
+
+    Bu, moderasyon notunu hedefin kendisine değil HERKESE açıyordu; üstelik
+    yöneticinin şüphesini ve bunu ihbar eden kişiyi ele verebilecek bir
+    metindi (bkz. app/config.py, ilke 2-3).
+
+    Şimdi gerekçeyi yalnızca /login döndürür — orada kontrol şifre
+    doğrulandıktan SONRA çalışır, yani karşıdaki gerçekten hesabın sahibidir.
+    Şifresiz uçlar (request-otp / verify-otp) genel cümleyle yetinir;
+    kullanıcı gerekçeyi şifresiyle giriş deneyerek öğrenir.
+
+    NOT: /verify-otp'ta askı kontrolü hâlâ kod doğrulamasından ÖNCE koşar —
+    doğru kodu bilmek askıyı delmemeli. Değişen tek şey, o yanıtın artık
+    yöneticinin notunu taşımaması.
+    """
+    if not user.is_suspended:
+        return
+    detail = SUSPENDED_DETAIL
+    if include_reason and user.suspended_reason:
+        detail = f"{detail} Sebep: {user.suspended_reason}"
+    raise HTTPException(status_code=403, detail=detail)
 
 
 # ---- kripto yardımcıları ----
@@ -247,6 +289,11 @@ def get_optional_user(
         db.commit()
         return None
 
+    # Askıya alınırken jetonlar zaten siliniyor; bu ikinci kapı, silme yarışı
+    # veya elle veritabanı müdahalesi durumunda askının delinmesini önler.
+    if row.user is not None and row.user.is_suspended:
+        return None
+
     return row.user
 
 
@@ -292,6 +339,9 @@ def request_otp(payload: EmailIn, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=404, detail="Bu e-posta kayıtlı değil. Önce kayıt ol."
         )
+    # Askıdaki hesaba kod göndermenin anlamı yok; verify-otp zaten reddedecek.
+    # Gerekçe EKLENMEZ: bu uç hiçbir kimlik doğrulaması istemiyor.
+    _reject_if_suspended(user)
 
     code = _issue_otp(user)
     response = _deliver_otp(payload.email, code)  # başarısızsa rollback
@@ -321,6 +371,8 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
             status_code=403,
             detail="Hesabın henüz doğrulanmamış. 'Kodla gir' ile e-postanı doğrula.",
         )
+    # Şifre DOĞRULANDIKTAN sonra: karşıdaki hesabın sahibi, gerekçeyi görebilir.
+    _reject_if_suspended(user, include_reason=True)
 
     token = _issue_token(db, user)
     db.commit()
@@ -332,6 +384,11 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     # 6 haneli kodun kaba kuvvetle denenmesini engeller (5 deneme / 15 dk)
     _rate_limit("verify-otp", payload.email)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
+    # Askı kontrolü koddan ÖNCE: doğru kodu bilmek askıyı delmemeli.
+    # Gerekçe EKLENMEZ: buraya kod doğrulanmadan gelinebiliyor, yani karşıdaki
+    # kişinin hesabın sahibi olduğu HENÜZ kanıtlanmadı.
+    if user is not None:
+        _reject_if_suspended(user)
     if user is None or user.otp_hash is None:
         raise HTTPException(status_code=400, detail="Önce kod iste.")
 
@@ -414,6 +471,35 @@ def change_password(
     db.commit()
 
 
+def _nullable_user_fk_columns() -> list:
+    """users.id'ye işaret eden ve NULL kabul eden TÜM sütunlar.
+
+    Liste elle tutulmaz, SQLAlchemy metadata'sından türetilir. Sebebi acı bir
+    tekrardır: reports.reporter_id için bir kez düzeltilen "hesap silinemiyor"
+    hatası, sonradan eklenen users.suspended_by / listings.reviewed_by /
+    messages.reviewed_by / reports.resolved_by sütunlarıyla aynen geri geldi
+    (yönetici tek bir moderasyon eylemi yapınca DELETE /api/auth/me
+    IntegrityError ile 500 veriyordu). Bundan sonra eklenen her nullable
+    yabancı anahtar bu süpürmeye kendiliğinden dahil olur.
+
+    NULL'a çekmek denetim izinin AKTÖRÜNÜ kaybettirir (kararın kendisi,
+    zamanı ve notu yerinde kalır). Bu bilinçli bir tercih: hesabını silme
+    hakkı, o hesabın moderasyon geçmişindeki imzasından önce gelir.
+
+    NOT NULL olan yabancı anahtarlar (swipes.swiper_id, matches.user_*_id,
+    messages.sender_id, reports.reporter_id, auth_tokens.user_id) NULL'a
+    çekilemez; onlar aşağıdaki açık silme sırasıyla temizlenir.
+    """
+    user_id_col = models.User.__table__.c.id
+    return [
+        column
+        for table in models.Base.metadata.sorted_tables
+        for column in table.columns
+        if column.nullable
+        and any(fk.column is user_id_col for fk in column.foreign_keys)
+    ]
+
+
 @router.delete("/me", status_code=204)
 def delete_account(
     payload: AccountDelete,
@@ -434,16 +520,19 @@ def delete_account(
             (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
         )
     ]
-    message_ids: list[int] = []
+    # messages.sender_id NOT NULL olduğu için kullanıcının yazdığı HER mesaj
+    # silinmek zorunda. Normalde bunların hepsi zaten kendi eşleşmelerinin
+    # içindedir; yine de match_id koşuluna güvenmiyoruz — tek bir artık satır
+    # yabancı anahtar kısıtına takılıp hesap silmeyi 500'e çevirir.
+    message_filter = models.Message.sender_id == uid
     if match_ids:
-        message_ids = [
-            m.id
-            for m in db.query(models.Message.id).filter(
-                models.Message.match_id.in_(match_ids)
-            )
-        ]
+        message_filter = message_filter | models.Message.match_id.in_(match_ids)
+    message_ids = [
+        m.id for m in db.query(models.Message.id).filter(message_filter)
+    ]
+    if message_ids:
         db.query(models.Message).filter(
-            models.Message.match_id.in_(match_ids)
+            models.Message.id.in_(message_ids)
         ).delete(synchronize_session=False)
     db.query(models.Match).filter(
         (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
@@ -492,6 +581,17 @@ def delete_account(
     db.query(models.AuthToken).filter_by(user_id=uid).delete(
         synchronize_session=False
     )
+
+    # Son adım: kullanıcıya işaret eden nullable yabancı anahtarları boşalt.
+    # Bunlar denetim izi alanlarıdır (kim askıya aldı / kim inceledi / kim
+    # raporu kapattı) ve silinen kullanıcı BAŞKALARININ satırlarında da
+    # geçebilir; temizlenmezse hesap hiç silinemez. Açık silmelerden SONRA
+    # koşar, böylece zaten silinmiş satırlar boşuna güncellenmez.
+    for column in _nullable_user_fk_columns():
+        db.execute(
+            update(column.table).where(column == uid).values({column.name: None})
+        )
+
     db.delete(user)
     db.commit()
 

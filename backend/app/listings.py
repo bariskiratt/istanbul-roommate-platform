@@ -35,13 +35,24 @@ FEATURE_FIELDS: tuple[str, ...] = (
 )
 
 
-def _moderate(title: str, description: str) -> bool:
+def _moderate(title: str, description: str) -> moderation.ModerationResult:
     """İlan metnini denetler.
 
-    "block" → 422 ile reddedilir. Dönüş değeri "işaretlensin mi" bilgisidir:
-    True ise ilan yayına girer ama is_flagged=True ile yönetici incelemesine
-    düşer.
+    "block" → 422 ile reddedilir. Sonuç nesnesi olduğu gibi döner: çağıran hem
+    `flagged` bayrağını hem de `reasons` gerekçelerini yazar. (Eskiden yalnızca
+    bool dönüyordu; gerekçeler kaybolduğu için yönetici neden işaretlendiğini
+    göremiyordu.)
     """
+    # Kullanıcı sistemin ağzından konuşamaz: yönetici kuyruğunda ilanın
+    # açıklaması olduğu gibi gösterildiği için sistem sabitleri burada da
+    # yasak (bkz. moderation.SYSTEM_MARKERS).
+    if moderation.is_system_marker(title) or moderation.is_system_marker(
+        description
+    ):
+        raise HTTPException(
+            status_code=422, detail=moderation.SYSTEM_MARKER_REJECTION
+        )
+
     result = moderation.check(f"{title}\n{description}", kind="listing")
     if result.blocked:
         raise HTTPException(
@@ -51,7 +62,29 @@ def _moderate(title: str, description: str) -> bool:
                 "İlan başlığını ve açıklamasını düzenleyip tekrar deneyin."
             ),
         )
-    return result.flagged
+    return result
+
+
+def _suspended_user_ids():
+    """Askıdaki kullanıcıların id'lerini veren alt sorgu."""
+    return select(models.User.id).where(models.User.is_suspended.is_(True))
+
+
+def _exclude_suspended_owners(stmt):
+    """Askıdaki sahibin ilanlarını sorgudan eler.
+
+    is_active'e DOKUNULMAZ: askı kalkınca ilanlar kendiliğinden geri gelir.
+    owner_id NULL olan (auth öncesi anonim) ilanlar elenmemeli; SQL'de
+    "NULL NOT IN (...)" NULL verdiği için açık OR şart.
+    """
+    return stmt.where(
+        models.Listing.owner_id.is_(None)
+        | models.Listing.owner_id.not_in(_suspended_user_ids())
+    )
+
+
+def _owner_suspended(row: models.Listing) -> bool:
+    return row.owner is not None and bool(row.owner.is_suspended)
 
 
 def _parse_features(raw: str | None) -> list[str]:
@@ -149,9 +182,12 @@ def create_listing(
     user: models.User = Depends(get_current_user),
 ):
     """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı."""
-    flagged = _moderate(payload.title, payload.description)
+    result = _moderate(payload.title, payload.description)
     row = models.Listing(
-        **payload.model_dump(), owner_id=user.id, is_flagged=flagged
+        **payload.model_dump(),
+        owner_id=user.id,
+        is_flagged=result.flagged,
+        flag_reasons=moderation.reasons_csv(result),
     )
     db.add(row)
     db.commit()
@@ -184,6 +220,8 @@ def list_listings(
         .where(models.Listing.is_active)
         .order_by(models.Listing.created_at.desc(), models.Listing.id.desc())
     )
+    # Askıdaki kullanıcının ilanları hiçbir listede görünmez.
+    stmt = _exclude_suspended_owners(stmt)
     if mine:
         if user is None:
             raise HTTPException(status_code=401, detail="Giriş yapman gerekiyor.")
@@ -217,7 +255,7 @@ def list_listings(
 @router.get("/{listing_id}", response_model=ListingOut)
 def get_listing(listing_id: int, db: Session = Depends(get_db)):
     row = db.get(models.Listing, listing_id)
-    if row is None or not row.is_active:
+    if row is None or not row.is_active or _owner_suspended(row):
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
     return row
 
@@ -233,7 +271,7 @@ def listing_fair_price(listing_id: int, db: Session = Depends(get_db)):
     from app.fairprice import estimate_for_listing  # döngüsel importu önler
 
     row = db.get(models.Listing, listing_id)
-    if row is None or not row.is_active:
+    if row is None or not row.is_active or _owner_suspended(row):
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
     if row.type != "ev_ilani" or row.rent is None:
         raise HTTPException(
@@ -307,7 +345,9 @@ def update_listing(
     new_title = updates.get("title", row.title)
     new_description = updates.get("description", row.description)
     if new_title != row.title or new_description != row.description:
-        row.is_flagged = _moderate(new_title, new_description)
+        result = _moderate(new_title, new_description)
+        row.is_flagged = result.flagged
+        row.flag_reasons = moderation.reasons_csv(result)
 
     for key, value in updates.items():
         setattr(row, key, value)
@@ -322,7 +362,13 @@ def deactivate_listing(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """Kalıcı silme yerine pasife çeker (geri alınabilir).
+    """Kalıcı silme yerine pasife çeker (satır ve veriler durur).
+
+    DÜRÜSTLÜK NOTU: satır silinmediği için veri kaybı yoktur, ama sahibin
+    kendi kapattığı ilanı YENİDEN YAYINA ALACAĞI BİR UÇ YOK — kapatma
+    kullanıcı açısından tek yönlüdür. (Yöneticinin kaldırdığı ilan ayrı bir
+    durumdur: moderation_removed=True olur ve
+    POST /api/admin/listing/{id}/restore ile geri alınır.)
 
     Yalnızca ilan sahibi kapatabilir; sahipsiz (eski anonim) kayıtlar API'den
     silinemez, gerekirse veritabanından temizlenir.

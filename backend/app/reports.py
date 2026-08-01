@@ -92,13 +92,8 @@ class ReportOut(BaseModel):
     created_at: datetime
     resolved: bool
     resolution_note: str | None
-
-
-class ReportResolveIn(BaseModel):
-    """Yönetici incelemesi sonucu."""
-
-    resolved: bool = True
-    resolution_note: str | None = Field(None, max_length=500)
+    resolved_by: int | None = None
+    resolved_at: datetime | None = None
 
 
 @router.get("/reasons", response_model=list[str])
@@ -171,20 +166,6 @@ def list_reports(
     return db.scalars(stmt.limit(limit)).all()
 
 
-@router.patch("/{report_id}", response_model=ReportOut)
-def resolve_report(
-    report_id: int,
-    payload: ReportResolveIn,
-    db: Session = Depends(get_db),
-    _admin: models.User = Depends(require_admin),
-):
-    """Raporu çözüldü/açık olarak işaretler — yalnızca yönetici."""
-    row = db.get(models.Report, report_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Rapor bulunamadı.")
-    row.resolved = payload.resolved
-    if payload.resolution_note is not None:
-        row.resolution_note = payload.resolution_note.strip() or None
-    db.commit()
-    db.refresh(row)
-    return row
+# NOT: Raporu çözme ucu buradan app/admin.py'ye TAŞINDI
+# (PATCH /api/admin/reports/{id}). Tek bir yönetici yüzeyi olsun diye iki ayrı
+# uç bırakılmadı; yeni uç ayrıca resolved_by / resolved_at yazar.

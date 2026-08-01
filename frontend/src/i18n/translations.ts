@@ -107,6 +107,7 @@ const tr = {
     "Bu ilanlara verdiğin beğen/geç kararları silinsin ve deste baştan gelsin mi? Eşleşmelerin ve mesajların silinmez.",
   "swipe.resetDone": "Deste sıfırlandı ({count} kayıt silindi).",
   "swipe.resetFailed": "Deste sıfırlanamadı.",
+  "swipe.failed": "Kararın kaydedilemedi.",
 
   // ---- adil fiyat ----
   "fair.fair": "Adil fiyat",
@@ -148,6 +149,7 @@ const tr = {
   "settings.system": "Sistem",
   "settings.account": "Hesap Bilgileri",
   "settings.privacy": "Gizlilik ve Güvenlik",
+  "settings.moderation": "Moderasyon paneli",
   "settings.logout": "Çıkış Yap",
   "settings.loggedOut": "Çıkış yapıldı",
 
@@ -240,6 +242,12 @@ const tr = {
   "chat.notFound": "Eşleşme bulunamadı",
   "chat.matchListing": "Eşleşme İlanı",
   "chat.unreadable": "Bu mesaj görüntülenemiyor.",
+  "chat.removed": "Bu mesaj moderasyon tarafından kaldırıldı.",
+  "chat.loadFailed": "Mesajlar yüklenemedi.",
+  "chat.sendFailed": "Mesaj gönderilemedi",
+  "chat.closedTitle": "Bu sohbet şu an kapalı",
+  "chat.closedDesc":
+    "Karşı taraf şu anda erişilebilir değil. Geçmiş mesajları okuyabilirsin ama yeni mesaj gönderemezsin.",
 
   // ---- raporlama ----
   "report.titleListing": "İlanı bildir",
@@ -585,6 +593,149 @@ const tr = {
   // ---- 404 ----
   "notfound.text": "Aradığın sayfa bulunamadı.",
   "notfound.home": "Ana sayfaya dön",
+
+  // ---- yönetim paneli ----
+  "admin.title": "Yönetim",
+  "admin.subtitle": "Bildirimleri ve denetimin işaretlediği içeriği buradan incele.",
+  "admin.refresh": "Yenile",
+  "admin.loadFailed": "Liste yüklenemedi.",
+  "admin.summaryFailed": "Özet yüklenemedi.",
+  "admin.openReports": "Açık bildirim",
+  "admin.flaggedListings": "İşaretli ilan",
+  "admin.flaggedMessages": "İşaretli mesaj",
+  "admin.suspendedUsers": "Askıdaki kullanıcı",
+  "admin.totalUsers": "Toplam kullanıcı",
+  "admin.activeListings": "Yayındaki ilan",
+  "admin.tabReports": "Bildirimler",
+  "admin.tabFlagged": "İşaretlenenler",
+  "admin.tabSuspended": "Askıdakiler",
+  "admin.statusOpen": "Açık",
+  "admin.statusResolved": "Çözülmüş",
+  "admin.statusAll": "Tümü",
+  "admin.flagStatusPending": "Bekleyen",
+  "admin.flagStatusRemoved": "Kaldırılanlar",
+  "admin.kindAll": "Tümü",
+  "admin.kindListing": "İlanlar",
+  "admin.kindMessage": "Mesajlar",
+  "admin.reportedBy": "Bildiren: {name}",
+  "admin.reportNote": "Bildirim notu",
+  "admin.resolutionNote": "Karar notu",
+  "admin.badgeOpen": "Açık",
+  "admin.badgeResolved": "Çözüldü",
+  "admin.badgeFlagged": "İşaretli",
+  "admin.badgeRemoved": "Kaldırıldı",
+  "admin.badgeUnpublished": "Yayında değil",
+  "admin.badgeSuspended": "Askıda",
+  "admin.badgeAdmin": "Yönetici",
+  "admin.targetListing": "İlan",
+  "admin.targetUser": "Kullanıcı",
+  "admin.targetMessage": "Mesaj",
+  "admin.targetDeleted": "Bu içerik artık yok (silinmiş).",
+  "admin.ownerLabel": "Sahibi: {name}",
+  "admin.senderLabel": "Gönderen: {name}",
+  "admin.matchLabel": "Eşleşme #{id}",
+  "admin.noUniversity": "Üniversite bilgisi yok",
+  "admin.removedContent": "[moderasyon tarafından kaldırıldı]",
+  "admin.unreadableContent": "[içerik okunamadı]",
+  "admin.flagReasonsLabel": "Denetim gerekçesi",
+  "admin.flagReasonsNone": "Gerekçe kaydedilmemiş (eski kayıt).",
+  "admin.modProfanity": "Küfür",
+  "admin.modInsult": "Hakaret",
+  "admin.modHate": "Nefret söylemi",
+  "admin.modSexual": "Cinsel içerik",
+  "admin.modHarassment": "Taciz",
+  "admin.modScam": "Dolandırıcılık",
+  "admin.modOffsite": "Site dışına yönlendirme",
+  "admin.modContact": "İletişim bilgisi",
+  "admin.actionResolve": "Çöz",
+  "admin.actionReopen": "Yeniden aç",
+  "admin.actionRemoveListing": "İlanı yayından kaldır",
+  "admin.actionRemoveMessage": "Mesajı kaldır",
+  "admin.actionSuspend": "Kullanıcıyı askıya al",
+  "admin.actionUnsuspend": "Askıyı kaldır",
+  "admin.actionClear": "Temiz",
+  "admin.actionRemove": "Kaldır",
+  "admin.actionRestore": "Geri al",
+  "admin.emptyReports": "Açık bildirim yok",
+  "admin.emptyReportsDesc": "Kuyruk temiz — şu an bekleyen bir bildirim yok.",
+  "admin.emptyReportsFiltered": "Kayıt yok",
+  "admin.emptyReportsFilteredDesc": "Bu filtrede gösterilecek bir bildirim yok.",
+  "admin.emptyFlagged": "İşaretli içerik yok",
+  "admin.emptyFlaggedDesc": "Denetimden geçmeyi bekleyen bir içerik kalmadı.",
+  "admin.emptyRemoved": "Kaldırılan içerik yok",
+  "admin.emptyRemovedDesc": "Yönetici kararıyla kaldırılmış bir içerik bulunmuyor.",
+  "admin.emptyFiltered": "Kayıt yok",
+  "admin.emptyFlaggedFilteredDesc": "Bu filtrede bekleyen bir içerik yok.",
+  "admin.emptyRemovedFilteredDesc": "Bu filtrede kaldırılmış bir içerik yok.",
+  "admin.removedAt": "Kaldırılma: {date}",
+  // Kaldırılanlar kuyruğunda, YÖNETİCİ "geri al" DEMEDEN ÖNCE gösterilir:
+  // geri alma ilanı yalnızca kaldırılmadan önceki hâline döndürür.
+  "admin.staysClosedWarn":
+    "Sahibi bu ilanı kaldırılmadan önce zaten kendi kapatmıştı. Kararı geri alman ilanı yayına sokmaz; yalnızca kaldırma kaydı düşer.",
+  // Aynı desen mesajda: özgün metin hiç saklanmamışsa "geri al" bu kayda
+  // dokunamaz. Yönetici düğmeye basmadan önce bunu görmeli.
+  "admin.textUnrecoverableWarn":
+    "Bu mesajın özgün metni saklanmamış (özgün metin saklanmaya başlamadan önce kaldırılmış). Geri alma bu kayıtta hiçbir şeyi değiştirmez; mesaj kaldırılmış kalır ve bu kuyrukta görünmeye devam eder.",
+  "admin.emptySuspended": "Askıda kullanıcı yok",
+  "admin.emptySuspendedDesc": "Şu an askıya alınmış hesap bulunmuyor.",
+  "admin.suspendedReason": "Sebep: {reason}",
+  "admin.suspendedNoReason": "Sebep belirtilmemiş.",
+  "admin.suspendedAt": "Askıya alınma: {date}",
+  "admin.dlgResolveTitle": "Bildirimi çöz",
+  "admin.dlgResolveDesc":
+    "Bildirim kapanır ve açık kuyruktan düşer. Kararını not olarak bırakabilir, sonradan yeniden açabilirsin.",
+  "admin.dlgReopenTitle": "Bildirimi yeniden aç",
+  "admin.dlgReopenDesc": "Bildirim açık kuyruğa geri döner ve karar notu silinir.",
+  "admin.dlgRemoveListingTitle": "İlanı yayından kaldır",
+  "admin.dlgRemoveListingDesc":
+    "İlan listelerde görünmez olur ama silinmez. Kayıt “Kaldırılanlar” kuyruğunda durur; kararı oradan geri alabilirsin.",
+  "admin.dlgRemoveMessageTitle": "Mesajı kaldır",
+  "admin.dlgRemoveMessageDesc":
+    "Mesajın metni sohbette görünmez olur, satır yerinde kalır. Özgün metin saklanır; kararı “Kaldırılanlar” kuyruğundan geri alabilirsin.",
+  "admin.dlgRestoreListingTitle": "İlanı yeniden yayına al",
+  "admin.dlgRestoreListingDesc":
+    "Kaldırma kararı geri alınır ve ilan kaldırılmadan önceki hâline döner. Sahibi ilanı zaten kendi kapatmışsa kapalı kalır; sahibi askıdaysa askı kalkana kadar listelerde görünmez. Gerekçeni not olarak bırakabilirsin.",
+  "admin.dlgRestoreMessageTitle": "Mesajı geri al",
+  "admin.dlgRestoreMessageDesc":
+    "Saklanan özgün metin sohbete geri konur. Metin saklanmamışsa (bu özellik eklenmeden önce kaldırılmış eski mesajlar) ya da saklanan değer artık çözülemiyorsa geri gelmez; o durumda kayıt yalnızca kuyruktan düşer ve sonuç ekranında bunu bildiririz.",
+  "admin.dlgClearTitle": "İşareti kaldır",
+  "admin.dlgClearDesc":
+    "İçerik temiz sayılır ve kuyruktan düşer. Metne dokunulmaz; yalnızca işaret kalkar ve kararın (yönetici, tarih, not) kaydedilir.",
+  "admin.dlgSuspendTitle": "Kullanıcıyı askıya al",
+  "admin.dlgSuspendDesc":
+    "Kullanıcı giriş yapamaz, açık oturumları kapanır, ilanları listelerde görünmez olur ve kimse ona yeni mesaj gönderemez. İstediğin an geri alabilirsin.",
+  "admin.dlgUnsuspendTitle": "Askıyı kaldır",
+  "admin.dlgUnsuspendDesc":
+    "Kullanıcı yeniden giriş yapabilir, yayında olan ilanları listelere geri döner ve yeniden mesaj alabilir. Yönetici kararıyla kaldırılmış ilanları kaldırılmış kalır.",
+  "admin.dlgNoteLabel": "Not (isteğe bağlı)",
+  "admin.dlgNotePlaceholder": "Kararının kısa gerekçesi.",
+  "admin.dlgReasonLabel": "Askı sebebi",
+  "admin.dlgReasonPlaceholder": "Kullanıcı giriş ekranında bu sebebi görür.",
+  "admin.dlgConfirm": "Onayla",
+  "admin.dlgWorking": "Uygulanıyor…",
+  "admin.doneResolve": "Bildirim çözüldü.",
+  "admin.doneReopen": "Bildirim yeniden açıldı.",
+  "admin.doneRemoveListing": "İlan yayından kaldırıldı.",
+  "admin.doneRemoveMessage": "Mesaj kaldırıldı.",
+  "admin.doneRestoreListing": "İlan yeniden yayında.",
+  // Kaldırma geri alındı ama ilan yayına girmedi: sahibi onu zaten kendi
+  // kapatmıştı. "Yeniden yayında" demek yalan olurdu.
+  "admin.doneRestoreListingStillClosed":
+    "Kaldırma kararı geri alındı. İlan yayına girmedi: sahibi onu kendi kapatmış.",
+  "admin.doneRestoreMessage": "Mesajın metni geri kondu.",
+  // Kayıt geri alındı (Kaldırılanlar kuyruğundan düştü) ama saklanan metin
+  // çözülemiyor — anahtar kaybolmuş ya da dönmüş. "Metin geri kondu" demek
+  // yalan olurdu.
+  "admin.doneRestoreMessageNoText":
+    "Kayıt geri alındı ama özgün metin okunamıyor: saklanan değer artık çözülemiyor.",
+  // Saklanmış metin HİÇ YOKTU: sunucu kayda dokunmadı. Burada "geri alındı"
+  // demek yalan olurdu — mesaj hâlâ kaldırılmış ve kuyrukta duruyor.
+  "admin.doneRestoreMessageUnrecoverable":
+    "Geri alınacak bir metin yok: bu mesaj, özgün metin saklanmaya başlamadan önce kaldırılmış. Kayıt değişmedi; mesaj kaldırılmış kalıyor ve Kaldırılanlar kuyruğunda görünmeye devam ediyor.",
+  "admin.doneClear": "İşaret kaldırıldı.",
+  "admin.doneSuspend": "Kullanıcı askıya alındı.",
+  "admin.doneUnsuspend": "Askı kaldırıldı.",
+  "admin.actionFailed": "İşlem tamamlanamadı",
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -691,6 +842,7 @@ const en: Record<TranslationKey, string> = {
     "Clear your like/pass decisions on these listings and start the deck over? Your matches and messages are kept.",
   "swipe.resetDone": "Deck reset ({count} decisions cleared).",
   "swipe.resetFailed": "Couldn't reset the deck.",
+  "swipe.failed": "Your decision could not be saved.",
 
   // ---- fair price ----
   "fair.fair": "Fair price",
@@ -732,6 +884,7 @@ const en: Record<TranslationKey, string> = {
   "settings.system": "System",
   "settings.account": "Account details",
   "settings.privacy": "Privacy and safety",
+  "settings.moderation": "Moderation panel",
   "settings.logout": "Log out",
   "settings.loggedOut": "Logged out",
 
@@ -824,6 +977,12 @@ const en: Record<TranslationKey, string> = {
   "chat.notFound": "Match not found",
   "chat.matchListing": "Matched listing",
   "chat.unreadable": "This message can't be displayed.",
+  "chat.removed": "This message was removed by moderation.",
+  "chat.loadFailed": "The messages could not be loaded.",
+  "chat.sendFailed": "Message not sent",
+  "chat.closedTitle": "This chat is closed for now",
+  "chat.closedDesc":
+    "The other person is not reachable right now. You can read the past messages but cannot send new ones.",
 
   // ---- reporting ----
   "report.titleListing": "Report listing",
@@ -1168,6 +1327,138 @@ const en: Record<TranslationKey, string> = {
   // ---- 404 ----
   "notfound.text": "We couldn't find that page.",
   "notfound.home": "Back to home",
+
+  // ---- moderation panel ----
+  "admin.title": "Moderation",
+  "admin.subtitle": "Review reports and anything automated moderation flagged.",
+  "admin.refresh": "Refresh",
+  "admin.loadFailed": "The list could not be loaded.",
+  "admin.summaryFailed": "The summary could not be loaded.",
+  "admin.openReports": "Open reports",
+  "admin.flaggedListings": "Flagged listings",
+  "admin.flaggedMessages": "Flagged messages",
+  "admin.suspendedUsers": "Suspended users",
+  "admin.totalUsers": "Total users",
+  "admin.activeListings": "Live listings",
+  "admin.tabReports": "Reports",
+  "admin.tabFlagged": "Flagged",
+  "admin.tabSuspended": "Suspended",
+  "admin.statusOpen": "Open",
+  "admin.statusResolved": "Resolved",
+  "admin.statusAll": "All",
+  "admin.flagStatusPending": "Pending",
+  "admin.flagStatusRemoved": "Removed",
+  "admin.kindAll": "All",
+  "admin.kindListing": "Listings",
+  "admin.kindMessage": "Messages",
+  "admin.reportedBy": "Reported by {name}",
+  "admin.reportNote": "Reporter's note",
+  "admin.resolutionNote": "Decision note",
+  "admin.badgeOpen": "Open",
+  "admin.badgeResolved": "Resolved",
+  "admin.badgeFlagged": "Flagged",
+  "admin.badgeRemoved": "Removed",
+  "admin.badgeUnpublished": "Not live",
+  "admin.badgeSuspended": "Suspended",
+  "admin.badgeAdmin": "Admin",
+  "admin.targetListing": "Listing",
+  "admin.targetUser": "User",
+  "admin.targetMessage": "Message",
+  "admin.targetDeleted": "This content no longer exists (deleted).",
+  "admin.ownerLabel": "Owner: {name}",
+  "admin.senderLabel": "Sender: {name}",
+  "admin.matchLabel": "Match #{id}",
+  "admin.noUniversity": "No university on file",
+  "admin.removedContent": "[removed by moderation]",
+  "admin.unreadableContent": "[content could not be read]",
+  "admin.flagReasonsLabel": "Moderation reasons",
+  "admin.flagReasonsNone": "No reasons recorded (older record).",
+  "admin.modProfanity": "Profanity",
+  "admin.modInsult": "Insult",
+  "admin.modHate": "Hate speech",
+  "admin.modSexual": "Sexual content",
+  "admin.modHarassment": "Harassment",
+  "admin.modScam": "Scam",
+  "admin.modOffsite": "Off-platform redirect",
+  "admin.modContact": "Contact details",
+  "admin.actionResolve": "Resolve",
+  "admin.actionReopen": "Reopen",
+  "admin.actionRemoveListing": "Unpublish listing",
+  "admin.actionRemoveMessage": "Remove message",
+  "admin.actionSuspend": "Suspend user",
+  "admin.actionUnsuspend": "Lift suspension",
+  "admin.actionClear": "Clear",
+  "admin.actionRemove": "Remove",
+  "admin.actionRestore": "Restore",
+  "admin.emptyReports": "No open reports",
+  "admin.emptyReportsDesc": "The queue is clear — nothing is waiting for you.",
+  "admin.emptyReportsFiltered": "Nothing here",
+  "admin.emptyReportsFilteredDesc": "No reports match this filter.",
+  "admin.emptyFlagged": "No flagged content",
+  "admin.emptyFlaggedDesc": "Nothing is waiting for a moderation decision.",
+  "admin.emptyRemoved": "No removed content",
+  "admin.emptyRemovedDesc": "Nothing has been taken down by a moderator.",
+  "admin.emptyFiltered": "Nothing here",
+  "admin.emptyFlaggedFilteredDesc": "No pending content matches this filter.",
+  "admin.emptyRemovedFilteredDesc": "No removed content matches this filter.",
+  "admin.removedAt": "Removed on {date}",
+  "admin.staysClosedWarn":
+    "Its owner had already closed this listing before it was taken down. Undoing the takedown will not put it back online; it only clears the removal record.",
+  "admin.textUnrecoverableWarn":
+    "The original text of this message was never stored (it was removed before originals were kept). Undoing the takedown changes nothing here: the message stays removed and keeps showing up in this queue.",
+  "admin.emptySuspended": "No suspended users",
+  "admin.emptySuspendedDesc": "No account is currently suspended.",
+  "admin.suspendedReason": "Reason: {reason}",
+  "admin.suspendedNoReason": "No reason given.",
+  "admin.suspendedAt": "Suspended on {date}",
+  "admin.dlgResolveTitle": "Resolve report",
+  "admin.dlgResolveDesc":
+    "The report closes and leaves the open queue. You can leave a note on your decision and reopen it later.",
+  "admin.dlgReopenTitle": "Reopen report",
+  "admin.dlgReopenDesc": "The report goes back to the open queue and the decision note is cleared.",
+  "admin.dlgRemoveListingTitle": "Unpublish listing",
+  "admin.dlgRemoveListingDesc":
+    "The listing disappears from every list but is not deleted. The record stays in the “Removed” queue, where you can undo this decision.",
+  "admin.dlgRemoveMessageTitle": "Remove message",
+  "admin.dlgRemoveMessageDesc":
+    "The message text stops showing in the chat while the row stays in place. The original text is kept, so you can undo this from the “Removed” queue.",
+  "admin.dlgRestoreListingTitle": "Republish listing",
+  "admin.dlgRestoreListingDesc":
+    "The takedown is undone and the listing returns to the state it was in before it was removed. If its owner had already closed it, it stays closed; if its owner is suspended, it stays hidden until the suspension is lifted. You can leave a note explaining why.",
+  "admin.dlgRestoreMessageTitle": "Restore message",
+  "admin.dlgRestoreMessageDesc":
+    "The stored original text goes back into the chat. If no text was stored (messages removed before this feature existed) or the stored value can no longer be decrypted, it does not come back; those records only leave the queue and we tell you so afterwards.",
+  "admin.dlgClearTitle": "Clear flag",
+  "admin.dlgClearDesc":
+    "The content counts as clean and leaves the queue. The text itself is untouched; only the flag is lifted and your decision (admin, time, note) is recorded.",
+  "admin.dlgSuspendTitle": "Suspend user",
+  "admin.dlgSuspendDesc":
+    "The user cannot sign in, open sessions are ended, their listings disappear from every list and nobody can send them new messages. You can undo this at any time.",
+  "admin.dlgUnsuspendTitle": "Lift suspension",
+  "admin.dlgUnsuspendDesc":
+    "The user can sign in again, their live listings come back to the lists and they can receive messages again. Listings a moderator took down stay down.",
+  "admin.dlgNoteLabel": "Note (optional)",
+  "admin.dlgNotePlaceholder": "A short reason for your decision.",
+  "admin.dlgReasonLabel": "Suspension reason",
+  "admin.dlgReasonPlaceholder": "The user sees this reason on the sign-in screen.",
+  "admin.dlgConfirm": "Confirm",
+  "admin.dlgWorking": "Applying…",
+  "admin.doneResolve": "Report resolved.",
+  "admin.doneReopen": "Report reopened.",
+  "admin.doneRemoveListing": "Listing unpublished.",
+  "admin.doneRemoveMessage": "Message removed.",
+  "admin.doneRestoreListing": "The listing is live again.",
+  "admin.doneRestoreListingStillClosed":
+    "The takedown was undone. The listing did not go live: its owner had already closed it.",
+  "admin.doneRestoreMessage": "The message text is back.",
+  "admin.doneRestoreMessageNoText":
+    "The record was restored, but the original text is unreadable: the stored value can no longer be decrypted.",
+  "admin.doneRestoreMessageUnrecoverable":
+    "There is no text to bring back: this message was removed before original texts were kept. Nothing changed — the message stays removed and keeps showing up in the Removed queue.",
+  "admin.doneClear": "Flag cleared.",
+  "admin.doneSuspend": "User suspended.",
+  "admin.doneUnsuspend": "Suspension lifted.",
+  "admin.actionFailed": "The action could not be completed",
 };
 
 export const translations = { tr, en } as const;

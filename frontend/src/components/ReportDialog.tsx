@@ -12,23 +12,12 @@ import {
   postReport,
   type ReportTargetType,
 } from "@/lib/api";
+import { reportReasonKey } from "@/lib/reportReasons";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 
 /** Sunucu `note` alanını en fazla 500 karakter kabul eder. */
 const NOTE_MAX = 500;
-
-// Sunucudan gelen sebep anahtarlarının arayüz etiketleri. Liste sunucuda
-// kapalıdır; burada karşılığı olmayan bir anahtar gelirse ham değeri basarız,
-// yani yeni bir sebep eklendiğinde arayüz kırılmaz.
-const reasonLabels: Record<string, TranslationKey> = {
-  spam: "report.reasonSpam",
-  dolandiricilik: "report.reasonScam",
-  taciz: "report.reasonHarassment",
-  uygunsuz_icerik: "report.reasonInappropriate",
-  sahte_ilan: "report.reasonFake",
-  diger: "report.reasonOther",
-};
 
 const titleKeys: Record<ReportTargetType, TranslationKey> = {
   listing: "report.titleListing",
@@ -182,7 +171,7 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
                 ) : (
                   <RadioGroup value={reason} onValueChange={setReason} className="gap-2">
                     {reasons.map(value => {
-                      const labelKey = reasonLabels[value];
+                      const labelKey = reportReasonKey(value);
                       const active = reason === value;
                       return (
                         <label

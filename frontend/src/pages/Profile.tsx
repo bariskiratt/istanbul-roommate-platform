@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Trash2, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { currentUser } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
@@ -20,26 +19,6 @@ const Profile = () => {
   const { isLoggedIn, user: me } = useAuth();
   const navigate = useNavigate();
   const { t, n, locale } = useI18n();
-
-  // Girişliyse gerçek profil; değilse AuthGate zaten kapatıyor ama render
-  // için mock iskelet kalır.
-  const user = me
-    ? {
-        name: me.name || t("messages.unnamed"),
-        university: me.university ?? "—",
-        department: me.department ?? "—",
-        year: me.year ?? 0,
-        preferredDistrict: me.preferred_districts.join(", ") || "—",
-        budgetMin: me.budget_min ?? 0,
-        budgetMax: me.budget_max ?? 0,
-        smoking: me.smoking ?? false,
-        pets: me.pets ?? false,
-        alcohol: me.alcohol ?? false,
-        sleepSchedule: (me.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
-        bio: me.bio,
-        photos: me.photos.length > 0 ? me.photos : [placeholderAvatar],
-      }
-    : currentUser;
 
   const { data: myListings = [] } = useQuery({
     queryKey: ["listings", "mine"],
@@ -67,11 +46,51 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
   const [bioExpanded, setBioExpanded] = useState(false);
 
+  // Kancalardan SONRA erken çıkışlar. Girişsizken AuthGate, oturum açıkken
+  // `me` henüz gelmemişken yükleniyor durumu basılır: bu aralıkta sahte bir
+  // profil göstermek kullanıcıya kendi bilgisiymiş gibi görünürdü.
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <AppHeader title={t("profile.title")} />
+        <AuthGate show onClose={() => {}} />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!me) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <AppHeader title={t("profile.title")} />
+        <p className="text-center text-sm text-muted-foreground py-16">{t("common.loading")}</p>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  const user = {
+    name: me.name || t("messages.unnamed"),
+    university: me.university ?? "—",
+    department: me.department ?? "—",
+    year: me.year ?? 0,
+    preferredDistrict: me.preferred_districts.join(", ") || "—",
+    budgetMin: me.budget_min ?? 0,
+    budgetMax: me.budget_max ?? 0,
+    smoking: me.smoking ?? false,
+    pets: me.pets ?? false,
+    alcohol: me.alcohol ?? false,
+    sleepSchedule: (me.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
+    bio: me.bio,
+    photos: me.photos.length > 0 ? me.photos : [placeholderAvatar],
+  };
+
   const matchCount = myMatches.length;
   const listingCount = myListings.length;
-  const memberSince = me
-    ? parseUtc(me.created_at).toLocaleDateString(locale, { month: "short", year: "numeric" })
-    : "—";
+  const memberSince = parseUtc(me.created_at).toLocaleDateString(locale, {
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -298,7 +317,6 @@ const Profile = () => {
         )}
       </div>
 
-      <AuthGate show={!isLoggedIn} onClose={() => {}} />
       <BottomNav />
     </div>
   );

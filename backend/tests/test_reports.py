@@ -171,10 +171,12 @@ def test_liste_ve_cozme_yalniz_admin(client):
         },
     ).json()["id"]
 
-    # Sıradan kullanıcı göremez / çözemez
+    # Sıradan kullanıcı göremez / çözemez.
+    # NOT: raporu çözme ucu /api/admin/reports/{id} altına taşındı
+    # (bkz. app/admin.py); tek yönetici yüzeyi bırakıldı.
     assert client.get("/api/reports", headers=reporter).status_code == 403
     assert client.patch(
-        f"/api/reports/{report_id}", headers=reporter, json={"resolved": True}
+        f"/api/admin/reports/{report_id}", headers=reporter, json={"resolved": True}
     ).status_code == 403
     assert client.get("/api/reports").status_code == 401
 
@@ -183,7 +185,7 @@ def test_liste_ve_cozme_yalniz_admin(client):
     assert [r["id"] for r in rows] == [report_id]
 
     res = client.patch(
-        f"/api/reports/{report_id}",
+        f"/api/admin/reports/{report_id}",
         headers=admin,
         json={"resolved": True, "resolution_note": "İlan kaldırıldı."},
     )

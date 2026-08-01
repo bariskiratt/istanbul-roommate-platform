@@ -402,3 +402,71 @@ def test_mesajda_hakaret_isaretlenir_ama_iletilir(ctx):
         f"/api/matches/{match_id}/messages", headers=ayse["headers"]
     ).json()
     assert msgs[-1]["content"] == "Bence bu fiyat aptalca."
+
+
+# ---- sistem sabitlerinin taklidi ----
+
+def test_sistem_sabitleri_tek_kaynaktan_okunuyor():
+    """Sabit iki yerde yazılırsa biri değişince arayüzün çevirisi bozulur.
+
+    crypto.UNREADABLE ve moderation.REMOVED_CONTENT sunucunun ürettiği,
+    dilden bağımsız işaretlerdir; arayüz onları tanıyıp kendi dilinde bir
+    karşılık basar. SYSTEM_MARKERS bu iki sabitin KENDİSİNİ taşımalı,
+    kopyasını değil.
+    """
+    from app import crypto
+
+    assert crypto.UNREADABLE in moderation.SYSTEM_MARKERS
+    assert moderation.REMOVED_CONTENT in moderation.SYSTEM_MARKERS
+    assert len(set(moderation.SYSTEM_MARKERS)) == len(moderation.SYSTEM_MARKERS)
+    # admin.py de aynı kaynaktan okumalı.
+    from app import admin
+
+    assert admin.REMOVED_CONTENT is moderation.REMOVED_CONTENT
+
+
+@pytest.mark.parametrize("marker", moderation.SYSTEM_MARKERS)
+def test_is_system_marker_tam_esitlik_arar(marker):
+    assert moderation.is_system_marker(marker)
+    assert moderation.is_system_marker(f"  {marker}\n")
+    assert moderation.is_system_marker(marker.upper())
+    # Cümle içinde geçmesi masumdur; arayüz de tam eşitlik arıyor.
+    assert not moderation.is_system_marker(f"şu yazıyor: {marker}")
+    assert not moderation.is_system_marker(marker.strip("[]"))
+    assert not moderation.is_system_marker("")
+    assert not moderation.is_system_marker(None)
+
+
+@pytest.mark.parametrize("marker", moderation.SYSTEM_MARKERS)
+def test_ilanda_sistem_sabiti_reddedilir(ctx, marker):
+    """İlan açıklaması yönetici kuyruğunda olduğu gibi gösteriliyor."""
+    client, _ = ctx
+    headers = _auth_headers(client)
+    res = client.post(
+        "/api/listings", headers=headers, json=_listing(description=marker)
+    )
+    assert res.status_code == 422, res.text
+    assert marker not in res.json()["detail"]
+
+    # Başlıkta da yasak (min_length=3 olduğu için sabitler zaten yeterince uzun).
+    assert client.post(
+        "/api/listings", headers=headers, json=_listing(title=marker)
+    ).status_code == 422
+
+
+def test_ilan_guncellemesiyle_de_sistem_sabiti_yazilamaz(ctx):
+    client, _ = ctx
+    headers = _auth_headers(client)
+    listing_id = client.post(
+        "/api/listings", headers=headers, json=_listing()
+    ).json()["id"]
+
+    res = client.patch(
+        f"/api/listings/{listing_id}",
+        headers=headers,
+        json={"description": moderation.REMOVED_CONTENT},
+    )
+    assert res.status_code == 422, res.text
+    assert client.get(f"/api/listings/{listing_id}").json()["description"] == (
+        _listing()["description"]
+    )

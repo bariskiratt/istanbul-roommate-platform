@@ -10,8 +10,20 @@ services:
     envVars:
       - key: CORS_ORIGINS
         sync: false        # Vercel adresini elle gir (ör. https://roommatch.vercel.app)
+      # GÜVENLİ TARAF: blueprint bu değeri açıkça 0 yazar.
+      # DEV_OTP=1 iken /auth/request-otp doğrulama kodunu API YANITINDA döndürür.
+      # Bu repoda yönetici e-postaları açıkça yazılı (app/config.py ADMIN_EMAILS)
+      # olduğu için, temiz bir dağıtımda değer 1 kalırsa herkes o adresle kod
+      # isteyip şifresiz yönetici olabilir. Eskiden burada `sync: false` vardı;
+      # değer panelde boş bırakılırsa auth.py'nin varsayılanı ("1") devreye
+      # giriyordu — yani unutmanın cezası açık bir yönetici paneliydi.
+      # 0 iken e-posta gönderilemezse kayıt/giriş 502 ile GÖRÜNÜR biçimde
+      # başarısız olur; sessizce güvensiz kalmaz. Önce BREVO_API_KEY + EMAIL_FROM.
+      # NOT: değer blueprint'e yazılı olduğu için sonraki blueprint eşitlemeleri
+      # panelden yapılan elle değişikliği geri alabilir. Bir dağıtımda gerçekten
+      # dev modu gerekiyorsa değeri burada değiştir. Doğrulama: DEPLOY.md §1.3.
       - key: DEV_OTP
-        sync: false        # Panelden yönetilir: e-posta servisi yokken 1, bağlanınca 0
+        value: "0"
       # Mesajların veritabanında AES-256-GCM ile şifrelenmesi için gereken anahtar.
       # Tanımlı değilse (ya da biçimi bozuksa) app/crypto.py sessizce DÜZ METİN
       # yazmaya döner — bu yüzden bu değişkenin üretimde dolu olması şart.

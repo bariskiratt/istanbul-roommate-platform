@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import moderation
 from app.db import Base, get_db
 from app.main import app
 
@@ -174,3 +175,56 @@ def test_matches_include_last_message(client):
     matches = client.get("/api/matches", headers=ayse["headers"]).json()
     assert matches[0]["last_message"] == "Son mesaj"
     assert matches[0]["last_message_at"] is not None
+
+
+# ---------------------------------------------------------------------------
+# kullanıcı, sistemin ağzından konuşamaz
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("marker", moderation.SYSTEM_MARKERS)
+def test_sistem_sabitini_taklit_eden_mesaj_reddedilir(client, marker):
+    """"[removed_by_moderation]" / "[unreadable]" kullanıcı metni olamaz.
+
+    Bu dizeler sunucunun ürettiği, DİLDEN BAĞIMSIZ işaretlerdir; arayüz
+    onları tanıyıp kendi dilinde bir SİSTEM CÜMLESİ basar. Kullanıcı aynı
+    dizeyi yazabildiğinde arayüzü kandırıp "Bu mesaj moderasyon tarafından
+    kaldırıldı." cümlesini bastırabiliyordu. Yan etkisi de vardı: yönetici
+    panelinde "Mesajı kaldır" düğmesi metin sabite eşitse gizlendiği için
+    sahte sabiti yazan kullanıcının mesajı rapor kuyruğundan kaldırılamıyordu.
+    """
+    ali, ayse, match_id = _matched_pair(client)
+    res = client.post(
+        f"/api/matches/{match_id}/messages",
+        headers=ali["headers"],
+        json={"content": marker},
+    )
+    assert res.status_code == 422, res.text
+    # Ret metni sabitin kendisini içermez; yoksa doğru yazımı öğretirdik.
+    assert marker not in res.json()["detail"]
+    assert client.get(
+        f"/api/matches/{match_id}/messages", headers=ali["headers"]
+    ).json() == []
+
+
+@pytest.mark.parametrize("marker", moderation.SYSTEM_MARKERS)
+def test_bosluk_ve_buyuk_harfle_kacis_da_reddedilir(client, marker):
+    """Kırpma ve büyük/küçük harf farkı korumayı atlatmamalı."""
+    ali, ayse, match_id = _matched_pair(client)
+    for variant in (f"  {marker} ", marker.upper()):
+        res = client.post(
+            f"/api/matches/{match_id}/messages",
+            headers=ali["headers"],
+            json={"content": variant},
+        )
+        assert res.status_code == 422, (variant, res.text)
+
+
+def test_sabit_cumle_icinde_gecerse_engellenmez(client):
+    """Yanlış pozitif olmasın: arayüz TAM EŞİTLİK arıyor, cümleyi değil."""
+    ali, ayse, match_id = _matched_pair(client)
+    res = client.post(
+        f"/api/matches/{match_id}/messages",
+        headers=ali["headers"],
+        json={"content": "Mesajın bende [unreadable] görünüyor, tekrar yazar mısın?"},
+    )
+    assert res.status_code == 201, res.text

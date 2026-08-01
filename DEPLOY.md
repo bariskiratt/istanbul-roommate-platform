@@ -18,6 +18,9 @@ them together.
 5. Verify the message encryption key — see section 1.1. **Do this before real
    users start chatting**, otherwise messages are written to the database in
    plain text.
+6. Verify that `DEV_OTP` is `0` and that `ADMIN_EMAILS` holds *your* addresses —
+   see section 1.3. **Do this before the frontend goes public.** Getting it
+   wrong hands the moderation panel to anyone who knows an admin address.
 
 Notes:
 - **Photos:** the free plan has no persistent disk — uploaded photos are
@@ -92,8 +95,8 @@ Environment → `MESSAGE_KEY` into a password manager.
 Rule-based moderation (`app/moderation.py`) runs on every listing and every
 message and needs no configuration — it is always on. Blocked text is rejected
 with 422; borderline text is published but marked `is_flagged` in the database.
-Those flagged rows are not surfaced anywhere yet — user reports (section 4) are
-the only review queue with an endpoint today.
+Flagged rows and user reports both surface in the admin moderation panel —
+see section 1.4.
 
 An optional AI layer (`app/moderation_ai.py`) is enabled **only** if
 `ANTHROPIC_API_KEY` is set. Before enabling it, note that it sends the **full
@@ -101,6 +104,127 @@ text of every listing and message** to `api.anthropic.com` synchronously
 (5-second timeout per call). That is a third-party data transfer: if you turn
 it on, your privacy policy / KVKK notice must say so. Leave the variable unset
 to keep all moderation local.
+
+### 1.3) `DEV_OTP` — the one variable that can hand over the admin panel
+
+> **`DEV_OTP=1` in production is a full account-takeover path, and it takes no
+> password.** With `DEV_OTP=1`, `POST /auth/request-otp` returns the six-digit
+> sign-in code in the API response body (field `dev_code`). Feed that code to
+> `POST /auth/verify-otp` and you hold a session token for that address. The
+> admin addresses are **written in the repository** (`backend/app/config.py`,
+> `ADMIN_EMAILS`), so anyone reading the source can pick one, ask for its code,
+> and land in the moderation panel — reading flagged private messages,
+> suspending users and taking listings down. If the address is not registered
+> yet, the attacker simply registers it first and then verifies it the same way.
+
+Why this is called out separately: the application default in
+`backend/app/auth.py` is `DEV_OTP=1` (development convenience), so **forgetting
+the variable is the unsafe outcome, not the safe one**. `render.yaml` therefore
+pins `DEV_OTP` to `"0"` explicitly instead of leaving it to be filled in from
+the dashboard, so a clean blueprint deploy starts closed. Do not weaken that
+back to a dashboard-managed value.
+
+Two consequences of `DEV_OTP=0` to expect:
+
+- Sign-up and code sign-in **need working email**. With no `BREVO_API_KEY` /
+  `EMAIL_FROM`, OTP delivery fails and the endpoint returns **502** instead of
+  quietly handing out the code. Visible breakage is the intended trade — set up
+  Brevo (section 4) before opening the site to users.
+- Password sign-in (`POST /auth/login`) does not involve OTP and keeps working
+  for already-verified accounts.
+
+**Verification (required, after the first deploy and after any env change).**
+Against the deployed API, with an address that exists:
+
+```bash
+curl -s -X POST https://YOUR-API/auth/request-otp \
+  -H 'Content-Type: application/json' -d '{"email":"you@example.com"}'
+```
+
+- Response contains **no** `dev_code` field → `DEV_OTP` is off. Correct.
+- Response contains `dev_code` → **stop and fix it now**: Render →
+  `roommatch-api` → Environment → set `DEV_OTP=0`, save, wait for the redeploy,
+  run the check again. Treat every admin account as compromised for the period
+  the value was `1`.
+
+While you are there, confirm `ADMIN_EMAILS` is set to your own addresses. Unset
+means the two project addresses baked into `config.py` stay in force on *your*
+deployment.
+
+### 1.4) Admin moderation panel
+
+**What it is.** `/api/admin/*` (`backend/app/admin.py`), surfaced in the
+frontend at `/admin`: a dashboard summary, the user-report queue, a queue of
+content the automatic checker flagged, a queue of the content admins removed,
+and user suspension.
+
+**Who gets in.** Any account whose email is in `ADMIN_EMAILS` — that single
+match is the whole authorization check (`models.User.is_admin`). There is no
+separate admin role, password or second factor, which is why section 1.3
+matters so much. Every endpoint is guarded server-side (`require_admin`: 401
+without a session, 403 for non-admins); hiding the UI is not what protects it.
+
+**What an admin can see.** Reported and flagged rows including the **plaintext
+of private messages** that were flagged or reported (decrypted for review, just
+that message and not the surrounding conversation — if the key that encrypted
+it is gone, the admin sees the same placeholder as everybody else, see section
+1.1) and the reporter's identity.
+The reporter is never shown to the person they reported. `/api/admin/users`
+requires an explicit `suspended=true|false` filter — there is no call that dumps
+the whole user base — and it returns an email address only for suspended
+accounts, since that is the only screen where one is needed.
+
+**The suspension reason is a moderator note, and only the account owner reads
+it.** `suspended_reason` is free text: it can name the suspicion, the report it
+came from, even an IP. It is returned in a login error **only after the password
+has been verified** (`POST /api/auth/login`), so the reader has proved the
+account is theirs. The endpoints that take no credential — `POST
+/api/auth/request-otp` and `POST /api/auth/verify-otp`, which reject suspended
+accounts before any code is checked — answer with the bare sentence
+"Hesabın yönetici tarafından askıya alındı." and never the note. Knowing
+somebody's email address must not be enough to read what a moderator wrote
+about them.
+
+**Which actions can be undone — read before deciding.** No `/api/admin/*`
+endpoint deletes a row: a removal flips a flag, and every removal has a
+matching restore. Row deletion does exist elsewhere in the API —
+`DELETE /api/auth/me` erases the account together with its listings, messages,
+matches and reports — but that is the user's own action, it is not a moderation
+tool, and it cannot be undone from the panel.
+
+| Action | Undo |
+|---|---|
+| Suspend a user | **Yes** — `POST /api/admin/users/{id}/unsuspend`. Listings come back untouched (suspension hides them but never changes `is_active`). Suspending drops the user's active sessions. |
+| Resolve a report | **Yes.** Reopening puts it back in the queue and clears the whole resolution — note, decider and timestamp — so a reopened report carries no trace of the reverted decision. |
+| Clear a flag | Content is left exactly as it is, but the row leaves the review queue and there is no endpoint to flag it again by hand. Reviewer, timestamp and note are recorded on the row. |
+| Take a listing down | **Yes** — `POST /api/admin/listing/{id}/restore` puts `is_active` back to the value the listing had at the moment of removal, which the takedown saved in `active_before_removal`. For a listing that was live, that is `True`. While it is down the listing is gone from search, from the owner's own list and from its detail URL (404), but it stays findable for review at `GET /api/admin/flagged?status=removed`. |
+| Remove a message | **Yes** — `POST /api/admin/message/{id}/restore`. The row never moves, and the original text is *moved* to `original_content` rather than overwritten, so restore writes that saved value back unchanged. Two cases where the text still does not come back — see the limits below. |
+
+Four limits worth knowing before you rely on this:
+
+- Restore only reverses an **admin** removal. Content that is not
+  `moderation_removed` — a listing the owner closed themselves, for instance —
+  is refused with 400.
+- Restore undoes the removal; it does not force content online. A flagged
+  listing stays in the pending queue even after its owner closes it, so an
+  admin can take down a listing that was already closed. Restoring that one
+  returns it to the state it was in — still closed — and the response reports
+  the outcome in `is_active`. That is how a user's own decision survives an
+  admin removal; read the field instead of assuming the listing is live again.
+  Listings taken down **before** `active_before_removal` existed have no saved
+  state, so restore publishes those unconditionally.
+- Restore hands back the **stored** text, not necessarily a readable one. If
+  `MESSAGE_KEY` was lost or replaced between removal and restore, the row comes
+  back as the `[unreadable]` placeholder (section 1.1) even though the response
+  says `content_restored: true` — that field only reports that saved text
+  existed.
+- Messages removed **before** the `original_content` column existed have no
+  saved text at all. Restore clears `moderation_removed` and answers
+  `content_restored: false`, but the marker text stays, so the reader still
+  sees a removed message. The row also leaves
+  `GET /api/admin/flagged?status=removed` at that point and a second restore
+  returns 400, which puts it out of reach of the panel — leave those rows in
+  the removed queue unless you have a reason not to.
 
 ## 2) Frontend — Vercel
 
@@ -119,16 +243,20 @@ to keep all moderation local.
 - [ ] Sign-up flow works (in dev mode the OTP appears in a toast)
 - [ ] `crypto.key_available()` returns `True` in Render Shell (section 1.1)
 - [ ] `MESSAGE_KEY` is backed up outside Render
+- [ ] **`DEV_OTP=0` verified** — `/auth/request-otp` returns no `dev_code`
+      field on the deployed API (section 1.3)
+- [ ] `ADMIN_EMAILS` is set to your own addresses, not the repo defaults
+- [ ] `/admin` returns 403 for a normal account and loads for an admin one
 
 ## 4) Known gaps before launch
 
 | Topic | Status |
 |---|---|
-| OTP email | Brevo integration is ready (`app/emailer.py`). To activate: create a Brevo account → verify your sender address → get an API key → set on Render: `BREVO_API_KEY`, `EMAIL_FROM`, `DEV_OTP=0`. Until those are set, keep `DEV_OTP=1`. |
+| OTP email | Brevo integration is ready (`app/emailer.py`). To activate: create a Brevo account → verify your sender address → get an API key → set on Render: `BREVO_API_KEY`, `EMAIL_FROM`. Until those are set, OTP sign-in returns 502 on a correctly configured deployment (`DEV_OTP=0`) — do **not** "fix" that by setting `DEV_OTP=1` on a public deployment, see section 1.3. |
 | Photo storage | Local disk; persistent storage (R2/S3) is needed. |
 | Rate limiting | Auth endpoints are limited to 5 requests per 15 min per email, but the counter lives **in process memory**: it resets on restart and is not shared between instances. Other endpoints are unlimited. |
 | Message encryption | At rest only, and only while `MESSAGE_KEY` is set correctly (section 1.1). Not end-to-end. |
-| Moderation | Rule-based and therefore bypassable; the AI layer is optional and off by default. Reports (`/api/reports`) are reviewed manually by `ADMIN_EMAILS`. |
+| Moderation | Rule-based and therefore bypassable; the AI layer is optional and off by default. Reports and flagged content are reviewed by hand in the admin panel (section 1.4) by accounts listed in `ADMIN_EMAILS` — no automatic enforcement, and no appeal flow for the person acted on. Every removal has an undo, within the limits in section 1.4. Undoing keeps no history: reopening a report or lifting a suspension clears the reverted decision rather than recording it. |
 | Sleep mode | `.github/workflows/keepalive.yml` pings the API every 10 minutes to keep the free service awake. |
 
 ## Environment variables (backend)
@@ -137,13 +265,13 @@ to keep all moderation local.
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection (Render supplies it automatically). Unset → local SQLite file. |
 | `CORS_ORIGINS` | localhost list | Comma-separated allowed origins. Unset → only localhost may call the API, so the deployed frontend gets CORS errors. |
-| `DEV_OTP` | `1` | `1`: the OTP code is returned in the API response (development). Set to `0` in production once email works, otherwise anyone can sign in as any address. |
+| `DEV_OTP` | `1` in code, **`0` from `render.yaml`** | `1`: the sign-in code is returned in the API response (`dev_code`) — development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. The unsafe value is the code-level default, so never leave this variable unset on a public deployment. See section 1.3. |
 | `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → **messages are stored in plain text** and only a log warning is printed. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
 | `ANTHROPIC_API_KEY` | — | Enables the optional AI moderation layer. Unset → rule-based moderation only (still fully functional). Set → the full text of every listing and message is sent to `api.anthropic.com`, which must be disclosed to users. |
 | `BREVO_API_KEY` | — | Brevo API key (real OTP emails). Unset → no email is sent; only dev-mode OTP works. |
 | `EMAIL_FROM` | — | Sender address verified in Brevo. Email sending requires both this and `BREVO_API_KEY`. |
 | `EMAIL_FROM_NAME` | `evdes.tr` | Display name on outgoing OTP emails. Unset → the default name is used; nothing breaks. |
-| `ADMIN_EMAILS` | two project addresses | Comma-separated admin accounts: they see the report queue and the admin-only views. Unset → the built-in defaults stay in effect, so set it explicitly for your own deployment. |
+| `ADMIN_EMAILS` | two project addresses | Comma-separated admin accounts. Membership in this list *is* the authorization check for the whole moderation panel — report queue, flagged private message text, user suspension, listing takedown (section 1.4). Unset → the defaults written in `config.py` stay in effect, so always set it explicitly for your own deployment. |
 | `UPLOADS_DIR` | `data/uploads` | Directory photos are written to. Unset → a path inside the container, i.e. photos are lost on redeploy. |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |

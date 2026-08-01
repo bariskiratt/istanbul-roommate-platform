@@ -6,6 +6,11 @@ import type { TranslationKey } from "@/i18n/translations";
 
 // Not: /notifications kaldırıldı — Beğeniler ile birebir aynı veriyi
 // gösteriyordu. Yerine uygulama içinden erişilemeyen Bütçe Haritası girdi.
+//
+// Not (moderasyon paneli): /admin bilerek buraya EKLENMEDİ. Yöneticide menü
+// zaten 6 sekmeye çıkıyor; 320 px genişlikte (px-6 kenar boşluğuyla 272 px)
+// 7. sekme başına ~39 px düşer ve 10 px'lik etiketler ("Mesajlar", "Yönetim")
+// sığmayıp taşar. Panel girişi Ayarlar'da (Settings.tsx), yalnızca yöneticide.
 const navItems: { icon: typeof Home; labelKey: TranslationKey; path: string; adminOnly?: boolean }[] = [
   { icon: Home, labelKey: "nav.discover", path: "/swipe" },
   { icon: Heart, labelKey: "nav.likes", path: "/matches" },

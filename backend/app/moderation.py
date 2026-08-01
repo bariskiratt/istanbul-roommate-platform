@@ -43,6 +43,11 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Literal
 
+# Tek kaynak ilkesi: "okunamayan içerik" işaretini crypto tanımlar, burada
+# yeniden yazılmaz. (app.crypto yalnızca standart kütüphaneye bağlıdır;
+# bu import modülün saflığını bozmaz ve döngü yaratmaz.)
+from app.crypto import UNREADABLE
+
 Kind = Literal["listing", "message"]
 Action = Literal["allow", "flag", "block"]
 
@@ -747,6 +752,68 @@ _MESSAGES: dict[str, str] = {
     SITE_DISI: "site dışına yönlendirme",
     ILETISIM: "iletişim bilgisi paylaşımı",
 }
+
+
+# Yönetici bir mesajı "kaldır" ile incelediğinde satır SİLİNMEZ (sohbet akışı
+# bozulmasın); yalnızca içerik bu sabitle değiştirilir.
+#
+# DİLDEN BAĞIMSIZ bir işarettir, kullanıcıya gösterilecek metin DEĞİLDİR:
+# arayüz bu sabiti tanıyıp kendi dilinde bir karşılık basar (bkz. i18n ve
+# crypto.UNREADABLE'da aynı desen). Değeri değiştirmek arayüzün çevirisini bozar.
+# Şifrelenmeden düz yazılır — crypto.decrypt "enc:v1:" ile başlamayan değeri
+# olduğu gibi döndürdüğü için sabit istemciye bozulmadan ulaşır.
+REMOVED_CONTENT = "[removed_by_moderation]"
+
+# Sunucunun ürettiği, arayüzün SİSTEM METNİ olarak bastığı dilden bağımsız
+# işaretlerin TAMAMI. Tek kaynak burasıdır: crypto.UNREADABLE buraya
+# import edilir, admin.py REMOVED_CONTENT'i buradan okur.
+#
+# Neden gerekli: kullanıcı içeriğine bu dizelerden birini yazmak, arayüzü
+# kandırıp "Bu mesaj moderasyon tarafından kaldırıldı." / "Bu mesaj
+# okunamıyor." cümlesini bastırıyordu — yani kullanıcı sistemin ağzından
+# konuşabiliyordu. Ayrıca yönetici panelinde "Mesajı kaldır" düğmesi metin
+# sabite eşitse gizlendiği için sahte sabiti yazan kullanıcının mesajı
+# rapor kuyruğundan kaldırılamıyordu. Yazma anında reddediliyor.
+SYSTEM_MARKERS: tuple[str, ...] = (REMOVED_CONTENT, UNREADABLE)
+
+_SYSTEM_MARKERS_FOLDED = frozenset(marker.casefold() for marker in SYSTEM_MARKERS)
+
+# Kullanıcıya gösterilen ret metni. Sabitin kendisini İÇERMEZ: hata mesajına
+# yazsaydık kullanıcıya doğru yazımı öğretmiş olurduk.
+SYSTEM_MARKER_REJECTION = (
+    "Bu metin sistemin kendi kullandığı bir işaretle aynı; "
+    "başka bir şey yazman gerekiyor."
+)
+
+
+def is_system_marker(text: str | None) -> bool:
+    """Kullanıcı girdisi sistem sabitlerinden birini taklit ediyor mu.
+
+    Yalnızca metnin TAMAMI sabite eşitse True döner. Cümle içinde geçmesi
+    ("mesajım [unreadable] görünüyor") masumdur ve arayüzü kandırmaz —
+    arayüz tam eşitlik arar.
+    """
+    if not text:
+        return False
+    return text.strip().casefold() in _SYSTEM_MARKERS_FOLDED
+
+
+def reasons_csv(result: ModerationResult) -> str | None:
+    """İşaretleme gerekçelerini tek sütuna yazılacak biçime getirir.
+
+    Sebep kodları ("kufur", "dolandiricilik:iban_aciliyet") virgülle birleşir.
+    İçerik işaretlenmediyse None döner — temiz kayıtta gerekçe saklanmaz.
+    """
+    if not result.flagged or not result.reasons:
+        return None
+    return ",".join(result.reasons)
+
+
+def split_reasons(raw: str | None) -> list[str]:
+    """flag_reasons sütunundaki virgüllü dizeyi listeye çevirir."""
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 def describe(reasons: list[str]) -> str:

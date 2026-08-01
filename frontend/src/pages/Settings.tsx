@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, User, LogOut, ChevronRight, Sun, Moon, Monitor, Languages } from "lucide-react";
+import { ArrowLeft, Lock, User, LogOut, ChevronRight, Sun, Moon, Monitor, Languages, ShieldAlert } from "lucide-react";
 import { useTheme } from "next-themes";
 import BottomNav from "@/components/layout/BottomNav";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { useI18n, type Lang } from "@/i18n";
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { t, lang, setLang } = useI18n();
 
@@ -23,7 +23,18 @@ const Settings = () => {
     { value: "en", label: "English" },
   ];
 
-  const items = [
+  // Moderasyon paneli yalnızca yöneticiye görünür. Alt menüye değil buraya
+  // konuldu: alt menü yöneticide zaten 6 sekmeye çıkıyor, 7.'si dar ekranda
+  // taşıyor (bkz. BottomNav.tsx notu).
+  const items: {
+    icon: typeof User;
+    label: string;
+    action: () => void;
+    destructive?: boolean;
+  }[] = [
+    ...(user?.is_admin
+      ? [{ icon: ShieldAlert, label: t("settings.moderation"), action: () => navigate("/admin") }]
+      : []),
     { icon: User, label: t("settings.account"), action: () => navigate("/settings/account") },
     { icon: Lock, label: t("settings.privacy"), action: () => navigate("/safety") },
     {
