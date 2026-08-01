@@ -1,68 +1,59 @@
-"""Kira tahminlerini bugüne taşıyan endeksleme.
+"""Kira tahminlerini bugüne taşıyan TÜFE endekslemesi.
 
-Eğitim verisinin fiyat düzeyi 2025 Şubat'tır. CSV'de tarih kolonu yoktur;
-dönem veri setinin toplandığı tarihe dayanır (DATA_PERIOD). Model o dönemin
-liralarıyla konuşur, kullanıcıya bugünün düzeyiyle göstermek gerekir.
+Eğitim verisinin fiyat düzeyi 2025 Şubat'tır (DATA_PERIOD). CSV'de tarih
+kolonu yoktur; dönem veri setinin toplandığı tarihe dayanır. Model o dönemin
+liralarıyla konuşur, kullanıcıya bugünün düzeyiyle gösterilmesi gerekir.
 
-YÖNTEM — neden aylık yüzde değil, endeks SEVİYESİ:
-Önceki sürüm aylık TÜFE yüzdelerini tek tek tabloya yazıp çarpıyordu. Bu
-yaklaşım iki yönden kırılgan: (1) her ay elle bir satır eklenmesi gerekir ve
-unutulursa tahminler sessizce geride kalır, (2) on sekiz ayı tek tek girmek
-hem hataya açıktır hem de sonucu doğrulamak zordur. Bunun yerine iki endeks
-seviyesi kullanılır ve çarpan tek bölmeyle bulunur:
+ÇARPAN NASIL BULUNDU (TÜİK haber bültenleri, doğrulanabilir):
 
-    çarpan = ENDEKS[bugün] / ENDEKS[DATA_PERIOD]
+TÜİK endeksi 2025'te yeniden tabanlandı — Şubat 2025 bülteni 2003=100,
+Haziran 2026 bülteni 2025=100 kullanıyor. Bu yüzden iki bültenin endeks
+SEVİYELERİ doğrudan bölünemez; oranlar zincirlenir:
 
-İki sayı da TÜİK'ten doğrudan okunur ve sonuç kolayca denetlenir.
+    Şubat 2025,  Aralık 2024'e göre        : +%7,42   (Sayı 54177)
+    Haziran 2025, Aralık 2024'e göre       : +%16,67  (Sayı 58289, karşılaştırma sütunu)
+    Haziran 2026, Haziran 2025'e göre      : +%32,11  (Sayı 58289)
 
-HANGİ ENDEKS: Konut kirası, Türkiye'de genel TÜFE'den belirgin biçimde hızlı
-artmıştır; manşet TÜFE kullanmak kiraları olduğundan düşük gösterir. Bu yüzden
-TÜFE'nin "gerçek kira" alt kalemi tercih edilmelidir (TÜİK veri portalı →
-Tüketici Fiyat Endeksi → madde bazında endeks).
+    Şubat 2025 → Haziran 2025 = 1,1667 / 1,0742 = 1,086111
+    Şubat 2025 → Haziran 2026 = 1,086111 × 1,3211 = 1,434861
 
-YAPILANDIRILMAMIŞSA: çarpan 1.0'dır ve tahminler DATA_PERIOD düzeyinde kalır.
-Bu durum API yanıtında `indexed: false` ile bildirilir ve arayüz "endekslenmedi"
-yazar — sessizce yanlış fiyat göstermek yerine görünür biçimde eksik kalır.
+ÖNEMLİ SINIR — bu rakam kira artışını MUHTEMELEN OLDUĞUNDAN DÜŞÜK gösterir:
+manşet TÜFE kullanılıyor, oysa konut ana grubu Haziran 2026'da yıllık %45,14
+artmış (manşet %32,11), Şubat 2025'te ise %70,81'di. Ayrıca TÜİK'in kira
+kalemi mevcut kiracıların ödediği kirayı ölçer; bunlar yıllarca yasal artış
+tavanına tabiydi. Bizim veri setimiz ise İLAN (istenen) kiralarıdır ve
+tavandan bağımsız hareket eder. Yani buradaki çarpan bir alt sınır sayılmalı.
+Elinde daha iyi bir piyasa verisi varsa RENT_INDEX_FACTOR ile ez.
+
+GÜNCELLEME: her yeni TÜİK bülteninde MONTHLY_AFTER_ANCHOR'a tek satır ekle
+(bültenin ilk sayfasındaki "bir önceki aya göre" oranı). Taban değişmediği
+sürece çıpayı yeniden hesaplamak gerekmez.
 """
 
 import os
 
-# Eğitim verisinin fiyat düzeyi (yıl-ay). Veri setinin toplandığı dönem.
+# Eğitim verisinin fiyat düzeyi (yıl-ay).
 DATA_PERIOD = "2025-02"
 
-# TÜİK endeks seviyeleri (aylık yüzde DEĞİL, endeksin kendisi).
-# En az iki giriş gerekir: DATA_PERIOD ve en güncel ay.
-#
-#   RENT_INDEX = {
-#       "2025-02": <TÜİK endeksi>,
-#       "2026-07": <TÜİK endeksi>,
-#   }
-#
-# Boş bırakıldığı sürece endeksleme yapılmaz (bkz. modül başlığı).
-RENT_INDEX: dict[str, float] = {}
+# Yukarıdaki zincirlemeyle bulunan çıpa: DATA_PERIOD → ANCHOR_PERIOD.
+ANCHOR_PERIOD = "2026-06"
+ANCHOR_FACTOR = 1.434861
 
-_warned = False
-
-
-def _warn_once(message: str) -> None:
-    global _warned
-    if not _warned:
-        print(message, flush=True)
-        _warned = True
+# ANCHOR_PERIOD'dan SONRAKİ aylar (%, bir önceki aya göre; TÜİK bülteni).
+# Örn. Temmuz 2026 bülteni çıkınca:  "2026-07": <aylık oran>
+MONTHLY_AFTER_ANCHOR: dict[str, float] = {}
 
 
 def is_configured() -> bool:
     """Endeksleme yapılabilir durumda mı?"""
-    if os.getenv("RENT_INDEX_FACTOR"):
-        return True
-    return DATA_PERIOD in RENT_INDEX and len(RENT_INDEX) >= 2
+    return bool(os.getenv("RENT_INDEX_FACTOR")) or ANCHOR_FACTOR > 0
 
 
 def rent_index() -> tuple[float, str]:
     """(çarpan, endekslenen dönem) döndürür.
 
     RENT_INDEX_FACTOR ortam değişkeni verilirse tablo yerine o kullanılır —
-    tabloya dokunmadan acil düzeltme ya da testte sabitleme için.
+    koda dokunmadan acil düzeltme ya da testte sabitleme için.
     """
     override = os.getenv("RENT_INDEX_FACTOR")
     if override:
@@ -71,15 +62,10 @@ def rent_index() -> tuple[float, str]:
         except ValueError:
             pass  # bozuk değer /api/estimate'i düşürmesin; tabloya dön
 
-    base = RENT_INDEX.get(DATA_PERIOD)
-    if not base:
-        _warn_once(
-            "⚠️  Kira endeksi yapılandırılmamış — tahminler "
-            f"{DATA_PERIOD} fiyat düzeyinde kalıyor ve bugünkü kiraların "
-            "altında görünecek. app/indexing.py içindeki RENT_INDEX tablosuna "
-            "TÜİK endeks seviyelerini girin."
-        )
-        return 1.0, DATA_PERIOD
-
-    latest = max(RENT_INDEX)
-    return RENT_INDEX[latest] / base, latest
+    factor = ANCHOR_FACTOR
+    last = ANCHOR_PERIOD
+    for month in sorted(MONTHLY_AFTER_ANCHOR):
+        if month > ANCHOR_PERIOD:
+            factor *= 1 + MONTHLY_AFTER_ANCHOR[month] / 100
+            last = month
+    return factor, last

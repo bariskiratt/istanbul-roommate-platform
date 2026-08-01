@@ -1,8 +1,7 @@
 """Kira endeksi çarpanı testleri.
 
-Çarpan iki endeks seviyesinin oranıdır (bkz. app/indexing.py). Buradaki
-testler hem oranın doğru hesaplandığını hem de tablo boşken ürünün SESSİZCE
-eski fiyat düzeyini sunmadığını (indexed=False ile bildirdiğini) doğrular.
+Çarpan, TÜİK bültenlerinden zincirlenerek bulunan bir çıpa (ANCHOR_FACTOR) ve
+çıpadan sonraki aylık oranların çarpımıdır (bkz. app/indexing.py).
 """
 
 import pytest
@@ -14,77 +13,74 @@ from app.indexing import is_configured, rent_index
 @pytest.fixture(autouse=True)
 def _temiz_ortam(monkeypatch):
     monkeypatch.delenv("RENT_INDEX_FACTOR", raising=False)
-    monkeypatch.setattr(indexing, "_warned", False)
 
 
-def test_carpan_iki_endeks_seviyesinin_orani(monkeypatch):
-    monkeypatch.setattr(
-        indexing, "RENT_INDEX", {indexing.DATA_PERIOD: 200.0, "2026-07": 250.0}
-    )
+def test_cipa_tuik_bultenlerinden_zincirlenen_degerle_ayni():
+    """Çıpa, bültenlerdeki üç orandan yeniden hesaplanabilmeli.
 
-    factor, indexed_to = rent_index()
-
-    assert factor == pytest.approx(1.25)
-    assert indexed_to == "2026-07"
-    assert is_configured()
-
-
-def test_en_guncel_ay_kullanilir(monkeypatch):
-    monkeypatch.setattr(
-        indexing,
-        "RENT_INDEX",
-        {indexing.DATA_PERIOD: 100.0, "2025-08": 130.0, "2026-07": 180.0},
-    )
-
-    factor, indexed_to = rent_index()
-
-    assert factor == pytest.approx(1.80)
-    assert indexed_to == "2026-07"
-
-
-def test_tablo_bosken_endeksleme_yapilmaz_ve_bildirilir(monkeypatch, capsys):
-    """Yapılandırılmamışken çarpan 1.0 kalır ve durum görünür olur.
-
-    Sessizce 1.0 dönmek, tahminleri aylarca eski fiyat düzeyinde bırakıp
-    kullanıcıya doğruymuş gibi göstermek demekti.
+    Sayı ileride elle değiştirilirse (ör. yanlış birim girilirse) bu test
+    kaynağa dönmeye zorlar.
     """
-    monkeypatch.setattr(indexing, "RENT_INDEX", {})
+    sub25_vs_ara24 = 1.0742   # Şubat 2025 bülteni
+    haz25_vs_ara24 = 1.1667   # Haziran 2025 (Haziran 2026 bülteninin karşılaştırması)
+    haz26_vs_haz25 = 1.3211   # Haziran 2026 bülteni
+
+    beklenen = haz26_vs_haz25 * (haz25_vs_ara24 / sub25_vs_ara24)
+
+    assert indexing.ANCHOR_FACTOR == pytest.approx(beklenen, abs=1e-5)
+
+
+def test_veri_donemi_ve_cipa_tutarli():
+    assert indexing.DATA_PERIOD == "2025-02"
+    assert indexing.ANCHOR_PERIOD > indexing.DATA_PERIOD
+
+
+def test_cipadan_sonraki_aylar_carpilir(monkeypatch):
+    monkeypatch.setattr(indexing, "ANCHOR_FACTOR", 1.5)
+    monkeypatch.setattr(
+        indexing, "MONTHLY_AFTER_ANCHOR", {"2026-07": 2.0, "2026-08": 1.0}
+    )
 
     factor, indexed_to = rent_index()
 
-    assert factor == 1.0
-    assert indexed_to == indexing.DATA_PERIOD
-    assert not is_configured()
-    assert "endeksi yapılandırılmamış" in capsys.readouterr().out
+    assert factor == pytest.approx(1.5 * 1.02 * 1.01)
+    assert indexed_to == "2026-08"
 
 
-def test_temel_donem_eksikse_endeksleme_yapilmaz(monkeypatch):
-    """Tabloda güncel ay var ama DATA_PERIOD yoksa oran hesaplanamaz."""
-    monkeypatch.setattr(indexing, "RENT_INDEX", {"2026-07": 250.0})
+def test_cipadan_onceki_ay_yok_sayilir(monkeypatch):
+    """Yanlışlıkla eski bir ay girilirse çarpana katılmamalı."""
+    monkeypatch.setattr(indexing, "ANCHOR_FACTOR", 1.5)
+    monkeypatch.setattr(indexing, "MONTHLY_AFTER_ANCHOR", {"2025-12": 99.0})
 
+    factor, indexed_to = rent_index()
+
+    assert factor == pytest.approx(1.5)
+    assert indexed_to == indexing.ANCHOR_PERIOD
+
+
+def test_carpan_makul_bantta():
+    """16 aylık Türkiye enflasyonu için 1.3-1.7 dışındaki değer birim hatasıdır.
+
+    (ör. yüzdeyi çarpan sanıp 43.49 yazmak ya da tabloyu boş bırakmak.)
+    """
     factor, _ = rent_index()
-
-    assert factor == 1.0
-    assert not is_configured()
+    assert 1.30 < factor < 1.70
 
 
 def test_ortam_degiskeni_tabloyu_ezer(monkeypatch):
-    monkeypatch.setenv("RENT_INDEX_FACTOR", "1.5")
+    monkeypatch.setenv("RENT_INDEX_FACTOR", "1.62")
 
     factor, indexed_to = rent_index()
 
-    assert factor == 1.5
+    assert factor == 1.62
     assert indexed_to == "manuel"
     assert is_configured()
 
 
-def test_bozuk_ortam_degiskeni_tabloya_duser(monkeypatch):
+def test_bozuk_ortam_degiskeni_cipaya_duser(monkeypatch):
     monkeypatch.setenv("RENT_INDEX_FACTOR", "abc")
-    monkeypatch.setattr(
-        indexing, "RENT_INDEX", {indexing.DATA_PERIOD: 100.0, "2026-07": 120.0}
-    )
 
     factor, indexed_to = rent_index()
 
-    assert factor == pytest.approx(1.20)
-    assert indexed_to == "2026-07"
+    assert factor == pytest.approx(indexing.ANCHOR_FACTOR)
+    assert indexed_to == indexing.ANCHOR_PERIOD
