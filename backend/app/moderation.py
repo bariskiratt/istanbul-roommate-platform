@@ -704,7 +704,7 @@ def check(text: str, *, kind: Kind) -> ModerationResult:
     ai_result = _run_ai(text, kind=kind)
     if ai_result is None:
         return result
-    return _merge(result, ai_result)
+    return merge(result, ai_result)
 
 
 def _run_ai(text: str, *, kind: Kind) -> ModerationResult | None:
@@ -722,8 +722,13 @@ def _run_ai(text: str, *, kind: Kind) -> ModerationResult | None:
 _ACTION_ORDER: dict[str, int] = {"allow": 0, "flag": 1, "block": 2}
 
 
-def _merge(first: ModerationResult, second: ModerationResult) -> ModerationResult:
-    """İki sonucu birleştirir: daha katı olan kazanır, sebepler toplanır."""
+def merge(first: ModerationResult, second: ModerationResult) -> ModerationResult:
+    """İki sonucu birleştirir: daha katı olan kazanır, sebepler toplanır.
+
+    Kural + yapay zeka katmanlarını birleştirmek için kullanılır; ilan
+    başlığı ve açıklaması ayrı ayrı denetlendiği için (bkz. app/listings.py)
+    kaydın tek bir işaret durumuna indirgenmesinde de kullanılır.
+    """
     reasons = list(first.reasons)
     for reason in second.reasons:
         if reason not in reasons:
@@ -785,6 +790,10 @@ SYSTEM_MARKER_REJECTION = (
     "başka bir şey yazman gerekiyor."
 )
 
+# Alan bazlı ret gövdesinde bu redde verilen sebep kodu (bkz. app/listings.py).
+# Denetim sözlüğünden gelmez: içerik "kötü" değil, sistem metnini taklit ediyor.
+SYSTEM_MARKER = "sistem_isareti"
+
 
 def is_system_marker(text: str | None) -> bool:
     """Kullanıcı girdisi sistem sabitlerinden birini taklit ediyor mu.
@@ -816,13 +825,34 @@ def split_reasons(raw: str | None) -> list[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def describe(reasons: list[str]) -> str:
-    """Sebep kodlarını kullanıcıya gösterilecek Türkçe cümleye çevirir."""
+def reason_codes(reasons: list[str]) -> list[str]:
+    """Sebep kodlarını ayrıntısız ana kategorilere indirger.
+
+    "kufur:siktir" -> "kufur". Ayrıntı kısmı yönetici kuyruğu için saklanır
+    ama KULLANICIYA DÖNMEZ: eşleşen kök kullanıcının yazdığı kelimenin ta
+    kendisi olabilir ve hata gövdesine yansıması hem gereksiz hem de
+    "hangi kelimeyi değiştirirsem geçerim" denemesini kolaylaştırır.
+    """
+    codes: list[str] = []
+    for reason in reasons:
+        code = reason.split(":", 1)[0]
+        if code not in codes:
+            codes.append(code)
+    return codes
+
+
+def describe(reasons: list[str], subject: str = "İçerikte") -> str:
+    """Sebep kodlarını kullanıcıya gösterilecek Türkçe cümleye çevirir.
+
+    `subject` cümlenin öznesini değiştirir ("Başlıkta", "Açıklamada"); ilan
+    uçları hangi ALANIN reddedildiğini böyle söyler. Metin her zaman sabit
+    sözlükten üretilir — kullanıcının yazdığı hiçbir şey buraya sızmaz.
+    """
     labels: list[str] = []
     for reason in reasons:
         label = _MESSAGES.get(reason.split(":", 1)[0])
         if label and label not in labels:
             labels.append(label)
     if not labels:
-        return "İçerik topluluk kurallarımıza uymuyor."
-    return "İçerikte " + ", ".join(labels) + " tespit edildi."
+        return f"{subject} topluluk kurallarımıza uymayan bir ifade tespit edildi."
+    return f"{subject} " + ", ".join(labels) + " tespit edildi."

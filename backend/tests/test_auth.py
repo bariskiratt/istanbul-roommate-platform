@@ -118,7 +118,7 @@ def test_listing_ownership_and_mine(client):
         "title": "Oda arıyorum",
         "description": "test",
         "district": "Kadıköy",
-        "photos": [],
+        "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
         "budget_min": 5000,
         "budget_max": 9000,
     }

@@ -35,34 +35,66 @@ FEATURE_FIELDS: tuple[str, ...] = (
 )
 
 
-def _moderate(title: str, description: str) -> moderation.ModerationResult:
-    """İlan metnini denetler.
+# Denetim reddinde hangi alanın sorunlu olduğu arayüze bu adlarla bildirilir.
+_FIELD_LABELS = {"title": "Başlıkta", "description": "Açıklamada"}
 
-    "block" → 422 ile reddedilir. Sonuç nesnesi olduğu gibi döner: çağıran hem
-    `flagged` bayrağını hem de `reasons` gerekçelerini yazar. (Eskiden yalnızca
-    bool dönüyordu; gerekçeler kaybolduğu için yönetici neden işaretlendiğini
-    göremiyordu.)
+
+def _reject(field: str, reasons: list[str]) -> HTTPException:
+    """Alanı adıyla anan, yapılandırılmış 422 üretir.
+
+    detail bir SÖZLÜKTÜR: arayüz `field` ile hatalı girdiyi işaretleyip
+    kullanıcıyı doğru adıma götürebilsin diye. Metin sabit sözlükten gelir —
+    KULLANICI GİRDİSİ hata mesajına asla yansıtılmaz.
     """
-    # Kullanıcı sistemin ağzından konuşamaz: yönetici kuyruğunda ilanın
-    # açıklaması olduğu gibi gösterildiği için sistem sabitleri burada da
-    # yasak (bkz. moderation.SYSTEM_MARKERS).
-    if moderation.is_system_marker(title) or moderation.is_system_marker(
-        description
-    ):
-        raise HTTPException(
-            status_code=422, detail=moderation.SYSTEM_MARKER_REJECTION
-        )
+    label = _FIELD_LABELS.get(field, "Metinde")
+    return HTTPException(
+        status_code=422,
+        detail={
+            # describe() özneyi kendisi kurar; cümleyi elle kırpmak Türkçe'de
+            # büyük İ'nin küçük harfe çevrilmesinde bozuk çıktı veriyor.
+            "message": (
+                f"{moderation.describe(reasons, subject=label)} "
+                "Bu alanı düzenleyip tekrar deneyin."
+            ),
+            "field": field,
+            "reasons": reasons,
+        },
+    )
 
-    result = moderation.check(f"{title}\n{description}", kind="listing")
-    if result.blocked:
+
+def _moderate_field(text: str, field: str) -> moderation.ModerationResult:
+    """Tek bir alanı denetler; engellenirse alanı adıyla anan 422 fırlatır."""
+    # Kullanıcı sistemin ağzından konuşamaz: yönetici kuyruğunda ilan metni
+    # olduğu gibi gösterildiği için sistem sabitleri yasak
+    # (bkz. moderation.SYSTEM_MARKERS).
+    if moderation.is_system_marker(text):
         raise HTTPException(
             status_code=422,
-            detail=(
-                f"{moderation.describe(result.reasons)} "
-                "İlan başlığını ve açıklamasını düzenleyip tekrar deneyin."
-            ),
+            detail={
+                "message": moderation.SYSTEM_MARKER_REJECTION,
+                "field": field,
+                "reasons": [moderation.SYSTEM_MARKER],
+            },
         )
+
+    result = moderation.check(text, kind="listing")
+    if result.blocked:
+        raise _reject(field, result.reasons)
     return result
+
+
+def _moderate(title: str, description: str) -> moderation.ModerationResult:
+    """Başlığı ve açıklamayı AYRI AYRI denetler, sonuçları birleştirir.
+
+    Ayrı denetlenmesinin tek sebebi geri bildirim: ikisi birleştirilip tek
+    metin olarak denetlendiğinde kullanıcı hangi alanı düzelteceğini
+    bilemiyordu. Kayıt üzerindeki işaret ve gerekçeler için sonuçlar yine
+    tek bir sonuca indirgenir (moderation.merge).
+    """
+    return moderation.merge(
+        _moderate_field(title, "title"),
+        _moderate_field(description, "description"),
+    )
 
 
 def _suspended_user_ids():
@@ -110,7 +142,12 @@ class ListingIn(BaseModel):
     title: str = Field(..., min_length=3, max_length=120)
     description: str = Field(..., min_length=1, max_length=2000)
     district: str = Field(..., min_length=1, max_length=40)
-    photos: list[str] = Field(default_factory=list, max_length=6)
+    # Mahalle isteğe bağlı: verilirse ve model tanıyorsa adil fiyat tahmini
+    # mahalle bazında yapılır, yoksa ilçe geneline düşer (bkz. app/fairprice.py).
+    neighborhood: str | None = Field(None, max_length=80)
+    # En az 3 fotoğraf: tek fotoğraflı ilanlar hem güven vermiyor hem de
+    # kaydırma destesinde ayırt edilemiyordu.
+    photos: list[str] = Field(..., min_length=3, max_length=6)
 
     # Ev ilanı alanları
     rent: int | None = Field(None, gt=0, le=10_000_000)
@@ -154,6 +191,7 @@ class ListingOut(BaseModel):
     title: str
     description: str
     district: str
+    neighborhood: str | None = None
     photos: list[str]
     rent: int | None
     room_count: str | None
@@ -278,7 +316,9 @@ def listing_fair_price(listing_id: int, db: Session = Depends(get_db)):
             status_code=400, detail="Yalnızca ev ilanları için hesaplanır."
         )
 
-    result = estimate_for_listing(row.district, row.room_count, row.rent)
+    result = estimate_for_listing(
+        row.district, row.room_count, row.rent, row.neighborhood
+    )
     if result is None:
         raise HTTPException(
             status_code=503, detail="Adil fiyat modeli yüklü değil."
@@ -292,7 +332,10 @@ class ListingUpdate(BaseModel):
     title: str | None = Field(None, min_length=3, max_length=120)
     description: str | None = Field(None, min_length=1, max_length=2000)
     district: str | None = Field(None, min_length=1, max_length=40)
-    photos: list[str] | None = Field(None, max_length=6)
+    neighborhood: str | None = Field(None, max_length=80)
+    # Gönderilmezse dokunulmaz: alt sınırdan önce açılmış ilanlar bu yüzden
+    # kilitlenmez, sahibi başlığını düzeltebilir. Gönderilirse kural aynı.
+    photos: list[str] | None = Field(None, min_length=3, max_length=6)
     rent: int | None = Field(None, gt=0, le=10_000_000)
     room_count: str | None = Field(None, max_length=10)
     smoking_allowed: bool | None = None

@@ -49,7 +49,7 @@ def _ev(**overrides) -> dict:
         "title": "Kadıköy'de güneşli daire",
         "description": "Ulaşımı rahat, aydınlık bir ev.",
         "district": "Kadıköy",
-        "photos": [],
+        "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
         "rent": 18000,
         "room_count": "2+1",
     } | overrides
@@ -145,7 +145,7 @@ def _kisisel(**overrides) -> dict:
         "title": "Beşiktaş'ta ev arkadaşı arıyorum",
         "description": "3. sınıf öğrencisiyim, sakinim.",
         "district": "Beşiktaş",
-        "photos": [],
+        "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
         "budget_min": 8000,
         "budget_max": 14000,
     } | overrides

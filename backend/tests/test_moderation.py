@@ -55,7 +55,7 @@ def _listing(**overrides) -> dict:
         "title": "Kadıköy'de güneşli 2+1",
         "description": "Moda'ya 5 dakika, geniş salon.",
         "district": "Kadıköy",
-        "photos": [],
+        "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
         "rent": 18000,
         "room_count": "2+1",
     } | overrides
@@ -264,7 +264,10 @@ def test_ilan_kufur_iceriyorsa_422(ctx):
         json=_listing(description="Beğenmeyen siktir gitsin."),
     )
     assert res.status_code == 422, res.text
-    assert "küfür" in res.json()["detail"]
+    # detail artık sözlük: arayüz hangi alanı işaretleyeceğini bilsin diye.
+    detail = res.json()["detail"]
+    assert "küfür" in detail["message"]
+    assert detail["field"] == "description"
 
 
 def test_ilan_temizse_isaretlenmez(ctx):
@@ -367,6 +370,8 @@ def test_mesajda_kufur_engellenir(ctx):
         json={"content": "siktir git"},
     )
     assert res.status_code == 422, res.text
+    # Mesajda tek alan var; detail düz metin kalır (alan bazlı yapı yalnız
+    # ilan uçlarında, başlık/açıklama ayrımı orada anlamlı).
     assert "küfür" in res.json()["detail"]
 
 
@@ -470,3 +475,56 @@ def test_ilan_guncellemesiyle_de_sistem_sabiti_yazilamaz(ctx):
     assert client.get(f"/api/listings/{listing_id}").json()["description"] == (
         _listing()["description"]
     )
+
+
+# ---- alan bazlı ret ----
+# Başlık ve açıklama ayrı denetlenir; kullanıcı hangi alanı düzelteceğini
+# bilmeden reddedilmemeli.
+
+
+def test_baslikta_kufur_title_olarak_bildirilir(ctx):
+    client, _ = ctx
+    headers = _auth_headers(client)
+
+    res = client.post(
+        "/api/listings",
+        json=_listing(title="siktir git buradan", description="Temiz ve sakin bir ev."),
+        headers=headers,
+    )
+
+    assert res.status_code == 422, res.text
+    detail = res.json()["detail"]
+    assert detail["field"] == "title"
+    assert "Başlıkta" in detail["message"]
+
+
+def test_aciklamada_kufur_description_olarak_bildirilir(ctx):
+    client, _ = ctx
+    headers = _auth_headers(client)
+
+    res = client.post(
+        "/api/listings",
+        json=_listing(title="Kadıköy'de güneşli oda", description="orospu çocuğu"),
+        headers=headers,
+    )
+
+    assert res.status_code == 422, res.text
+    detail = res.json()["detail"]
+    assert detail["field"] == "description"
+    assert "Açıklamada" in detail["message"]
+
+
+def test_ret_mesaji_kullanici_girdisini_yansitmaz(ctx):
+    """Hata metni sabit sözlükten gelir; girdiyi yansıtmak sızıntı kapısıdır."""
+    client, _ = ctx
+    headers = _auth_headers(client)
+    gizli = "siktir GIZLIMETIN42"
+
+    res = client.post(
+        "/api/listings",
+        json=_listing(title="Temiz oda", description=gizli),
+        headers=headers,
+    )
+
+    assert res.status_code == 422
+    assert "GIZLIMETIN42" not in str(res.json())

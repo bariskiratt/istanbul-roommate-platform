@@ -117,6 +117,9 @@ class Listing(Base):
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
     district: Mapped[str] = mapped_column(String(40), index=True)
+    # Mahalle ("Caferağa Mah."). Zorunlu değil: bu sütun gelmeden önce açılan
+    # ilanlarda NULL kalır ve adil fiyat tahmini onlarda ilçe geneline düşer.
+    neighborhood: Mapped[str | None] = mapped_column(String(80))
     photos: Mapped[list] = mapped_column(JSON, default=list)
 
     # Ev ilanı alanları

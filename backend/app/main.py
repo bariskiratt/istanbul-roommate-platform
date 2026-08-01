@@ -25,6 +25,7 @@ from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.db import init_db
 from app.heatmap import STATUS_STYLES, annotate_features, build_budget_heatmap
+from app import locations
 from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.listings import router as listings_router
 from app.messages import router as messages_router
@@ -93,19 +94,18 @@ async def lifespan(_app: FastAPI):
     # Adil fiyat modeli opsiyonel: yoksa harita yine de çalışsın.
     if MODEL_PATH.exists():
         STATE["model"] = joblib.load(MODEL_PATH)
-        # /api/locations yanıtı sabit; her istekte CSV okumamak için burada kur.
-        known = set(STATE["model"]["categories"]["neighborhood"])
-        grouped: dict[str, list[str]] = {}
-        for row in df.itertuples(index=False):
-            neighborhood = str(row.neighborhood).strip()
-            if neighborhood in known:
-                grouped.setdefault(str(row.district).strip(), []).append(neighborhood)
-        STATE["locations"] = {d: sorted(set(n)) for d, n in sorted(grouped.items())}
         print(f"✅ Adil fiyat modeli yüklendi "
               f"(medyan sapma %{STATE['model']['served_medape']:.1f}).")
     else:
         print(f"⚠️  Model yok ({MODEL_PATH}) — /api/estimate devre dışı. "
               f"Eğitmek için: python -m scripts.train_model")
+
+    # /api/locations yanıtı sabit; ilk istekte değil burada kurulur.
+    # Model varsa liste onun tanıdığı mahallelerle sınırlanır (bkz. locations.py).
+    locations.clear_cache()
+    STATE["locations"] = locations.get_locations()
+    print(f"✅ Konum listesi hazır: {len(STATE['locations'])} ilçe, "
+          f"{sum(len(d['neighborhoods']) for d in STATE['locations'])} mahalle.")
 
     # Toplu taşıma erişilebilirliği opsiyonel: veri yoksa /api/alternatives kapalı.
     if TRANSIT_PATH.exists():
@@ -231,10 +231,14 @@ async def get_legend():
 
 @app.get("/api/locations")
 async def get_locations():
-    """Formu doldurmak için modelin tanıdığı ilçe -> mahalle listesi."""
-    _require_model()
+    """İlan formu için ilçe -> mahalle listesi.
+
+    Model yüklüyse yalnızca onun TANIDIĞI mahalleler döner; tanımadığı bir
+    mahalle seçilse tahmin ilçe geneline düşerdi (bkz. app/locations.py).
+    Yanıt sürece göre sabittir, bu yüzden uzun süreli önbelleklenebilir.
+    """
     return JSONResponse(
-        STATE["locations"],
+        STATE.get("locations") or locations.get_locations(),
         headers={"Cache-Control": "public, max-age=3600"},
     )
 

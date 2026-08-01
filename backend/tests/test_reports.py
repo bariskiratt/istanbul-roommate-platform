@@ -58,7 +58,7 @@ def _make_listing(client, headers) -> int:
             "title": "Kadıköy'de güneşli 2+1",
             "description": "Moda'ya 5 dakika.",
             "district": "Kadıköy",
-            "photos": [],
+            "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
             "rent": 18000,
             "room_count": "2+1",
         },

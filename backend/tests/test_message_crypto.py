@@ -146,7 +146,7 @@ def _matched_pair(client):
             "title": "Ali'nin evi",
             "description": "Geniş ve aydınlık.",
             "district": "Kadıköy",
-            "photos": [],
+            "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
             "rent": 10000,
             "room_count": "2+1",
         },

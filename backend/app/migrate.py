@@ -51,6 +51,8 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
     "listings": (
         # Auth öncesi dönemden kalan tablolarda olmayabilir.
         _Column("owner_id", "INTEGER", references="users(id)"),
+        # Mahalle — eski ilanlarda NULL (o ilanlarda tahmin ilçe geneline düşer).
+        _Column("neighborhood", "VARCHAR(80)"),
         # Ev özellikleri — hepsi nullable (NULL = belirtilmemiş).
         _Column("furnished", "BOOLEAN"),
         _Column("elevator", "BOOLEAN"),

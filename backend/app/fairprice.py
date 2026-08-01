@@ -39,8 +39,30 @@ def parse_rooms(room_count: str | None) -> int:
         return 2
 
 
-def estimate_for_listing(district: str, room_count: str | None, asking_rent: int):
+def resolve_neighborhood(model, neighborhood: str | None) -> str:
+    """Modelin TANIDIĞI mahalle adını döndürür; tanımıyorsa boş dize.
+
+    İlan mahallesi kullanıcıdan geldiği (ve eski ilanlarda hiç olmadığı) için
+    modelin kategorilerinde bulunmayabilir. Bilinmeyen kategori pandas'ta NaN'a
+    düşer, yani isteği patlatmaz — ama tahmin yine de ilçe geneline dayanır.
+    Bunu burada açıkça yapıyoruz ki `district_level` bayrağı doğruyu söylesin.
+    """
+    if not neighborhood:
+        return ""
+    name = neighborhood.strip()
+    return name if name in set(model["categories"]["neighborhood"]) else ""
+
+
+def estimate_for_listing(
+    district: str,
+    room_count: str | None,
+    asking_rent: int,
+    neighborhood: str | None = None,
+):
     """İlan için adil oda payı bandı ve kıyas sonucu döndürür.
+
+    Mahalle verilmiş ve model onu tanıyorsa tahmin mahalle bazında yapılır;
+    aksi hâlde ilçe geneline düşer (`district_level=True`).
 
     Model yüklü değilse None döner (çağıran 503 verir).
     """
@@ -51,6 +73,7 @@ def estimate_for_listing(district: str, room_count: str | None, asking_rent: int
         return None
 
     rooms = parse_rooms(room_count)
+    resolved = resolve_neighborhood(model, neighborhood)
     features = build_features(
         pd.DataFrame([{
             "room": rooms,
@@ -59,8 +82,8 @@ def estimate_for_listing(district: str, room_count: str | None, asking_rent: int
             "age": DEFAULT_AGE,
             "floor": DEFAULT_FLOOR,
             "district": district.strip(),
-            # İlanlarda mahalle yok: tahmin ilçe geneline dayanır
-            "neighborhood": "",
+            # Boş dize = mahalle bilinmiyor; model ilçe genelinden tahmin eder.
+            "neighborhood": resolved,
         }]),
         model["categories"],
     )
@@ -100,5 +123,9 @@ def estimate_for_listing(district: str, room_count: str | None, asking_rent: int
         "data_period": DATA_PERIOD,
         "indexed_to": indexed_to,
         "indexed": is_configured(),
-        "district_level": True,  # mahalle değil, ilçe geneline dayanıyor
+        # Tahmin neye dayandı: mahalle kullanıldıysa False, ilçe geneli ise True.
+        "district_level": resolved == "",
+        # Kullanılan mahalle (yoksa/tanınmadıysa None) — arayüz "Kadıköy geneli"
+        # ile "Caferağa Mah." arasındaki farkı dürüstçe yazabilsin diye.
+        "neighborhood": resolved or None,
     }

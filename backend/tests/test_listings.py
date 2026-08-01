@@ -19,7 +19,7 @@ EV_ILANI = {
     "title": "Kadıköy'de güneşli 2+1",
     "description": "Moda'ya 5 dakika, geniş salon.",
     "district": "Kadıköy",
-    "photos": ["https://example.com/a.jpg"],
+    "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
     "rent": 18000,
     "room_count": "2+1",
     "smoking_allowed": False,
@@ -31,7 +31,7 @@ KISISEL_ILAN = {
     "title": "Beşiktaş'ta ev arkadaşı arıyorum",
     "description": "3. sınıf öğrencisiyim, sakinim.",
     "district": "Beşiktaş",
-    "photos": [],
+    "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
     "budget_min": 8000,
     "budget_max": 14000,
 }
@@ -171,3 +171,88 @@ def test_deactivate_owner_only(client):
 
     # ikinci silme 404
     assert client.delete("/api/listings/1", headers=owner).status_code == 404
+
+
+# ---- mahalle ve fotoğraf alt sınırı ----
+
+
+def test_mahalleli_ilan_olusturulabilir(client):
+    """Mahalle kaydedilir ve yanıtta döner."""
+    headers = _auth_headers(client)
+
+    res = client.post(
+        "/api/listings",
+        json=EV_ILANI | {"neighborhood": "Caferağa Mah."},
+        headers=headers,
+    )
+
+    assert res.status_code == 201, res.text
+    assert res.json()["neighborhood"] == "Caferağa Mah."
+
+
+def test_mahalle_istege_bagli(client):
+    headers = _auth_headers(client)
+
+    res = client.post("/api/listings", json=EV_ILANI, headers=headers)
+
+    assert res.status_code == 201, res.text
+    assert res.json()["neighborhood"] is None
+
+
+def test_uc_fotograftan_az_ilan_reddedilir(client):
+    headers = _auth_headers(client)
+
+    res = client.post(
+        "/api/listings",
+        json=EV_ILANI | {"photos": ["https://example.com/1.jpg"]},
+        headers=headers,
+    )
+
+    assert res.status_code == 422
+
+
+def test_fotografsiz_ilan_reddedilir(client):
+    headers = _auth_headers(client)
+
+    res = client.post(
+        "/api/listings", json=EV_ILANI | {"photos": []}, headers=headers
+    )
+
+    assert res.status_code == 422
+
+
+def test_fotograf_gonderilmezse_eski_ilan_kilitlenmez(client):
+    """Alt sınırdan önce açılmış ilanlar düzenlenebilir kalmalı.
+
+    Kural yalnız oluşturmada ve fotoğraf listesi GÖNDERİLDİĞİNDE işler;
+    aksi hâlde bugün 1-2 fotoğraflı olan ilanların sahipleri başlıklarını
+    bile düzeltemezdi.
+    """
+    headers = _auth_headers(client)
+    listing_id = client.post(
+        "/api/listings", json=EV_ILANI, headers=headers
+    ).json()["id"]
+
+    res = client.patch(
+        f"/api/listings/{listing_id}",
+        json={"title": "Kadıköy'de güneşli 2+1 daire"},
+        headers=headers,
+    )
+
+    assert res.status_code == 200, res.text
+    assert res.json()["title"] == "Kadıköy'de güneşli 2+1 daire"
+
+
+def test_guncellemede_fotograf_gonderilirse_alt_sinir_gecerli(client):
+    headers = _auth_headers(client)
+    listing_id = client.post(
+        "/api/listings", json=EV_ILANI, headers=headers
+    ).json()["id"]
+
+    res = client.patch(
+        f"/api/listings/{listing_id}",
+        json={"photos": ["https://example.com/tek.jpg"]},
+        headers=headers,
+    )
+
+    assert res.status_code == 422

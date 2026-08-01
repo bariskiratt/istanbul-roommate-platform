@@ -60,7 +60,7 @@ def _make_listing(client, headers, title="İlan") -> int:
             "title": title,
             "description": "test",
             "district": "Kadıköy",
-            "photos": [],
+            "photos": ["https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"],
             "rent": 10000,
             "room_count": "2+1",
         },

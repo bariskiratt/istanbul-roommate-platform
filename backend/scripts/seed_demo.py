@@ -338,6 +338,9 @@ def seed(force: bool = False) -> None:
             title=item["title"],
             description=item["description"],
             district=item["district"],
+            # Mahalle kaydedilir: adil fiyat böylece ilçe geneli yerine
+            # mahalle bazında çalışır (bkz. app/fairprice.py).
+            neighborhood=item["neighborhood"],
             photos=[_unsplash(p) for p in item["photos"]],
         )
         if item["type"] == "ev_ilani":
