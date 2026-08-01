@@ -27,7 +27,22 @@ def test_cipa_tuik_bultenlerinden_zincirlenen_degerle_ayni():
 
     beklenen = haz26_vs_haz25 * (haz25_vs_ara24 / sub25_vs_ara24)
 
-    assert indexing.ANCHOR_FACTOR == pytest.approx(beklenen, abs=1e-5)
+    assert indexing.HEADLINE_FACTOR == pytest.approx(beklenen, abs=1e-5)
+
+
+def test_servis_edilen_cipa_konut_bandinin_icinde():
+    """Konut ana grubuna dayalı çıpa, türetilen sınırların dışına çıkmamalı.
+
+    Sınırlar (bkz. app/indexing.py): konut Haziran 2026/Haziran 2025 = 1,4514
+    çarpı Şubat→Haziran 2025 için 1,0861 (alt) … 1,1962 (üst).
+    """
+    konut_haz26_vs_haz25 = 1.4514
+    alt = konut_haz26_vs_haz25 * 1.086111
+    ust = konut_haz26_vs_haz25 * 1.0458**4
+
+    assert alt < indexing.ANCHOR_FACTOR < ust
+    # Manşet TÜFE her koşulda alt sınır: kira ondan hızlı arttı.
+    assert indexing.ANCHOR_FACTOR > indexing.HEADLINE_FACTOR
 
 
 def test_veri_donemi_ve_cipa_tutarli():
@@ -59,12 +74,12 @@ def test_cipadan_onceki_ay_yok_sayilir(monkeypatch):
 
 
 def test_carpan_makul_bantta():
-    """16 aylık Türkiye enflasyonu için 1.3-1.7 dışındaki değer birim hatasıdır.
+    """16 aylık Türkiye enflasyonu için 1.3-1.8 dışındaki değer birim hatasıdır.
 
     (ör. yüzdeyi çarpan sanıp 43.49 yazmak ya da tabloyu boş bırakmak.)
     """
     factor, _ = rent_index()
-    assert 1.30 < factor < 1.70
+    assert 1.30 < factor < 1.80
 
 
 def test_ortam_degiskeni_tabloyu_ezer(monkeypatch):
