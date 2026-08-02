@@ -711,6 +711,14 @@ export interface AdminUserRow {
   suspended_at: string | null;
   suspended_reason: string | null;
   suspended_by: number | null;
+  /**
+   * Askının KALDIRILMASININ izi. Askı kalkınca gerekçe silinmez,
+   * `last_suspension_reason`a taşınır: "bu hesap daha önce askıya alınmış
+   * mıydı, neden, kim geri aldı" sorusu cevaplanabilir kalsın diye.
+   */
+  unsuspended_at: string | null;
+  unsuspended_by: number | null;
+  last_suspension_reason: string | null;
   created_at: string;
 }
 
@@ -769,9 +777,35 @@ export const restoreRemoved = (kind: FlaggedKind, itemId: number, note?: string)
     ...(note?.trim() ? { note: note.trim() } : {}),
   });
 
-/** `suspended` zorunludur; sunucu filtresiz listelemeyi kabul etmez (422). */
-export const fetchAdminUsers = (suspended: boolean) =>
-  getJSON<AdminUserRow[]>(`/api/admin/users?suspended=${suspended}`);
+/**
+ * Kullanıcı listesi — arama ve sayfalama ile.
+ *
+ * `suspended` artık isteğe bağlıdır (eskiden zorunluydu, sunucu filtresiz
+ * çağrıyı 422 ile reddediyordu). Filtre bir süre zorunlu tutulmuştu çünkü uç
+ * tüm tabanı e-postalarıyla döküyordu; asıl iki sorun (sınırsız sayfa ve
+ * koşulsuz e-posta) artık doğrudan kapatıldı: sayfalama zorunlu ve e-posta
+ * yalnız askıdaki hesaplar için dönüyor.
+ *
+ * `q` ad VEYA e-postada kısmi ve harf duyarsız arar. E-POSTA ARAMA
+ * KOŞULUNDA KULLANILIR AMA YANITTA DÖNMEZ: "şu adresi bul" ihtiyacı tüm
+ * adresleri görmeyi gerektirmiyor.
+ */
+export const fetchAdminUsers = (params?: {
+  q?: string;
+  /** true: askıdakiler, false: aktifler, verilmezse hepsi. */
+  suspended?: boolean;
+  /** Sunucu 1-200 arası kabul eder; varsayılan 50. */
+  limit?: number;
+  offset?: number;
+}) => {
+  const query = new URLSearchParams();
+  if (params?.q?.trim()) query.set("q", params.q.trim());
+  if (params?.suspended !== undefined) query.set("suspended", String(params.suspended));
+  if (params?.limit != null) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return getJSON<AdminUserRow[]>(`/api/admin/users${qs ? `?${qs}` : ""}`);
+};
 
 export const suspendUser = (userId: number, reason?: string) =>
   postJSON<AdminUserRow>(`/api/admin/users/${userId}/suspend`, {
@@ -780,6 +814,199 @@ export const suspendUser = (userId: number, reason?: string) =>
 
 export const unsuspendUser = (userId: number) =>
   request<AdminUserRow>(`/api/admin/users/${userId}/unsuspend`, { method: "POST" });
+
+// ---- Yönetici: ilan yönetimi ----
+
+/**
+ * İlan durumu süzgeci.
+ *
+ * "inactive" ile "removed" arasındaki fark kritiktir: ikisinde de ilan yayında
+ * DEĞİLDİR ama ilki SAHİBİNİN kararı, ikincisi YÖNETİCİNİNdir. Yalnızca ilki
+ * yayına alınabilir (bkz. adminPublishListing); ikincisinin geri alma yolu
+ * ayrıdır (restoreRemoved).
+ */
+export type AdminListingStatus = "all" | "active" | "inactive" | "removed" | "flagged";
+
+/**
+ * İlanın yönetici görünümü — moderasyon alanlarıyla birlikte.
+ *
+ * `type` bilerek ApiListing'deki birlikten (`"ev_ilani" | "kisisel_ilan"`)
+ * çıkarılıp serbest metne genişletildi: sunucu bu listede BOZUK kayıtları da
+ * döndürmek zorunda, çünkü yöneticinin düzeltmesi gereken kayıt tam da odur.
+ * Arayüz de tanımadığı bir tipi "kişisel ilan" sanmamalı.
+ */
+export interface AdminListing extends Omit<ApiListing, "type"> {
+  type: string;
+  /** Yayından kaldırma kararı YÖNETİCİDEN mi geldi (sahibinin kapatması değil). */
+  moderation_removed: boolean;
+  /** Kaldırılmadan önce yayında mıydı; null = sunucu bunu tutmadan önceki kayıt. */
+  active_before_removal: boolean | null;
+  is_flagged: boolean;
+  /** Denetimin gerekçe kodları ("kufur:siktir" gibi); eski kayıtlarda boş. */
+  flag_reasons: string[];
+  flag_reasons_text: string | null;
+  /**
+   * Sahibi askıdaysa ilan hiçbir genel listede görünmez — is_active true olsa
+   * bile. Arayüz "yayında" derken bunu okumalı.
+   */
+  owner_suspended: boolean;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
+/**
+ * TÜM ilanlar: pasifler ve yöneticinin kaldırdıkları dâhil. Normal
+ * `GET /api/listings` yalnız yayındaki ve sahibi askıda olmayan ilanları döner;
+ * yönetici tam da o filtrenin gizlediklerine bakmak zorunda.
+ *
+ * `q` başlıkta, ilçede ve ilan sahibinde (ad/e-posta) kısmi arar. E-posta arama
+ * KOŞULUNDA kullanılır ama yanıtta dönmez.
+ */
+export const fetchAdminListings = (params?: {
+  q?: string;
+  status?: AdminListingStatus;
+  /** Sunucu 1-200 arası kabul eder; varsayılan 50. */
+  limit?: number;
+  offset?: number;
+}) => {
+  const query = new URLSearchParams();
+  if (params?.q?.trim()) query.set("q", params.q.trim());
+  if (params?.status) query.set("status", params.status);
+  if (params?.limit != null) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return getJSON<AdminListing[]>(`/api/admin/listings${qs ? `?${qs}` : ""}`);
+};
+
+/** Yönetici düzenlemesi — `type` değiştirilemez, gönderilmeyen alan dokunulmaz. */
+export type AdminListingUpdate = Partial<Omit<ListingPayload, "type">>;
+
+/**
+ * Herhangi bir ilanı düzenler; sahiplik şartı yoktur. İçerik denetimi çalışır
+ * ama yöneticiyi ENGELLEMEZ: metin kaydedilir, gerekirse işaretlenir. Yanıttaki
+ * `is_flagged` yeni metnin denetim sonucudur.
+ */
+export const adminUpdateListing = (id: number, payload: AdminListingUpdate) =>
+  request<AdminListing>(`/api/admin/listings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export interface AdminPublishResult {
+  id: number;
+  is_active: boolean;
+  /** Bu çağrı gerçekten bir şey değiştirdi mi; false ise ilan zaten yayındaydı. */
+  changed: boolean;
+  moderation_removed: boolean;
+  /** true ise ilan yayında SAYILIR ama kimseye görünmez. */
+  owner_suspended: boolean;
+}
+
+/**
+ * SAHİBİNİN kapattığı ilanı yayına alır. Yöneticinin kaldırdığı ilana
+ * DOKUNMAZ — sunucu 409 döner ve o kararın geri alma yolu restoreRemoved'dır.
+ */
+export const adminPublishListing = (id: number) =>
+  request<AdminPublishResult>(`/api/admin/listings/${id}/publish`, { method: "POST" });
+
+export interface AdminDeleteResult {
+  kind: "listing" | "user";
+  id: number;
+  deleted: boolean;
+  /** Yazılan denetim kaydının id'si (GET /api/admin/actions ile bulunur). */
+  action_id: number;
+  /**
+   * Birlikte temizlenen bağlı kayıt sayıları. İlanda `detached_matches`,
+   * SİLİNEN değil, ilan bağlantısı koparılıp YAŞAMAYA DEVAM EDEN eşleşme
+   * sayısıdır: ilan bir tanışmanın sebebiydi, sebebi silmek konuşmayı silmez.
+   */
+  cleanup: Record<string, number>;
+}
+
+/**
+ * İlanı KALICI siler — satır gider, geri alınamaz. Gerekçe ZORUNLUDUR
+ * (sunucu boş kabul etmez) ve denetim kaydına yazılır: silinen satır geri
+ * gelmeyeceği için "neyi neden sildim" sorusunun cevabı başka yerde kalmıyor.
+ */
+export const adminDeleteListing = (id: number, reason: string) =>
+  request<AdminDeleteResult>(`/api/admin/listings/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ reason: reason.trim() }),
+  });
+
+// ---- Yönetici: hesap silme ----
+
+/**
+ * Hesabı ve ona bağlı TÜM verisini (ilanları, eşleşmeleri, mesajları,
+ * kaydırmaları, bildirimleri) KALICI siler. Gerekçe zorunludur ve denetim
+ * kaydına yazılır.
+ *
+ * Sunucu iki hesabı korur: yöneticinin KENDİSİ (400) ve BAŞKA BİR YÖNETİCİ
+ * (403). Bu bir yetki kısıtı değil, emniyet kilidi: son yönetici kendini
+ * silerse platformun yönetimi geri dönülemez biçimde kaybolur. Kişi kendi
+ * hesabını normal yoldan (şifreyle, DELETE /api/auth/me) yine silebilir.
+ * Arayüz o satırlarda düğmeyi HİÇ göstermez — sunucudan hata almak için
+ * tıklanan bir düğme kötü tasarımdır.
+ */
+export const adminDeleteUser = (userId: number, reason: string) =>
+  request<AdminDeleteResult>(`/api/admin/users/${userId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ reason: reason.trim() }),
+  });
+
+// ---- Yönetici: denetim kaydı ----
+
+/** Denetim kaydının hedef türü. */
+export type AdminActionTargetType = "listing" | "user";
+
+/**
+ * Denetim kaydı satırı — GERİ ALINAMAZ yönetici eylemlerinin izi.
+ *
+ * Geri alınabilir eylemler (askıya alma, işaret temizleme, yayından kaldırma)
+ * buraya YAZILMAZ; izlerini kendi sütunlarında taşırlar. Kayıt salt okunurdur:
+ * sunucuda ne yazma ne silme ucu vardır.
+ */
+export interface AdminActionRow {
+  id: number;
+  /**
+   * null = eylemi yapan yönetici o zamandan beri hesabını sildi. Kayıt
+   * aktörünü kaybeder ama KENDİSİ DURUR; arayüz ad yerine nötr bir metin
+   * gösterir ("silinmiş yönetici"), uydurma bir isim değil.
+   */
+  actor_id: number | null;
+  actor_name: string | null;
+  /** Sunucu kodu: "listing_delete", "user_delete", "listing_update", … */
+  action: string;
+  target_type: string;
+  target_id: number;
+  /** Yalnız yıkıcı eylemlerde zorunlu; düzenleme/yayına alma kaydında null. */
+  reason: string | null;
+  /**
+   * JSON METNİ — nesne DEĞİL. Silinen satırın özeti ya da düzenlemede
+   * değişen alanlar + ÖNCEKİ metin durur; sahibinin yazdığı metnin tek
+   * kalan kopyası burasıdır.
+   */
+  detail: string | null;
+  created_at: string;
+}
+
+/** Denetim kaydı, en yeni önce. Sunucu toplam sayı vermez, sayfalıdır. */
+export const fetchAdminActions = (params?: {
+  action?: string;
+  targetType?: AdminActionTargetType;
+  /** Sunucu 1-200 arası kabul eder; varsayılan 50. */
+  limit?: number;
+  offset?: number;
+}) => {
+  const query = new URLSearchParams();
+  if (params?.action) query.set("action", params.action);
+  if (params?.targetType) query.set("target_type", params.targetType);
+  if (params?.limit != null) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return getJSON<AdminActionRow[]>(`/api/admin/actions${qs ? `?${qs}` : ""}`);
+};
 
 // ---- Fotoğraf yükleme ----
 

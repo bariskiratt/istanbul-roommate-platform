@@ -440,15 +440,72 @@ const tr = {
   "create.editTexts": "Başlık ve açıklamaya dön",
 
   // ---- ilan listesi ----
-  "listings.heading": "İlanlar",
-  "listings.live": "Canlı",
-  "listings.sub": "Topluluğun paylaştığı ev ve kişisel ilanlar",
+  "listings.heading": "İlan yönetimi",
+  "listings.sub": "Tüm ilanlar — sahibinin kapattıkları ve yönetici kaldırmaları dâhil.",
   "listings.filterAll": "Tümü",
   "listings.loading": "İlanlar yükleniyor…",
   "listings.loadFailed": "İlanlar yüklenemedi.",
   "listings.backendHint": "Backend çalışıyor mu? (127.0.0.1:8000)",
   "listings.emptyTitle": "Henüz ilan yok.",
-  "listings.emptyDesc": "İlk ilanı sen oluştur!",
+  "listings.emptyDesc": "Sistemde kayıtlı hiç ilan bulunmuyor.",
+  "listings.emptyFilteredTitle": "Eşleşen ilan yok",
+  "listings.emptyFilteredDesc": "Arama sözcüğünü ya da durum süzgecini değiştirmeyi dene.",
+  // ---- yönetici ilan aracı ----
+  "listings.searchLabel": "İlan ara",
+  "listings.searchPlaceholder": "Başlık, ilçe ya da ilan sahibi",
+  "listings.searchClear": "Aramayı temizle",
+  "listings.statusActive": "Yayında",
+  "listings.statusInactive": "Sahibi kapattı",
+  "listings.statusRemoved": "Kaldırıldı",
+  "listings.statusFlagged": "İşaretli",
+  "listings.badgeOwnerSuspended": "Sahibi askıda",
+  "listings.hiddenNote":
+    "Bu ilan yayında görünüyor ama sahibi askıda olduğu için hiçbir listede çıkmıyor.",
+  "listings.ownerUnknown": "Sahibi silinmiş",
+  "listings.createdAt": "Eklenme: {date}",
+  "listings.resultCount": "Bu sayfada {count} ilan",
+  "listings.pageFirst": "İlk sayfaya dön",
+  "listings.pagePrev": "Önceki",
+  "listings.pageNext": "Sonraki",
+  "listings.pageLabel": "Sayfa {page}",
+  "listings.actionPublish": "Yayına al",
+  "listings.actionUnpublish": "Yayından kaldır",
+  "listings.actionDelete": "Kalıcı sil",
+  "listings.donePublish": "İlan yayına alındı.",
+  "listings.donePublishNoop": "İlan zaten yayındaydı; bir şey değişmedi.",
+  "listings.donePublishHidden":
+    "İlan yayına alındı ama sahibi askıda olduğu için hâlâ hiçbir listede görünmüyor.",
+  "listings.dlgDeleteTitle": "İlanı kalıcı olarak sil",
+  "listings.dlgDeleteDesc":
+    "İlan kaydı veritabanından tamamen silinir. İlana gelen beğeniler ve ilanla ilgili bildirimler de silinir. Eşleşmeler ve sohbetler DURUR; yalnızca ilan bağlantıları kopar.",
+  "listings.dlgDeleteWarn":
+    "Bu işlem geri alınamaz. Amacın ilanı yalnızca görünmez yapmaksa \"Yayından kaldır\"ı kullan — o karar geri alınabilir.",
+  "listings.dlgDeleteReasonLabel": "Silme gerekçesi (zorunlu)",
+  "listings.dlgDeleteReasonPlaceholder":
+    "Denetim kaydına yazılır; silinen ilanın neden silindiğini sonradan yalnızca buradan okuyabilirsin.",
+  "listings.doneDelete": "İlan kalıcı olarak silindi.",
+  "listings.doneDeleteDesc": "Eşleşmeler ve sohbetler duruyor; yalnızca ilan bağlantısı koptu.",
+  "listings.dlgEditTitle": "İlanı düzenle",
+  "listings.dlgEditDesc":
+    "Sahiplik şartı yok. Kaydettiğin metin içerik denetiminden geçer: engellenmez, ama işaretlenirse inceleme kuyruğunda görünür.",
+  "listings.fieldTitle": "Başlık",
+  "listings.fieldDescription": "Açıklama",
+  "listings.fieldRent": "Kira (₺)",
+  "listings.fieldRooms": "Oda sayısı",
+  "listings.fieldFeatures": "Özellikler",
+  "listings.fieldBudgetMin": "Bütçe alt sınırı (₺)",
+  "listings.fieldBudgetMax": "Bütçe üst sınırı (₺)",
+  "listings.editNoChange": "Değişiklik yok",
+  "listings.editChangedCount": "{count} alan değişti",
+  "listings.doneEdit": "İlan güncellendi.",
+  "listings.doneEditFlagged":
+    "İlan güncellendi. Yeni metin denetimde işaretlendi; inceleme kuyruğunda görünecek.",
+  "listings.errTitle": "Başlık 3-120 karakter olmalı.",
+  "listings.errDescription": "Açıklama boş bırakılamaz (en çok 2000 karakter).",
+  "listings.errDistrict": "İlçe seçilmeli.",
+  "listings.errRent": "Kira 0'dan büyük bir sayı olmalı.",
+  "listings.errBudgetValue": "Bütçe 0'dan büyük bir sayı olmalı.",
+  "listings.errBudget": "Bütçe alt sınırı üst sınırdan büyük olamaz.",
   "listings.closedTitle": "Bu sayfa şu an kapalı",
   "listings.closedDesc": "İlanları Keşfet ekranında kaydırarak görebilirsin.",
   "listings.goDiscover": "Keşfet'e git",
@@ -626,7 +683,8 @@ const tr = {
 
   // ---- yönetim paneli ----
   "admin.title": "Yönetim",
-  "admin.subtitle": "Bildirimleri ve denetimin işaretlediği içeriği buradan incele.",
+  "admin.subtitle":
+    "Bildirimleri, işaretli içeriği ve kullanıcıları buradan yönet; geri alınamayan eylemler Kayıtlar sekmesinde durur.",
   "admin.refresh": "Yenile",
   "admin.loadFailed": "Liste yüklenemedi.",
   "admin.summaryFailed": "Özet yüklenemedi.",
@@ -638,7 +696,8 @@ const tr = {
   "admin.activeListings": "Yayındaki ilan",
   "admin.tabReports": "Bildirimler",
   "admin.tabFlagged": "İşaretlenenler",
-  "admin.tabSuspended": "Askıdakiler",
+  "admin.tabUsers": "Kullanıcılar",
+  "admin.tabActions": "Kayıtlar",
   "admin.statusOpen": "Açık",
   "admin.statusResolved": "Çözülmüş",
   "admin.statusAll": "Tümü",
@@ -766,6 +825,57 @@ const tr = {
   "admin.doneSuspend": "Kullanıcı askıya alındı.",
   "admin.doneUnsuspend": "Askı kaldırıldı.",
   "admin.actionFailed": "İşlem tamamlanamadı",
+
+  // ---- kullanıcı yönetimi ----
+  "admin.userSearchLabel": "Kullanıcı ara",
+  "admin.userSearchPlaceholder": "Ad ya da e-posta",
+  "admin.userSearchClear": "Aramayı temizle",
+  "admin.userStatusActive": "Aktif",
+  "admin.badgeNormal": "Normal",
+  "admin.emailOnlySuspended":
+    "Arama e-postada da çalışır; e-posta yalnızca askıdaki hesaplarda gösterilir.",
+  "admin.userCreatedAt": "Kayıt: {date}",
+  "admin.userUnsuspendedAt": "Askı kaldırılma: {date}",
+  "admin.lastSuspensionReason": "Önceki askı sebebi: {reason}",
+  "admin.actionDeleteUser": "Hesabı sil",
+  "admin.adminProtectedNote":
+    "Yönetici hesapları buradan askıya alınamaz ve silinemez: son yönetici kendini kilitlerse platformun yönetimi geri gelmez. Kişi kendi hesabını hesap ayarlarından, şifresiyle silebilir.",
+  "admin.resultCount": "Bu sayfada {count} kayıt",
+  "admin.emptyUsers": "Kullanıcı yok",
+  "admin.emptyUsersDesc": "Bu listede gösterilecek bir hesap bulunmuyor.",
+  "admin.emptyUsersFilteredDesc": "Bu arama ve süzgece uyan bir hesap yok.",
+  "admin.dlgDeleteUserTitle": "Hesabı kalıcı olarak sil",
+  "admin.dlgDeleteUserDesc":
+    "Hesap ve ona bağlı her şey silinir: ilanları, eşleşmeleri, mesajları, kaydırmaları ve bildirimleri. Eşleşmeleri silindiği için karşı taraftaki kişiler de o sohbetleri kaybeder.",
+  "admin.dlgDeleteUserWarn":
+    "Bu işlem geri alınamaz. Hesabı geri getirmenin bir yolu yok; geriye yalnızca denetim kaydındaki satır kalır.",
+  "admin.dlgDeleteUserReasonLabel": "Silme gerekçesi (zorunlu)",
+  "admin.dlgDeleteUserReasonPlaceholder":
+    "Bu hesabı neden siliyorsun? Denetim kaydına yazılır.",
+  "admin.doneDeleteUser": "Hesap kalıcı olarak silindi.",
+  "admin.doneDeleteUserDesc":
+    "{listings} ilan, {matches} eşleşme ve {messages} mesaj birlikte silindi.",
+
+  // ---- denetim kaydı ----
+  "admin.logIntro":
+    "Yalnızca geri alınamayan eylemler burada tutulur. Kayıt salt okunurdur: düzenlenemez, silinemez.",
+  "admin.logListingDelete": "İlan kalıcı silindi",
+  "admin.logUserDelete": "Hesap kalıcı silindi",
+  "admin.logListingUpdate": "İlan düzenlendi",
+  "admin.logListingPublish": "İlan yayına alındı",
+  "admin.logActorLabel": "Uygulayan: {name}",
+  "admin.logActorDeleted": "Hesabı silinmiş yönetici",
+  "admin.logReason": "Gerekçe",
+  "admin.logDetail": "Kayıt ayrıntısı",
+  "admin.logRawNote": "Alan adları sunucudaki hâliyle gösterilir.",
+  "admin.logValueTrue": "evet",
+  "admin.logValueFalse": "hayır",
+  "admin.logBefore": "Düzenlemeden önceki metin",
+  "admin.logBeforeNote": "Sahibinin yazdığı metnin kalan tek kopyası bu.",
+  "admin.emptyActionsTitle": "Denetim kaydı boş",
+  "admin.emptyActionsDesc":
+    "Geri alınamayan bir yönetici eylemi henüz yapılmamış.",
+  "admin.emptyActionsFilteredDesc": "Bu süzgece uyan bir kayıt yok.",
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -1204,15 +1314,72 @@ const en: Record<TranslationKey, string> = {
   "create.editTexts": "Back to title and description",
 
   // ---- listings ----
-  "listings.heading": "Listings",
-  "listings.live": "Live",
-  "listings.sub": "Rooms and roommate posts shared by the community",
+  "listings.heading": "Listing management",
+  "listings.sub": "Every listing — including ones their owner closed and ones moderation took down.",
   "listings.filterAll": "All",
   "listings.loading": "Loading listings…",
   "listings.loadFailed": "Couldn't load the listings.",
   "listings.backendHint": "Is the backend running? (127.0.0.1:8000)",
   "listings.emptyTitle": "No listings yet.",
-  "listings.emptyDesc": "Be the first to post one!",
+  "listings.emptyDesc": "There is no listing stored on the platform.",
+  "listings.emptyFilteredTitle": "No matching listing",
+  "listings.emptyFilteredDesc": "Try a different search term or status filter.",
+  // ---- admin listing tool ----
+  "listings.searchLabel": "Search listings",
+  "listings.searchPlaceholder": "Title, district or owner",
+  "listings.searchClear": "Clear search",
+  "listings.statusActive": "Live",
+  "listings.statusInactive": "Closed by owner",
+  "listings.statusRemoved": "Taken down",
+  "listings.statusFlagged": "Flagged",
+  "listings.badgeOwnerSuspended": "Owner suspended",
+  "listings.hiddenNote":
+    "This listing counts as live, but its owner is suspended so it shows up in no list at all.",
+  "listings.ownerUnknown": "Owner deleted",
+  "listings.createdAt": "Added: {date}",
+  "listings.resultCount": "{count} listings on this page",
+  "listings.pageFirst": "Back to the first page",
+  "listings.pagePrev": "Previous",
+  "listings.pageNext": "Next",
+  "listings.pageLabel": "Page {page}",
+  "listings.actionPublish": "Publish",
+  "listings.actionUnpublish": "Unpublish",
+  "listings.actionDelete": "Delete permanently",
+  "listings.donePublish": "The listing is live.",
+  "listings.donePublishNoop": "The listing was already live; nothing changed.",
+  "listings.donePublishHidden":
+    "The listing is live, but its owner is suspended so it still shows up in no list.",
+  "listings.dlgDeleteTitle": "Delete the listing permanently",
+  "listings.dlgDeleteDesc":
+    "The listing row is erased from the database. Likes sent to it and reports about it go too. Matches and chats SURVIVE; only their link to the listing is cut.",
+  "listings.dlgDeleteWarn":
+    "This cannot be undone. If you only want the listing hidden, use \"Unpublish\" — that decision can be reversed.",
+  "listings.dlgDeleteReasonLabel": "Reason for deleting (required)",
+  "listings.dlgDeleteReasonPlaceholder":
+    "Written to the audit log; afterwards this is the only place that says why the listing was deleted.",
+  "listings.doneDelete": "The listing was permanently deleted.",
+  "listings.doneDeleteDesc": "Matches and chats are still there; only the link to the listing is gone.",
+  "listings.dlgEditTitle": "Edit the listing",
+  "listings.dlgEditDesc":
+    "No ownership required. What you save still goes through content moderation: it is not blocked, but if it gets flagged it shows up in the review queue.",
+  "listings.fieldTitle": "Title",
+  "listings.fieldDescription": "Description",
+  "listings.fieldRent": "Rent (₺)",
+  "listings.fieldRooms": "Rooms",
+  "listings.fieldFeatures": "Features",
+  "listings.fieldBudgetMin": "Minimum budget (₺)",
+  "listings.fieldBudgetMax": "Maximum budget (₺)",
+  "listings.editNoChange": "No changes",
+  "listings.editChangedCount": "{count} field(s) changed",
+  "listings.doneEdit": "Listing updated.",
+  "listings.doneEditFlagged":
+    "Listing updated. The new text was flagged by moderation and will appear in the review queue.",
+  "listings.errTitle": "The title must be 3-120 characters.",
+  "listings.errDescription": "The description cannot be empty (2000 characters max).",
+  "listings.errDistrict": "Pick a district.",
+  "listings.errRent": "Rent must be a number greater than 0.",
+  "listings.errBudgetValue": "Budget must be a number greater than 0.",
+  "listings.errBudget": "The minimum budget cannot be greater than the maximum.",
   "listings.closedTitle": "This page is closed for now",
   "listings.closedDesc": "You can browse the listings by swiping on the Discover screen.",
   "listings.goDiscover": "Go to Discover",
@@ -1388,7 +1555,8 @@ const en: Record<TranslationKey, string> = {
 
   // ---- moderation panel ----
   "admin.title": "Moderation",
-  "admin.subtitle": "Review reports and anything automated moderation flagged.",
+  "admin.subtitle":
+    "Handle reports, flagged content and user accounts here; anything that cannot be undone is kept in the Audit log tab.",
   "admin.refresh": "Refresh",
   "admin.loadFailed": "The list could not be loaded.",
   "admin.summaryFailed": "The summary could not be loaded.",
@@ -1400,7 +1568,8 @@ const en: Record<TranslationKey, string> = {
   "admin.activeListings": "Live listings",
   "admin.tabReports": "Reports",
   "admin.tabFlagged": "Flagged",
-  "admin.tabSuspended": "Suspended",
+  "admin.tabUsers": "Users",
+  "admin.tabActions": "Audit log",
   "admin.statusOpen": "Open",
   "admin.statusResolved": "Resolved",
   "admin.statusAll": "All",
@@ -1517,6 +1686,56 @@ const en: Record<TranslationKey, string> = {
   "admin.doneSuspend": "User suspended.",
   "admin.doneUnsuspend": "Suspension lifted.",
   "admin.actionFailed": "The action could not be completed",
+
+  // ---- user management ----
+  "admin.userSearchLabel": "Search users",
+  "admin.userSearchPlaceholder": "Name or email",
+  "admin.userSearchClear": "Clear search",
+  "admin.userStatusActive": "Active",
+  "admin.badgeNormal": "Standard",
+  "admin.emailOnlySuspended":
+    "Search covers email too; the address itself is only shown for suspended accounts.",
+  "admin.userCreatedAt": "Joined {date}",
+  "admin.userUnsuspendedAt": "Suspension lifted on {date}",
+  "admin.lastSuspensionReason": "Previous suspension reason: {reason}",
+  "admin.actionDeleteUser": "Delete account",
+  "admin.adminProtectedNote":
+    "Admin accounts cannot be suspended or deleted from here: if the last admin locks themselves out, nobody can run the platform again. An admin can still delete their own account from account settings, with their password.",
+  "admin.resultCount": "{count} rows on this page",
+  "admin.emptyUsers": "No users",
+  "admin.emptyUsersDesc": "There is no account to show in this list.",
+  "admin.emptyUsersFilteredDesc": "No account matches this search and filter.",
+  "admin.dlgDeleteUserTitle": "Delete the account permanently",
+  "admin.dlgDeleteUserDesc":
+    "The account and everything attached to it goes: their listings, matches, messages, swipes and reports. Because the matches are deleted, the people on the other side lose those chats too.",
+  "admin.dlgDeleteUserWarn":
+    "This cannot be undone. There is no way to bring the account back; all that remains is the row in the audit log.",
+  "admin.dlgDeleteUserReasonLabel": "Reason for deleting (required)",
+  "admin.dlgDeleteUserReasonPlaceholder":
+    "Why are you deleting this account? It goes into the audit log.",
+  "admin.doneDeleteUser": "The account was permanently deleted.",
+  "admin.doneDeleteUserDesc":
+    "{listings} listings, {matches} matches and {messages} messages went with it.",
+
+  // ---- audit log ----
+  "admin.logIntro":
+    "Only actions that cannot be undone are kept here. The log is read-only: it cannot be edited or deleted.",
+  "admin.logListingDelete": "Listing permanently deleted",
+  "admin.logUserDelete": "Account permanently deleted",
+  "admin.logListingUpdate": "Listing edited",
+  "admin.logListingPublish": "Listing published",
+  "admin.logActorLabel": "By {name}",
+  "admin.logActorDeleted": "Admin whose account was deleted",
+  "admin.logReason": "Reason",
+  "admin.logDetail": "Recorded details",
+  "admin.logRawNote": "Field names appear exactly as the server records them.",
+  "admin.logValueTrue": "yes",
+  "admin.logValueFalse": "no",
+  "admin.logBefore": "Text before the edit",
+  "admin.logBeforeNote": "This is the only surviving copy of what the owner wrote.",
+  "admin.emptyActionsTitle": "The audit log is empty",
+  "admin.emptyActionsDesc": "No irreversible admin action has been taken yet.",
+  "admin.emptyActionsFilteredDesc": "No entry matches this filter.",
 };
 
 export const translations = { tr, en } as const;

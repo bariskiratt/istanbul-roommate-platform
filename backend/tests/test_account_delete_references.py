@@ -2,10 +2,17 @@
 
 BU DOSYA NE İŞE YARIYOR
 -----------------------
-DELETE /api/auth/me, silinen kullanıcıya işaret eden her satırı ya silmek ya
-da o alanı NULL'a çekmek zorundadır. Bir tanesi bile atlanırsa Postgres'in
-yabancı anahtar kısıtı silmeyi reddeder, hata yakalanmadığı için istek 500
-verir ve KULLANICI HESABINI SİLEMEZ.
+Hesap silen İKİ uç var ve ikisi de aynı temizliği yapmak zorunda:
+    DELETE /api/auth/me          kişinin kendisi (şifre doğrulamasıyla)
+    DELETE /api/admin/users/{id} yönetici (gerekçe zorunlu)
+Silinen kullanıcıya işaret eden her satır ya silinmeli ya da o alan NULL'a
+çekilmeli. Bir tanesi bile atlanırsa Postgres'in yabancı anahtar kısıtı
+silmeyi reddeder, hata yakalanmadığı için istek 500 verir ve HESAP SİLİNEMEZ.
+
+Aşağıdaki testler her yabancı anahtarı İKİ UÇ İÇİN DE ayrı ayrı koşar. İkisi
+de app.auth.purge_user'ı çağırdığı için normalde aynı sonucu vermeleri
+gerekir; testin ikisini birden koşmasının sebebi tam olarak budur — biri
+gün gelip kendi silme listesini yazmaya kalkarsa burada yakalanır.
 
 Bu hata bu projede İKİ KEZ yaşandı:
   1. reports.reporter_id eklendiğinde (düzeltildi, auth.py'de yorumu duruyor),
@@ -48,11 +55,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import models
+from app.config import ADMIN_EMAILS
 from app.db import Base, get_db
 from app.main import app
 
 EMAIL = "silinecek@uni.edu.tr"
 PASSWORD = "Sifre1234"
+# config.ADMIN_EMAILS ortam değişkeninden okunur; kurulum farkı testi kırmasın
+# diye listeden birini alıp yönetici hesabını onunla kuruyoruz.
+ADMIN_EMAIL = sorted(ADMIN_EMAILS)[0]
 
 _USER_ID = models.User.__table__.c.id
 # Tablo adı -> ORM sınıfı. Genel satır üreticisi tabloyu görüp modeli bulur.
@@ -147,15 +158,39 @@ def ctx():
     app.dependency_overrides.clear()
 
 
-def _register(client) -> tuple[dict, int]:
+def _register(client, email: str = EMAIL) -> tuple[dict, int]:
     res = client.post(
-        "/api/auth/register", json={"email": EMAIL, "password": PASSWORD}
+        "/api/auth/register", json={"email": email, "password": PASSWORD}
     )
     data = client.post(
         "/api/auth/verify-otp",
-        json={"email": EMAIL, "code": res.json()["dev_code"]},
+        json={"email": email, "code": res.json()["dev_code"]},
     ).json()
     return {"Authorization": f"Bearer {data['token']}"}, data["user"]["id"]
+
+
+def _delete_kendi(client, headers, uid):
+    """DELETE /api/auth/me — kişinin kendisi, şifreyle. Başarı: 204."""
+    res = client.request(
+        "DELETE", "/api/auth/me", headers=headers, json={"password": PASSWORD}
+    )
+    return res, 204
+
+
+def _delete_yonetici(client, headers, uid):
+    """DELETE /api/admin/users/{id} — yönetici, gerekçeyle. Başarı: 200."""
+    admin_headers, _ = _register(client, ADMIN_EMAIL)
+    res = client.request(
+        "DELETE",
+        f"/api/admin/users/{uid}",
+        headers=admin_headers,
+        json={"reason": "Test: kalıcı silme"},
+    )
+    return res, 200
+
+
+# Her yabancı anahtar bu iki yolun İKİSİ İÇİN DE denenir.
+_DELETE_PATHS = {"kendi": _delete_kendi, "yonetici": _delete_yonetici}
 
 
 def _referencing_rows(db, user_id: int) -> dict[str, int]:
@@ -175,14 +210,15 @@ def test_sema_gercekten_yabanci_anahtar_tasiyor():
     assert len(_FK_COLUMNS) >= 8, _FK_IDS
 
 
+@pytest.mark.parametrize("yol", _DELETE_PATHS)
 @pytest.mark.parametrize("column", _FK_COLUMNS, ids=_FK_IDS)
-def test_hesap_silme_her_yabanci_anahtari_temizler(ctx, column):
-    """users.id'ye bakan HER sütun için: hesap silinebilmeli (204).
+def test_hesap_silme_her_yabanci_anahtari_temizler(ctx, column, yol):
+    """users.id'ye bakan HER sütun için: hesap İKİ YOLDAN DA silinebilmeli.
 
-    Bu test kırıldıysa yapılacak şey, app/auth.py'deki delete_account'a o
-    sütunu eklemektir. Sütun nullable ise oradaki genel süpürme
-    (_nullable_user_fk_columns) zaten hallediyor olmalı; NOT NULL ise ilgili
-    satırların açıkça silinmesi gerekir.
+    Bu test kırıldıysa yapılacak şey, app/auth.py'deki purge_user'a o sütunu
+    eklemektir (iki uç da orayı çağırır). Sütun nullable ise oradaki genel
+    süpürme (_nullable_user_fk_columns) zaten hallediyor olmalı; NOT NULL ise
+    ilgili satırların açıkça silinmesi gerekir.
     """
     client, Session = ctx
     headers, uid = _register(client)
@@ -193,14 +229,49 @@ def test_hesap_silme_her_yabanci_anahtari_temizler(ctx, column):
         db.commit()
         assert _referencing_rows(db, uid), "kurulum satırı gerçekten bağlanmadı"
 
-    res = client.request(
-        "DELETE", "/api/auth/me", headers=headers, json={"password": PASSWORD}
-    )
-    assert res.status_code == 204, res.text
+    res, beklenen = _DELETE_PATHS[yol](client, headers, uid)
+    assert res.status_code == beklenen, res.text
 
     with Session() as db:
         assert db.get(models.User, uid) is None
         assert _referencing_rows(db, uid) == {}
+
+
+@pytest.mark.parametrize("yol", _DELETE_PATHS)
+def test_denetim_kaydinin_aktoru_silinince_kayit_kaybolmaz(ctx, yol):
+    """Silinen kullanıcı bir denetim kaydının AKTÖRÜ ise kayıt DURUR.
+
+    admin_actions, geri alınamaz eylemlerin (kalıcı silme) tek izidir. Aktörü
+    silinince kaydın da silinmesi, izini yok etmenin en kolay yolunu "kendi
+    hesabını sil" yapardı. Doğru davranış: actor_id NULL'a düşer, satır kalır.
+    """
+    client, Session = ctx
+    headers, uid = _register(client)
+
+    with Session() as db:
+        db.add(
+            models.AdminAction(
+                actor_id=uid,
+                action="listing_delete",
+                target_type="listing",
+                target_id=4242,
+                reason="Hukuki kaldırma talebi",
+            )
+        )
+        db.commit()
+
+    res, beklenen = _DELETE_PATHS[yol](client, headers, uid)
+    assert res.status_code == beklenen, res.text
+
+    with Session() as db:
+        kayit = db.scalar(
+            select(models.AdminAction).where(models.AdminAction.target_id == 4242)
+        )
+        assert kayit is not None, "denetim kaydı aktörüyle birlikte silinmiş"
+        assert kayit.actor_id is None
+        # Eylemin KENDİSİ ve gerekçesi duruyor; kaybolan yalnızca imza.
+        assert kayit.action == "listing_delete"
+        assert kayit.reason == "Hukuki kaldırma talebi"
 
 
 def test_yonetici_moderasyon_yaptiktan_sonra_hesabini_silebilir(ctx):

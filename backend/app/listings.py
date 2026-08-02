@@ -97,6 +97,79 @@ def _moderate(title: str, description: str) -> moderation.ModerationResult:
     )
 
 
+def moderate_listing_text(
+    title: str, description: str
+) -> moderation.ModerationResult:
+    """Başlığı ve açıklamayı denetler ama HİÇBİR ŞEYİ ENGELLEMEZ.
+
+    _moderate ile aynı metni aynı kurallardan geçirir; tek farkı, "block"
+    sonucunda 422 fırlatmak yerine sonucu olduğu gibi döndürmesidir. Yönetici
+    düzenlemesi (PATCH /api/admin/listings/{id}) bunu kullanır: moderasyonun
+    yöneticiyi durdurması, kaldırılamayan bir ilanı düzeltmek için gelen
+    yöneticiyi tam da düzeltmek istediği metin yüzünden dışarıda bırakırdı.
+    Denetim yine de ÇALIŞIR; sonucu kayda işaret olarak yazılır, böylece
+    yöneticinin bıraktığı metin de inceleme kuyruğunda görünür.
+    """
+    return moderation.merge(
+        moderation.check(title, kind="listing"),
+        moderation.check(description, kind="listing"),
+    )
+
+
+def flag_state(result: moderation.ModerationResult) -> tuple[bool, str | None]:
+    """Denetim sonucunu kayda yazılacak (işaretli mi, gerekçe CSV) çiftine çevirir.
+
+    moderation.reasons_csv "block" sonucunda None döner ve bu KULLANICI yolu
+    için doğrudur: engellenen metin zaten kaydedilmiyor, gerekçeyi saklayacak
+    bir satır yok. Yönetici yolunda ise metin KAYDEDİLİYOR (denetim yöneticiyi
+    engellemiyor); orada aynı kuralı uygulamak "işaretli ama sebebi boş" bir
+    kayıt üretirdi ve yönetici kuyruğunda neye baktığını kimse anlayamazdı.
+
+    Bu yüzden burada "block" da "flag" da işaret sayılır ve gerekçe korunur.
+    """
+    flagged = result.flagged or result.blocked
+    if not flagged or not result.reasons:
+        return flagged, None
+    return True, ",".join(result.reasons)
+
+
+def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
+    """İlanı KALICI siler ve ona bağlı kayıtları temizler. COMMIT ETMEZ.
+
+    Bağlı kayıtlarda iki farklı karar var; ikisi de bilinçli:
+
+    1. SİLİNİR — o ilana verilmiş kaydırmalar (swipes) ve hedefi bu ilan olan
+       raporlar. İkisi de yalnızca ilan var olduğu sürece anlamlı: konusu
+       kalmamış bir rapor yönetici kuyruğunda tıklanınca 404 veren ölü kayıt
+       olurdu.
+    2. YAŞAR — eşleşmeler ve sohbetler. matches.listing_id NULL'a çekilir,
+       satır durur. İlan bir eşleşmenin BAŞLAMA SEBEBİDİR, konusu değil:
+       ilanı silmek insanların birbirine yazdıklarını silmez. models.Match
+       zaten bunu öngörüp listing_id'yi nullable tanımlamış ("ilan kapansa da
+       eşleşme yaşar").
+
+    Postgres'te bu temizlik ZORUNLUDUR: swipes.listing_id ve matches.listing_id
+    yabancı anahtar kısıtı taşır, atlanırsa DELETE reddedilir ve uç 500 verir.
+    (SQLite'ta kısıtlar varsayılan kapalı olduğu için hata testte değil
+    üretimde görünürdü.)
+    """
+    lid = row.id
+    swipes = db.query(models.Swipe).filter(
+        models.Swipe.listing_id == lid
+    ).delete(synchronize_session=False)
+    reports = db.query(models.Report).filter(
+        models.Report.target_type == "listing",
+        models.Report.target_id == lid,
+    ).delete(synchronize_session=False)
+    matches = db.query(models.Match).filter(
+        models.Match.listing_id == lid
+    ).update({models.Match.listing_id: None}, synchronize_session=False)
+
+    db.delete(row)
+    db.flush()
+    return {"swipes": swipes, "reports": reports, "detached_matches": matches}
+
+
 def _suspended_user_ids():
     """Askıdaki kullanıcıların id'lerini veren alt sorgu."""
     return select(models.User.id).where(models.User.is_suspended.is_(True))
@@ -407,11 +480,14 @@ def deactivate_listing(
 ):
     """Kalıcı silme yerine pasife çeker (satır ve veriler durur).
 
-    DÜRÜSTLÜK NOTU: satır silinmediği için veri kaybı yoktur, ama sahibin
-    kendi kapattığı ilanı YENİDEN YAYINA ALACAĞI BİR UÇ YOK — kapatma
-    kullanıcı açısından tek yönlüdür. (Yöneticinin kaldırdığı ilan ayrı bir
-    durumdur: moderation_removed=True olur ve
-    POST /api/admin/listing/{id}/restore ile geri alınır.)
+    DÜRÜSTLÜK NOTU: satır silinmediği için veri kaybı yoktur, ama sahibinin
+    KENDİ ELİYLE yeniden yayına alacağı bir uç hâlâ yok — kapatma kullanıcı
+    açısından tek yönlüdür. Yeniden yayına almak bugün YÖNETİCİDEN geçiyor
+    (POST /api/admin/listings/{id}/publish); kullanıcının kendi düğmesi
+    ayrı bir iştir ve yapılmadı.
+
+    (Yöneticinin kaldırdığı ilan ayrı bir durumdur: moderation_removed=True
+    olur ve POST /api/admin/listing/{id}/restore ile geri alınır.)
 
     Yalnızca ilan sahibi kapatabilir; sahipsiz (eski anonim) kayıtlar API'den
     silinemez, gerekirse veritabanından temizlenir.

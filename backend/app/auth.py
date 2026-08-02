@@ -500,18 +500,23 @@ def _nullable_user_fk_columns() -> list:
     ]
 
 
-@router.delete("/me", status_code=204)
-def delete_account(
-    payload: AccountDelete,
-    user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Hesabı ve ona bağlı tüm verileri kalıcı olarak siler."""
-    if not user.password_hash or not _verify_password(
-        payload.password, user.password_hash
-    ):
-        raise HTTPException(status_code=400, detail="Şifren hatalı.")
+def purge_user(db: Session, user: models.User) -> dict[str, int]:
+    """Kullanıcıyı ve ona bağlı TÜM verileri siler. COMMIT ETMEZ.
 
+    HESABI SİLEN İKİ UÇ DA BURAYI ÇAĞIRIR:
+      - DELETE /api/auth/me          (kişinin kendisi, şifre doğrulamasıyla)
+      - DELETE /api/admin/users/{id} (yönetici, gerekçe zorunlu)
+
+    Ortak fonksiyon olması bir üslup tercihi değil: bu projede "silinecek
+    satırlar" listesi elle iki yerde tutulsaydı, users.id'ye bakan yeni bir
+    sütun eklendiğinde biri güncellenip diğeri unutulurdu. Aynı hata tek
+    listeyle bile ÜÇ KEZ yaşandı (bkz. aşağıdaki reports.reporter_id notu ve
+    tests/test_account_delete_references.py). Tek giriş noktası + şemadan
+    türetilen süpürme, hatanın tekrarını yapısal olarak engelliyor.
+
+    Dönen sözlük temizlenen satır sayılarıdır; yönetici ucu bunu yanıtında
+    döndürüp "ne silindi" sorusunu cevaplar.
+    """
     uid = user.id
     # Eşleşmelere ait mesajlar (karşı tarafınkiler dahil) önce silinmeli
     match_ids = [
@@ -530,32 +535,34 @@ def delete_account(
     message_ids = [
         m.id for m in db.query(models.Message.id).filter(message_filter)
     ]
+    deleted_messages = 0
     if message_ids:
-        db.query(models.Message).filter(
+        deleted_messages = db.query(models.Message).filter(
             models.Message.id.in_(message_ids)
         ).delete(synchronize_session=False)
-    db.query(models.Match).filter(
+    deleted_matches = db.query(models.Match).filter(
         (models.Match.user_a_id == uid) | (models.Match.user_b_id == uid)
     ).delete(synchronize_session=False)
 
     listing_ids = [
         l.id for l in db.query(models.Listing.id).filter_by(owner_id=uid)
     ]
+    deleted_swipes = 0
     if listing_ids:
-        db.query(models.Swipe).filter(
+        deleted_swipes += db.query(models.Swipe).filter(
             models.Swipe.listing_id.in_(listing_ids)
         ).delete(synchronize_session=False)
-    db.query(models.Swipe).filter(models.Swipe.swiper_id == uid).delete(
-        synchronize_session=False
-    )
-    db.query(models.Listing).filter_by(owner_id=uid).delete(
+    deleted_swipes += db.query(models.Swipe).filter(
+        models.Swipe.swiper_id == uid
+    ).delete(synchronize_session=False)
+    deleted_listings = db.query(models.Listing).filter_by(owner_id=uid).delete(
         synchronize_session=False
     )
 
     # Raporlar: reporter_id users.id'ye yabancı anahtarla bağlı — temizlenmezse
     # Postgres kısıtı hesabın silinmesini engeller (SQLite'ta FK varsayılan
     # kapalı olduğu için bu sessizce gözden kaçabiliyordu).
-    db.query(models.Report).filter_by(reporter_id=uid).delete(
+    deleted_reports = db.query(models.Report).filter_by(reporter_id=uid).delete(
         synchronize_session=False
     )
     # Hedefi bu kullanıcı olan raporlar da silinir. target_id'de yabancı anahtar
@@ -564,16 +571,16 @@ def delete_account(
     # Temizlenmezse yönetici kuyruğunda var olmayan bir kullanıcıyı/ilanı/mesajı
     # gösteren, tıklanınca 404 veren ölü kayıtlar birikir. Aynı gerekçeyle
     # kullanıcının silinen ilan ve mesajlarına açılmış raporlar da temizlenir.
-    db.query(models.Report).filter(
+    deleted_reports += db.query(models.Report).filter(
         models.Report.target_type == "user", models.Report.target_id == uid
     ).delete(synchronize_session=False)
     if listing_ids:
-        db.query(models.Report).filter(
+        deleted_reports += db.query(models.Report).filter(
             models.Report.target_type == "listing",
             models.Report.target_id.in_(listing_ids),
         ).delete(synchronize_session=False)
     if message_ids:
-        db.query(models.Report).filter(
+        deleted_reports += db.query(models.Report).filter(
             models.Report.target_type == "message",
             models.Report.target_id.in_(message_ids),
         ).delete(synchronize_session=False)
@@ -584,15 +591,51 @@ def delete_account(
 
     # Son adım: kullanıcıya işaret eden nullable yabancı anahtarları boşalt.
     # Bunlar denetim izi alanlarıdır (kim askıya aldı / kim inceledi / kim
-    # raporu kapattı) ve silinen kullanıcı BAŞKALARININ satırlarında da
-    # geçebilir; temizlenmezse hesap hiç silinemez. Açık silmelerden SONRA
-    # koşar, böylece zaten silinmiş satırlar boşuna güncellenmez.
+    # raporu kapattı / KİM KALICI SİLDİ) ve silinen kullanıcı BAŞKALARININ
+    # satırlarında da geçebilir; temizlenmezse hesap hiç silinemez. Açık
+    # silmelerden SONRA koşar, böylece zaten silinmiş satırlar boşuna
+    # güncellenmez.
+    #
+    # models.AdminAction.actor_id de bu süpürmeye dahildir ve OLMASI GEREKEN
+    # budur: yönetici hesabı silinince denetim kaydı aktörünü kaybeder ama
+    # KENDİSİ DURUR. Kaydı aktörüyle birlikte silmek, "kim neyi neden sildi"
+    # sorusunu silinen her yöneticiyle birlikte cevapsız bırakırdı — üstelik
+    # izini silmenin en kolay yolu kendi hesabını silmek olurdu.
     for column in _nullable_user_fk_columns():
         db.execute(
             update(column.table).where(column == uid).values({column.name: None})
         )
 
     db.delete(user)
+    db.flush()
+    return {
+        "listings": deleted_listings,
+        "matches": deleted_matches,
+        "messages": deleted_messages,
+        "swipes": deleted_swipes,
+        "reports": deleted_reports,
+    }
+
+
+@router.delete("/me", status_code=204)
+def delete_account(
+    payload: AccountDelete,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Hesabı ve ona bağlı tüm verileri kalıcı olarak siler.
+
+    Şifre doğrulaması BURADA yapılır, purge_user'da değil: yönetici ucu
+    (DELETE /api/admin/users/{id}) başkasının şifresini bilemez, onun
+    doğrulaması require_admin + gerekçe zorunluluğudur. Ortak olan yalnızca
+    "hangi satırlar silinir" mantığıdır.
+    """
+    if not user.password_hash or not _verify_password(
+        payload.password, user.password_hash
+    ):
+        raise HTTPException(status_code=400, detail="Şifren hatalı.")
+
+    purge_user(db, user)
     db.commit()
 
 

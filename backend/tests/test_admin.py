@@ -140,18 +140,30 @@ ADMIN_ENDPOINTS = [
     ("post", "/api/admin/message/1/restore", None),
     ("get", "/api/admin/users", None),
     ("get", "/api/admin/users?suspended=true", None),
+    ("get", "/api/admin/users?q=ali", None),
     ("post", "/api/admin/users/1/suspend", {"reason": "spam"}),
     ("post", "/api/admin/users/1/unsuspend", None),
+    # Kalıcı silme ve ilan yönetimi (bu turda eklendi).
+    ("get", "/api/admin/listings", None),
+    ("get", "/api/admin/listings?status=removed&q=kadikoy", None),
+    ("patch", "/api/admin/listings/1", {"title": "Yeni başlık"}),
+    ("post", "/api/admin/listings/1/publish", None),
+    ("delete", "/api/admin/listings/1", {"reason": "Hukuki talep"}),
+    ("delete", "/api/admin/users/1", {"reason": "Sahte hesap"}),
+    ("get", "/api/admin/actions", None),
 ]
 
 
 def _call(client, method, path, body=None, headers=None):
-    # TestClient.get() "json" argümanı kabul etmez; gövde yalnızca varsa geçilir.
+    # TestClient.get()/delete() "json" argümanı kabul etmez; gövdeli istekler
+    # request() üzerinden gider, gövde yalnızca varsa geçilir.
     kwargs = {}
     if body is not None:
         kwargs["json"] = body
     if headers is not None:
         kwargs["headers"] = headers
+    if body is not None and method in ("delete", "get"):
+        return client.request(method.upper(), path, **kwargs)
     return getattr(client, method)(path, **kwargs)
 
 
@@ -179,10 +191,18 @@ def test_admin_olmayan_403(client, method, path, body):
         "/api/admin/flagged?kind=message",
         "/api/admin/flagged?status=removed",
         "/api/admin/flagged?kind=message&status=removed",
-        # NOT: "/api/admin/users" filtresiz ARTIK 422 — bkz.
-        # test_kullanici_listesi_suspended_filtresi_zorunlu.
+        "/api/admin/users",
         "/api/admin/users?suspended=true",
         "/api/admin/users?suspended=false",
+        "/api/admin/users?q=ali",
+        "/api/admin/listings",
+        "/api/admin/listings?status=active",
+        "/api/admin/listings?status=inactive",
+        "/api/admin/listings?status=removed",
+        "/api/admin/listings?status=flagged",
+        "/api/admin/listings?q=kadikoy&limit=10&offset=0",
+        "/api/admin/actions",
+        "/api/admin/actions?action=listing_delete&target_type=listing",
     ],
 )
 def test_admin_get_uclari_200(client, path):
@@ -1020,13 +1040,39 @@ def test_gecersiz_restore_turu_422(client):
 # yönetici veri asgarisi
 # ---------------------------------------------------------------------------
 
-def test_kullanici_listesi_suspended_filtresi_zorunlu(client):
-    """Filtresiz çağrı tüm kullanıcı tabanını e-postalarıyla döküyordu."""
+def test_kullanici_listesi_filtresiz_de_sayfali_ve_epostasiz(client):
+    """Filtresiz çağrı ARTIK serbest — ama iki koruma yerinde duruyor.
+
+    Bu uç bir dönem `suspended` filtresini ZORUNLU tutuyordu; sebebi
+    filtresiz çağrının tüm kullanıcı tabanını E-POSTALARIYLA ve SINIRSIZ
+    dökmesiydi. Filtre zorunluluğu o iki soruna dolaylı bir çareydi:
+    "askıdakiler" ya da "aktifler" demek de tabanın tamamına yakınını
+    dökebiliyordu. Asıl iki koruma doğrudan kondu (sayfalama + e-postanın
+    yalnız askıdakilerde dönmesi), zorunluluk kalktı — çünkü bir bildirimde
+    adı geçen kişiyi aramanın başka yolu yoktu ve o kişinin askıda olup
+    olmadığı zaten önceden bilinmiyor.
+
+    Test ikisini birden bekçiler: filtresiz çağrı 200 döner ama sayfalıdır ve
+    aktif hesapların e-postasını TAŞIMAZ.
+    """
     admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
-    _make_user(client, "ali@uni.edu.tr", "Ali")
-    assert client.get(
-        "/api/admin/users", headers=admin["headers"]
-    ).status_code == 422
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+
+    res = client.get("/api/admin/users", headers=admin["headers"])
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert {u["id"] for u in rows} == {admin["id"], ali["id"]}
+    # Askıda olmayan hiçbir hesabın e-postası dönmez.
+    assert all(u["email"] is None for u in rows)
+
+    # Sayfalama gerçekten uygulanıyor (varsayılan 50, elle daraltılabilir).
+    tek = client.get("/api/admin/users?limit=1", headers=admin["headers"]).json()
+    assert len(tek) == 1
+    ikinci = client.get(
+        "/api/admin/users?limit=1&offset=1", headers=admin["headers"]
+    ).json()
+    assert len(ikinci) == 1
+    assert ikinci[0]["id"] != tek[0]["id"]
 
 
 def test_eposta_yalnizca_askidakiler_icin_doner(client):

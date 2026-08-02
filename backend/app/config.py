@@ -38,7 +38,7 @@ DB_PATH = DATA_DIR / "app.db"
 #   GET  /api/admin/summary            kuyruk sayaçları
 #   GET  /api/admin/reports            karar bağlamıyla bildirim kuyruğu
 #   PATCH /api/admin/reports/{id}      bildirimi kapatma / yeniden açma
-#   GET  /api/admin/users?suspended=.. kullanıcı listesi (filtre ZORUNLU;
+#   GET  /api/admin/users              kullanıcı listesi/araması (sayfalı;
 #                                      e-posta yalnız askıdaki hesaplar için)
 #   POST /api/admin/users/{id}/suspend   askıya alma, oturumlarını düşürme
 #   POST /api/admin/users/{id}/unsuspend askıyı kaldırma
@@ -47,9 +47,23 @@ DB_PATH = DATA_DIR / "app.db"
 #   POST /api/admin/flagged/{kind}/{id}/review  ilanı yayından kaldırma,
 #                                      mesaj metnini sabitle örtme
 #   POST /api/admin/{kind}/{id}/restore  kaldırılanı yayına geri alma
+#   GET  /api/admin/listings           TÜM ilanlar (pasif ve kaldırılmış dâhil)
+#   PATCH /api/admin/listings/{id}     BAŞKASININ ilanını düzenleme
+#   POST /api/admin/listings/{id}/publish  ilanı yayına alma
+#   GET  /api/admin/actions            denetim kaydı
+#   -- GERİ ALINAMAZ (gerekçe zorunlu, denetim kaydına yazılır) --
+#   DELETE /api/admin/listings/{id}    ilanı KALICI silme
+#   DELETE /api/admin/users/{id}       hesabı KALICI silme
+#
+# Yöneticinin YAPAMADIKLARI da bilinçli kararlardır: kendini ya da başka bir
+# yöneticiyi askıya alamaz/silemez (son yönetici kendini kilitlerse yönetim
+# geri gelmez) ve BAŞKA BİR KULLANICI OLARAK GİRİŞ YAPAMAZ (kimliğe bürünme
+# ucu yok; ayrıntı app/admin.py ilke 3b).
 #
 # RİSK: yetki tek başına e-posta eşleşmesine dayandığı için, bu adreslerden
-# birinin hesabını ele geçiren kişi doğrudan moderatör olur. İki sonucu var:
+# birinin hesabını ele geçiren kişi doğrudan moderatör olur. Artık yalnızca
+# içeriği gizleyemez, KALICI SİLEBİLİR de — aşağıdaki iki madde bu yüzden
+# eskisinden daha önemli. İki sonucu var:
 #   1. Kendi dağıtımında ADMIN_EMAILS'i MUTLAKA kendi adreslerinle ez;
 #      aşağıdaki varsayılanlar bu repoda açıkça yazılı.
 #   2. DEV_OTP üretimde 0 olmalı. 1 iken /auth/request-otp doğrulama kodunu

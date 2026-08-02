@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Flag, RefreshCw, ShieldCheck, UserX } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  RefreshCw,
+  ScrollText,
+  Search,
+  ShieldCheck,
+  Users,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import AppHeader from "@/components/layout/AppHeader";
 import BottomNav from "@/components/layout/BottomNav";
 import AdminActionDialog, { type AdminActionKind } from "@/components/AdminActionDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
@@ -15,6 +27,8 @@ import { reportReasonKey } from "@/lib/reportReasons";
 import {
   REMOVED_CONTENT,
   UNREADABLE_CONTENT,
+  adminDeleteUser,
+  fetchAdminActions,
   fetchAdminReports,
   fetchAdminSummary,
   fetchAdminUsers,
@@ -24,6 +38,9 @@ import {
   reviewFlagged,
   suspendUser,
   unsuspendUser,
+  type AdminActionRow,
+  type AdminActionTargetType,
+  type AdminDeleteResult,
   type AdminReport,
   type AdminReportStatus,
   type AdminUserRow,
@@ -32,6 +49,9 @@ import {
   type FlaggedStatus,
   type RestoreResult,
 } from "@/lib/api";
+
+/** Sunucu sayfa başına en çok bu kadar satır döndürür (limit varsayılanı 50). */
+const PAGE_SIZE = 50;
 
 /** useI18n().t ile aynı imza; alt bileşenlere aktarmak yerine kendileri çağırır. */
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string;
@@ -62,6 +82,67 @@ const doneKeys: Record<AdminActionKind, TranslationKey> = {
   clear: "admin.doneClear",
   suspend: "admin.doneSuspend",
   unsuspend: "admin.doneUnsuspend",
+  deleteUser: "admin.doneDeleteUser",
+};
+
+/**
+ * Denetim kaydındaki eylem kodu -> etiket. Kod listesi sunucuda kapalıdır
+ * (app/admin.py); tanımadığımız bir kod gelirse ham kodu basarız, böylece
+ * sunucu yeni bir eylem kaydettiğinde kayıt görünmez olmaz.
+ */
+const actionLabelKeys: Record<string, TranslationKey> = {
+  listing_delete: "admin.logListingDelete",
+  user_delete: "admin.logUserDelete",
+  listing_update: "admin.logListingUpdate",
+  listing_publish: "admin.logListingPublish",
+};
+
+const targetLabelKeys: Record<string, TranslationKey> = {
+  listing: "admin.targetListing",
+  user: "admin.targetUser",
+  message: "admin.targetMessage",
+};
+
+/** Kullanıcı satırında gösterilebilecek eylemler. */
+export type UserRowAction = "suspend" | "unsuspend" | "deleteUser";
+
+/**
+ * Bir kullanıcı satırında hangi eylem düğmelerinin GÖSTERİLECEĞİ.
+ *
+ * Yönetici satırında hiçbiri gösterilmez. Sunucu bu istekleri zaten
+ * reddediyor (kendine 400, başka bir yöneticiye 403); düğmeyi gösterip
+ * kullanıcıya hata aldırmak, olmayan bir yetkiyi varmış gibi göstermek olur.
+ * Kısıtın kendisi bir yetki meselesi değil emniyet kilidi: son yönetici
+ * kendini askıya alır ya da silerse platformun yönetimi geri gelmez. Satırın
+ * altında bunun gerekçesi yazılı olarak durur (admin.adminProtectedNote) —
+ * düğmenin neden yokluğu sessiz kalmasın.
+ */
+export const userRowActions = (
+  row: Pick<AdminUserRow, "is_admin" | "is_suspended">,
+): UserRowAction[] => {
+  if (row.is_admin) return [];
+  return row.is_suspended ? ["unsuspend", "deleteUser"] : ["suspend", "deleteUser"];
+};
+
+/**
+ * Denetim kaydının `detail` alanı JSON METNİDİR, nesne değil.
+ *
+ * Ayrıştırılamayan bir değer tüm satırı gizlememeli: kaydın asıl bilgisi
+ * (kim, ne zaman, neyi, hangi gerekçeyle) kendi sütunlarında duruyor ve
+ * okunabilir kalmalı. Bu yüzden hata fırlatmak yerine null döner.
+ */
+export const parseActionDetail = (
+  raw: string | null,
+): Record<string, unknown> | null => {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -113,9 +194,22 @@ type AdminAction =
   | { kind: "restoreMessage"; label: string; itemId: number; unrecoverable: boolean }
   | { kind: "clear"; label: string; itemKind: FlaggedKind; itemId: number }
   | { kind: "suspend"; label: string; userId: number }
-  | { kind: "unsuspend"; label: string; userId: number };
+  | { kind: "unsuspend"; label: string; userId: number }
+  // Kalıcı: hesap ve bağlı verisi gider, geri getirilemez.
+  | { kind: "deleteUser"; label: string; userId: number };
 
-type Tab = "reports" | "flagged" | "suspended";
+/**
+ * "suspended" sekmesi "users" ile BİRLEŞTİRİLDİ. Askıdakiler listesi, yeni
+ * kullanıcı listesinin `suspended` süzgecinden başka bir şey değildi: aynı
+ * uçtan aynı satırları çekiyor, ama arama, sayfalama ve hesap silme olmadan.
+ * İkisini de tutmak, aynı kullanıcı için iki farklı eylem kümesi gösteren iki
+ * liste demekti; askıdaki bir hesabı silmek isteyen yönetici hangisinde
+ * olduğunu hatırlamak zorunda kalırdı.
+ */
+type Tab = "reports" | "flagged" | "users" | "actions";
+
+/** Kullanıcı listesi süzgeci; sunucudaki `suspended` (bool|yok) parametresi. */
+type UserStatus = "all" | "suspended" | "active";
 
 /**
  * Sunucunun içerik yerine yazdığı dilden bağımsız işaretleri kendi dilimize
@@ -512,42 +606,242 @@ const FlaggedCard = ({
   );
 };
 
-// ---- askıdaki kullanıcı kartı ----
+// ---- kullanıcı kartı ----
 
-const SuspendedCard = ({ row, onAction }: { row: AdminUserRow; onAction: (a: AdminAction) => void }) => {
+const UserCard = ({ row, onAction }: { row: AdminUserRow; onAction: (a: AdminAction) => void }) => {
   const { t, locale } = useI18n();
+  const allowed = userRowActions(row);
+  // Askı kalkınca gerekçe silinmez, last_suspension_reason'a taşınır: "bu
+  // hesap daha önce askıya alınmış mıydı" sorusu cevaplanabilir kalsın diye.
+  const hadSuspension = !row.is_suspended && (row.unsuspended_at !== null || row.last_suspension_reason !== null);
+
   return (
     <div className="card-listing p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-sm text-foreground break-words">{row.name}</p>
-          {/* Sunucu e-postayı yalnızca askıdaki hesaplar için döner. */}
+          {/* Sunucu e-postayı YALNIZCA askıdaki hesaplar için döner; arama
+              yine e-postada da çalışır (bkz. fetchAdminUsers). */}
           {row.email && <p className="text-xs text-muted-foreground break-all">{row.email}</p>}
           <p className="text-xs text-muted-foreground">{row.university || t("admin.noUniversity")}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {t("admin.userCreatedAt", { date: fmtDateTime(row.created_at, locale) })}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <Chip tone="danger">{t("admin.badgeSuspended")}</Chip>
+          {/* Durum: yönetici / askıda / normal. İlk ikisi birlikte de
+              görünebilir (askıya alınmış bir hesap sonradan yönetici
+              yapılmışsa); tek bir rozete indirmek durumu gizlerdi. */}
           {row.is_admin && <Chip tone="ok">{t("admin.badgeAdmin")}</Chip>}
+          {row.is_suspended ? (
+            <Chip tone="danger">{t("admin.badgeSuspended")}</Chip>
+          ) : (
+            !row.is_admin && <Chip>{t("admin.badgeNormal")}</Chip>
+          )}
         </div>
       </div>
 
-      <div className="rounded-2xl bg-muted/50 p-3 space-y-1">
-        <p className="text-xs text-foreground break-words">
-          {row.suspended_reason
-            ? t("admin.suspendedReason", { reason: row.suspended_reason })
-            : t("admin.suspendedNoReason")}
-        </p>
-        {row.suspended_at && (
-          <p className="text-[11px] text-muted-foreground">
-            {t("admin.suspendedAt", { date: fmtDateTime(row.suspended_at, locale) })}
+      {row.is_suspended && (
+        <div className="rounded-2xl bg-muted/50 p-3 space-y-1">
+          <p className="text-xs text-foreground break-words">
+            {row.suspended_reason
+              ? t("admin.suspendedReason", { reason: row.suspended_reason })
+              : t("admin.suspendedNoReason")}
           </p>
-        )}
+          {row.suspended_at && (
+            <p className="text-[11px] text-muted-foreground">
+              {t("admin.suspendedAt", { date: fmtDateTime(row.suspended_at, locale) })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {hadSuspension && (
+        <div className="rounded-2xl bg-muted/50 p-3 space-y-1">
+          {row.last_suspension_reason && (
+            <p className="text-xs text-foreground break-words">
+              {t("admin.lastSuspensionReason", { reason: row.last_suspension_reason })}
+            </p>
+          )}
+          {row.unsuspended_at && (
+            <p className="text-[11px] text-muted-foreground">
+              {t("admin.userUnsuspendedAt", { date: fmtDateTime(row.unsuspended_at, locale) })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {allowed.length === 0 ? (
+        // Düğmelerin yokluğu sessiz kalmasın: sebebi burada yazılı.
+        <p className="text-[11px] text-muted-foreground">{t("admin.adminProtectedNote")}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {allowed.includes("unsuspend") && (
+            <ActionButton
+              label={t("admin.actionUnsuspend")}
+              onClick={() => onAction({ kind: "unsuspend", label: row.name, userId: row.id })}
+            />
+          )}
+          {allowed.includes("suspend") && (
+            <ActionButton
+              destructive
+              label={t("admin.actionSuspend")}
+              onClick={() => onAction({ kind: "suspend", label: row.name, userId: row.id })}
+            />
+          )}
+          {allowed.includes("deleteUser") && (
+            <ActionButton
+              destructive
+              label={t("admin.actionDeleteUser")}
+              onClick={() => onAction({ kind: "deleteUser", label: row.name, userId: row.id })}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---- denetim kaydı kartı ----
+
+/**
+ * Kaydın `detail` değerlerini metne çevirir.
+ *
+ * Anahtarlar SUNUCUDAKİ HÂLİYLE gösterilir (çevrilmez): alan listesi sunucuda
+ * açık uçlu, yarısı çevrilmiş bir liste hem karışık görünür hem de sunucu yeni
+ * bir alan ekleyince sessizce eskir. Değerlerde yalnız doğru/yanlış çevrilir,
+ * çünkü "true" bir metin değil bir cevaptır.
+ */
+const DetailValue = ({ value }: { value: unknown }) => {
+  const { t } = useI18n();
+  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
+  if (typeof value === "boolean") {
+    return <span>{t(value ? "admin.logValueTrue" : "admin.logValueFalse")}</span>;
+  }
+  if (Array.isArray(value)) return <span>{value.map(String).join(", ")}</span>;
+  if (typeof value === "object") return <span>{JSON.stringify(value)}</span>;
+  return <span>{String(value)}</span>;
+};
+
+const ActionCard = ({ row }: { row: AdminActionRow }) => {
+  const { t, locale } = useI18n();
+  const labelKey = actionLabelKeys[row.action];
+  const targetKey = targetLabelKeys[row.target_type];
+  const detail = parseActionDetail(row.detail);
+  // "before" ayrı gösterilir: düzenlenen ilanın ESKİ metni, sahibinin ne
+  // yazdığının kalan tek kopyasıdır — anahtar/değer listesine gömülmemeli.
+  const before = detail?.before;
+  const beforeFields =
+    before !== null && typeof before === "object" && !Array.isArray(before)
+      ? Object.entries(before as Record<string, unknown>)
+      : [];
+  const entries = Object.entries(detail ?? {}).filter(([key]) => key !== "before");
+
+  return (
+    <div className="card-listing p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {/* Tanınmayan kod ham hâliyle basılır; kayıt görünmez olmasın. */}
+          <p className="font-semibold text-sm text-foreground break-words">
+            {labelKey ? t(labelKey) : row.action}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {/* Aktörü silinmiş kayıtta ad UYDURULMAZ; nötr bir metin durur. */}
+            {t("admin.logActorLabel", {
+              name: row.actor_name ?? t("admin.logActorDeleted"),
+            })}{" "}
+            · {fmtDateTime(row.created_at, locale)}
+          </p>
+        </div>
+        <Chip>{`${targetKey ? t(targetKey) : row.target_type} #${row.target_id}`}</Chip>
       </div>
 
-      <ActionButton
-        label={t("admin.actionUnsuspend")}
-        onClick={() => onAction({ kind: "unsuspend", label: row.name, userId: row.id })}
-      />
+      {row.reason && (
+        <div>
+          <p className="text-[11px] font-semibold text-foreground">{t("admin.logReason")}</p>
+          <p className="text-sm text-muted-foreground break-words">{row.reason}</p>
+        </div>
+      )}
+
+      {entries.length > 0 && (
+        <div className="rounded-2xl bg-muted/50 p-3 space-y-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[11px] font-semibold text-foreground">{t("admin.logDetail")}</p>
+            <p className="text-[10px] text-muted-foreground">{t("admin.logRawNote")}</p>
+          </div>
+          <dl className="space-y-0.5">
+            {entries.map(([key, value]) => (
+              <div key={key} className="flex gap-2 text-xs">
+                <dt className="text-muted-foreground shrink-0 font-mono">{key}</dt>
+                <dd className="text-foreground break-words min-w-0">
+                  <DetailValue value={value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {beforeFields.length > 0 && (
+        <div className="rounded-2xl border border-border p-3 space-y-1.5">
+          <p className="text-[11px] font-semibold text-foreground">{t("admin.logBefore")}</p>
+          <p className="text-[10px] text-muted-foreground">{t("admin.logBeforeNote")}</p>
+          <dl className="space-y-0.5">
+            {beforeFields.map(([key, value]) => (
+              <div key={key} className="flex gap-2 text-xs">
+                <dt className="text-muted-foreground shrink-0 font-mono">{key}</dt>
+                <dd className="text-foreground break-words min-w-0">
+                  <DetailValue value={value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---- sayfalama ----
+
+/**
+ * Sunucu toplam satır sayısını vermez; "sonraki" ancak sayfa DOLU geldiyse
+ * anlamlıdır. Sayfa numarası da bu yüzden "3/12" değil "Sayfa 3"tür.
+ */
+const Pager = ({
+  page,
+  count,
+  onPage,
+}: {
+  page: number;
+  count: number;
+  onPage: (next: number) => void;
+}) => {
+  const { t, n } = useI18n();
+  if (page === 0 && count < PAGE_SIZE) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page === 0}
+        onClick={() => onPage(Math.max(0, page - 1))}
+        className="rounded-full"
+      >
+        <ChevronLeft className="w-3.5 h-3.5 mr-1" /> {t("listings.pagePrev")}
+      </Button>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {t("listings.pageLabel", { page: n(page + 1) })}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={count < PAGE_SIZE}
+        onClick={() => onPage(page + 1)}
+        className="rounded-full"
+      >
+        {t("listings.pageNext")} <ChevronRight className="w-3.5 h-3.5 ml-1" />
+      </Button>
     </div>
   );
 };
@@ -563,8 +857,24 @@ const Admin = () => {
   const [reportStatus, setReportStatus] = useState<AdminReportStatus>("open");
   const [flaggedKind, setFlaggedKind] = useState<FlaggedKind | "all">("all");
   const [flaggedStatus, setFlaggedStatus] = useState<FlaggedStatus>("pending");
+  const [userSearch, setUserSearch] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+  const [userStatus, setUserStatus] = useState<UserStatus>("all");
+  const [userPage, setUserPage] = useState(0);
+  const [logTarget, setLogTarget] = useState<AdminActionTargetType | "all">("all");
+  const [logPage, setLogPage] = useState(0);
   const [action, setAction] = useState<AdminAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Her tuşta istek atmamak için kısa gecikme; arama sunucuda çalışıyor.
+  useEffect(() => {
+    const id = window.setTimeout(() => setUserQuery(userSearch.trim()), 300);
+    return () => window.clearTimeout(id);
+  }, [userSearch]);
+
+  // Süzgeç değişince ilk sayfaya dön: aksi hâlde 3. sayfada boş liste görünür.
+  useEffect(() => setUserPage(0), [userQuery, userStatus]);
+  useEffect(() => setLogPage(0), [logTarget]);
 
   // `user` oturum açıkken asenkron dolar; yönetici olmadığı KESİNLEŞENE kadar
   // yönlendirme yapmayız, yoksa sayfa yenilemesinde panel bir an kaçırılır.
@@ -585,10 +895,27 @@ const Admin = () => {
     queryFn: () => fetchFlagged(flaggedKind, flaggedStatus),
     enabled: isAdmin && tab === "flagged",
   });
-  const suspended = useQuery({
-    queryKey: ["admin", "users", "suspended"],
-    queryFn: () => fetchAdminUsers(true),
-    enabled: isAdmin && tab === "suspended",
+  const users = useQuery({
+    queryKey: ["admin", "users", userStatus, userQuery, userPage],
+    queryFn: () =>
+      fetchAdminUsers({
+        q: userQuery || undefined,
+        // "all" -> parametre hiç gönderilmez (sunucuda isteğe bağlı).
+        suspended: userStatus === "all" ? undefined : userStatus === "suspended",
+        limit: PAGE_SIZE,
+        offset: userPage * PAGE_SIZE,
+      }),
+    enabled: isAdmin && tab === "users",
+  });
+  const actions = useQuery({
+    queryKey: ["admin", "actions", logTarget, logPage],
+    queryFn: () =>
+      fetchAdminActions({
+        targetType: logTarget === "all" ? undefined : logTarget,
+        limit: PAGE_SIZE,
+        offset: logPage * PAGE_SIZE,
+      }),
+    enabled: isAdmin && tab === "actions",
   });
 
   const mutation = useMutation({
@@ -612,6 +939,8 @@ const Admin = () => {
           return suspendUser(a.userId, note);
         case "unsuspend":
           return unsuspendUser(a.userId);
+        case "deleteUser":
+          return adminDeleteUser(a.userId, note);
       }
     },
     onSuccess: (data, { a }) => {
@@ -620,10 +949,22 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ["admin"] });
       queryClient.invalidateQueries({ queryKey: ["listings"] });
       queryClient.invalidateQueries({ queryKey: ["matches"] });
-      // Sunucunun GERÇEKTE ne yaptığına göre cümle seçilir; karar mantığı
-      // restoreOutcome'da ve ayrıca test edilir.
-      const { key, tone } = restoreOutcome(a.kind, data as Partial<RestoreResult>);
-      (tone === "warning" ? toast.warning : toast.success)(t(key));
+      if (a.kind === "deleteUser") {
+        // Ne silindiği sunucunun saydığı satırlardan okunur; tahmin edilmez.
+        const { cleanup } = data as AdminDeleteResult;
+        toast.success(t("admin.doneDeleteUser"), {
+          description: t("admin.doneDeleteUserDesc", {
+            listings: n(cleanup.listings ?? 0),
+            matches: n(cleanup.matches ?? 0),
+            messages: n(cleanup.messages ?? 0),
+          }),
+        });
+      } else {
+        // Sunucunun GERÇEKTE ne yaptığına göre cümle seçilir; karar mantığı
+        // restoreOutcome'da ve ayrıca test edilir.
+        const { key, tone } = restoreOutcome(a.kind, data as Partial<RestoreResult>);
+        (tone === "warning" ? toast.warning : toast.success)(t(key));
+      }
       setAction(null);
     },
     onError: err => {
@@ -643,7 +984,12 @@ const Admin = () => {
   if (user !== null && !user.is_admin) return <Navigate to="/" replace />;
 
   const s = summary.data;
-  const listQuery = tab === "reports" ? reports : tab === "flagged" ? flagged : suspended;
+  const listQuery =
+    tab === "reports" ? reports : tab === "flagged" ? flagged : tab === "users" ? users : actions;
+
+  const userRows = users.data ?? [];
+  const logRows = actions.data ?? [];
+  const userFiltering = userQuery !== "" || userStatus !== "all";
 
   // "Tümü" dışında bir tür seçiliyken kuyruğun boş olması YALNIZCA o filtre
   // için geçerlidir; sunucu istenen türü süzerek döndürür (GET /flagged?kind=).
@@ -706,7 +1052,8 @@ const Admin = () => {
           options={[
             { value: "reports", label: t("admin.tabReports") },
             { value: "flagged", label: t("admin.tabFlagged") },
-            { value: "suspended", label: t("admin.tabSuspended") },
+            { value: "users", label: t("admin.tabUsers") },
+            { value: "actions", label: t("admin.tabActions") },
           ]}
         />
 
@@ -741,6 +1088,58 @@ const Admin = () => {
                 { value: "all", label: t("admin.kindAll") },
                 { value: "listing", label: t("admin.kindListing") },
                 { value: "message", label: t("admin.kindMessage") },
+              ]}
+            />
+          </div>
+        )}
+        {tab === "users" && (
+          <div className="space-y-2">
+            {/* Arama sunucuda, ad VE e-posta üzerinde çalışır. */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                aria-label={t("admin.userSearchLabel")}
+                placeholder={t("admin.userSearchPlaceholder")}
+                className="rounded-2xl pl-9 pr-9"
+              />
+              {userSearch && (
+                <button
+                  type="button"
+                  onClick={() => setUserSearch("")}
+                  aria-label={t("admin.userSearchClear")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {/* E-postanın neden çoğu satırda görünmediği söylenmezse arama
+                çalışmıyor sanılır. */}
+            <p className="text-[11px] text-muted-foreground">{t("admin.emailOnlySuspended")}</p>
+            {/* "Askıdakiler" sekmesi buraya taşındı: aynı listenin süzgeci. */}
+            <Segmented<UserStatus>
+              value={userStatus}
+              onChange={setUserStatus}
+              options={[
+                { value: "all", label: t("admin.statusAll") },
+                { value: "suspended", label: t("admin.badgeSuspended") },
+                { value: "active", label: t("admin.userStatusActive") },
+              ]}
+            />
+          </div>
+        )}
+        {tab === "actions" && (
+          <div className="space-y-2">
+            <p className="text-[11px] text-muted-foreground">{t("admin.logIntro")}</p>
+            <Segmented<AdminActionTargetType | "all">
+              value={logTarget}
+              onChange={setLogTarget}
+              options={[
+                { value: "all", label: t("admin.statusAll") },
+                { value: "listing", label: t("admin.targetListing") },
+                { value: "user", label: t("admin.targetUser") },
               ]}
             />
           </div>
@@ -782,10 +1181,84 @@ const Admin = () => {
                   />
                 ))}
 
-            {tab === "suspended" &&
-              (suspended.data?.length
-                ? suspended.data.map(row => <SuspendedCard key={row.id} row={row} onAction={ask} />)
-                : <EmptyState icon={UserX} title={t("admin.emptySuspended")} desc={t("admin.emptySuspendedDesc")} />)}
+            {tab === "users" &&
+              (userRows.length ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.resultCount", { count: n(userRows.length) })}
+                  </p>
+                  {userRows.map(row => (
+                    <UserCard key={row.id} row={row} onAction={ask} />
+                  ))}
+                  <Pager page={userPage} count={userRows.length} onPage={setUserPage} />
+                </>
+              ) : (
+                <>
+                  {/* Süzgeç varken "hiç kullanıcı yok" demek yanlış olur:
+                      sunucu yalnız o süzgece uyanları döndürüyor. Sayfa
+                      başında da aynı sorun var. */}
+                  <EmptyState
+                    icon={Users}
+                    title={t(
+                      userStatus === "suspended" && !userQuery
+                        ? "admin.emptySuspended"
+                        : userFiltering || userPage > 0
+                          ? "admin.emptyFiltered"
+                          : "admin.emptyUsers",
+                    )}
+                    desc={t(
+                      userStatus === "suspended" && !userQuery
+                        ? "admin.emptySuspendedDesc"
+                        : userFiltering || userPage > 0
+                          ? "admin.emptyUsersFilteredDesc"
+                          : "admin.emptyUsersDesc",
+                    )}
+                  />
+                  {userPage > 0 && (
+                    <div className="text-center">
+                      <Button variant="outline" size="sm" onClick={() => setUserPage(0)} className="rounded-full">
+                        {t("listings.pageFirst")}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ))}
+
+            {tab === "actions" &&
+              (logRows.length ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.resultCount", { count: n(logRows.length) })}
+                  </p>
+                  {logRows.map(row => (
+                    <ActionCard key={row.id} row={row} />
+                  ))}
+                  <Pager page={logPage} count={logRows.length} onPage={setLogPage} />
+                </>
+              ) : (
+                <>
+                  <EmptyState
+                    icon={ScrollText}
+                    title={t(
+                      logTarget !== "all" || logPage > 0
+                        ? "admin.emptyFiltered"
+                        : "admin.emptyActionsTitle",
+                    )}
+                    desc={t(
+                      logTarget !== "all" || logPage > 0
+                        ? "admin.emptyActionsFilteredDesc"
+                        : "admin.emptyActionsDesc",
+                    )}
+                  />
+                  {logPage > 0 && (
+                    <div className="text-center">
+                      <Button variant="outline" size="sm" onClick={() => setLogPage(0)} className="rounded-full">
+                        {t("listings.pageFirst")}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ))}
           </motion.div>
         )}
       </div>
@@ -802,7 +1275,10 @@ const Admin = () => {
             ? t("admin.staysClosedWarn")
             : action?.kind === "restoreMessage" && action.unrecoverable
               ? t("admin.textUnrecoverableWarn")
-              : null
+              : // Geri alınamazlık onaydan ÖNCE, kırmızı kutuda söylenir.
+                action?.kind === "deleteUser"
+                ? t("admin.dlgDeleteUserWarn")
+                : null
         }
         pending={mutation.isPending}
         error={actionError}

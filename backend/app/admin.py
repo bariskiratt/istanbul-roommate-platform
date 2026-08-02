@@ -2,8 +2,8 @@
 
 Tasarım ilkeleri:
 
-1. EYLEMLER GERİ ALINABİLİR — ve geri almanın gerçek bir yolu vardır.
-   Hiçbir uç kayıt silmez:
+1. ÖNCE GERİ ALINABİLİR YOL. Bir işin geri alınabilir bir karşılığı varsa
+   yıkıcı olan değil o kullanılır:
      - kullanıcı askıya alınır       -> POST /users/{id}/unsuspend
      - ilan yayından kaldırılır      -> POST /listing/{id}/restore
      - mesajın metni sabitle örtülür -> POST /message/{id}/restore
@@ -16,11 +16,36 @@ Tasarım ilkeleri:
    gerçekten kaybolmuştur; onlarda restore metni geri getiremez. O kayıtlarda
    restore hiçbir şeyi değiştirmez ve `restored:false` döner: kayıt
    Kaldırılanlar kuyruğunda BULUNABİLİR kalsın diye bayrak indirilmez.
+
+1b. YIKICI YOL DA VAR, AMA AYRI VE İZLİ. Kaldırma her derde deva değil:
+   satırın gerçekten gitmesi gereken durumlar (hukuki talep, gerçek kişi
+   verisi, tekrar tekrar açılan sahte hesap) elde yalnızca "gizle" varken
+   çözülemiyordu. İki uç kalıcı siler:
+     DELETE /listings/{id}   ilan satırı gider
+     DELETE /users/{id}      hesap ve bağlı verisi gider
+   Bu ikisinin üç ortak kuralı var:
+     - GEREKÇE ZORUNLU (gövdede reason),
+     - models.AdminAction'a denetim kaydı yazılır (GET /actions),
+     - bağlı kayıtlar temizlenir ama SOHBET YAŞAR: ilan silinince
+       matches.listing_id NULL'a çekilir, eşleşme ve mesajlar durur.
+       İnsanların birbirine yazdıkları, konuştukları ilan silindi diye
+       silinmez.
+   Geri alınabilir eylemler AdminAction'a YAZILMAZ; onlar izini kendi
+   sütunlarında (reviewed_by, suspended_by, resolved_by) zaten bırakıyor ve
+   aynı olayı iki yerde tutmak ikisinin çelişmesi demektir.
 2. BİLDİRENİN KİMLİĞİ BİLDİRİLENE GÖSTERİLMEZ. Bu uçlar yalnızca yöneticiye
    açıktır; raporun reporter bilgisi buradan dışarı sızmaz.
 3. YÖNETİCİ YALNIZCA KARAR İÇİN GEREKENİ GÖRÜR. Raporlanan mesajın metni
-   döner, sohbetin tamamı DÖNMEZ. Kullanıcı listesi suspended filtresi
-   ZORUNLU ister ve e-postayı yalnız askıdaki hesaplar için döner.
+   döner, sohbetin tamamı DÖNMEZ. Kullanıcı listesi e-postayı yalnız askıdaki
+   hesaplar için döner ve sayfalıdır (bir istekte tüm taban dökülmez).
+   E-posta ARAMADA kullanılabilir (?q=) ama yanıtta yine dönmez: yöneticinin
+   "şu adresi bul" ihtiyacı, tüm adresleri görmesini gerektirmiyor.
+
+3b. KİMLİĞE BÜRÜNME YOK. "Bu kullanıcı olarak giriş yap" diye bir uç bilerek
+   eklenmedi ve eklenmemeli. Yönetici bildirilen/işaretlenen içeriği zaten
+   görebiliyor; birinin oturumunu devralıp özel sohbetlerini okumak veya onun
+   adına mesaj yazmak bambaşka bir yetkidir. İhtiyaç doğarsa doğru cevap
+   salt-okunur bir görüntüleyicidir, oturum devralma değil.
 4. HER EYLEM KAYDEDİLİR: resolved_by/resolved_at, reviewed_by/reviewed_at,
    suspended_by/suspended_at. Geri alma da bir eylemdir: ilan/mesaj geri
    alınırken review_note'a not yazılır, askı kaldırılırken
@@ -30,16 +55,26 @@ Tasarım ilkeleri:
 Tüm uçlar require_admin ile korunur: girişsiz 401, admin olmayan 403.
 """
 
+import json
 from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import crypto, models, moderation
+from app.auth import purge_user
 from app.db import get_db
+from app.listings import (
+    FEATURE_FIELDS,
+    ListingOut,
+    ListingUpdate,
+    flag_state,
+    moderate_listing_text,
+    purge_listing,
+)
 from app.reports import require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -209,6 +244,96 @@ class RestoreOut(BaseModel):
     review_note: str | None
 
 
+class AdminListingOut(ListingOut):
+    """İlan satırının yönetici sürümü — moderasyon alanları da görünür.
+
+    ListingOut'tan türer: yönetici düzenleme formu normal ilanın TÜM
+    alanlarını göstermek zorunda, o listeyi ikinci kez yazmak ikisinin
+    zamanla ayrışması demekti.
+
+    `type` bilerek Literal'den str'ye gevşetildi: yönetici listesi BOZUK
+    kayıtları da göstermek zorunda. Literal kalsaydı tipi tanınmayan tek bir
+    satır tüm listeyi 500'e düşürür, yani yöneticinin düzeltmesi gereken kayıt
+    tam da onu göremediği kayıt olurdu.
+    """
+
+    type: str
+    # Ev ilanı özellikleri ListingOut'ta zaten var; buraya yalnız yönetici
+    # alanları ekleniyor.
+    moderation_removed: bool
+    active_before_removal: bool | None
+    is_flagged: bool
+    flag_reasons: list[str]
+    flag_reasons_text: str | None
+    # Sahibi askıdaysa ilan hiçbir genel listede görünmez. Yayına alma ucu
+    # bunu ENGELLEMEZ ama arayüz "yayında" derken bu alanı okumalı: askıdaki
+    # sahibin ilanı is_active=True olsa da kimseye görünmez.
+    owner_suspended: bool
+    reviewed_by: int | None
+    reviewed_at: datetime | None
+    review_note: str | None
+
+
+class ListingPublishOut(BaseModel):
+    """Yayına alma sonucu."""
+
+    id: int
+    is_active: bool
+    # Bu çağrı gerçekten bir şey değiştirdi mi. İlan zaten yayındaysa uç
+    # başarılı döner ama False yazar; arayüz "yayına alındı" demeden önce
+    # buna bakar.
+    changed: bool
+    moderation_removed: bool
+    owner_suspended: bool
+
+
+class DeleteIn(BaseModel):
+    """Kalıcı silme gövdesi. GEREKÇE ZORUNLU.
+
+    Sebep: bu iki uç geri alınamaz. Denetim kaydına yazılacak tek açıklama
+    burası; boş bırakılabilseydi kayıt "birisi bir şeyi sildi"den ibaret
+    kalır, tutmanın anlamı kalmazdı.
+    """
+
+    reason: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        # min_length boşluklardan oluşan bir gerekçeyi geçirirdi.
+        if not v.strip():
+            raise ValueError("Silme gerekçesi boş olamaz.")
+        return v.strip()
+
+
+class AdminDeleteOut(BaseModel):
+    """Kalıcı silme sonucu."""
+
+    kind: Literal["listing", "user"]
+    id: int
+    deleted: bool
+    # Yazılan denetim kaydının id'si (GET /api/admin/actions ile bulunur).
+    action_id: int
+    # Birlikte temizlenen bağlı kayıt sayıları. "İlanı sildim, sohbetlere ne
+    # oldu" sorusunun cevabı: detached_matches, listing_id'si NULL'a çekilip
+    # YAŞAMAYA DEVAM EDEN eşleşme sayısıdır — silinen değil.
+    cleanup: dict[str, int]
+
+
+class AdminActionOut(BaseModel):
+    id: int
+    # NULL = eylemi yapan yönetici o zamandan beri hesabını sildi. Kayıt
+    # aktörünü kaybeder ama kaybolmaz.
+    actor_id: int | None
+    actor_name: str | None
+    action: str
+    target_type: str
+    target_id: int
+    reason: str | None
+    detail: str | None
+    created_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # yardımcılar
 # ---------------------------------------------------------------------------
@@ -318,6 +443,110 @@ def _reasons(raw: str | None) -> tuple[list[str], str | None]:
     """flag_reasons sütununu (kodlar, Türkçe açıklama) çiftine çevirir."""
     codes = moderation.split_reasons(raw)
     return codes, (moderation.describe(codes) if codes else None)
+
+
+def _record_action(
+    db: Session,
+    admin: models.User,
+    action: str,
+    target_type: str,
+    target_id: int,
+    *,
+    reason: str | None = None,
+    detail: dict | None = None,
+) -> models.AdminAction:
+    """Denetim kaydı yazar (commit ETMEZ — çağıran eylemle aynı işlemde).
+
+    Aynı işlemde olması şart: kayıt ayrı commit edilseydi eylem başarısız
+    olduğunda "sildim" diyen ama hiçbir şey silmemiş bir kayıt kalırdı.
+    """
+    row = models.AdminAction(
+        actor_id=admin.id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        reason=reason,
+        # ensure_ascii=False: Türkçe metin kayıtta okunabilir kalsın.
+        detail=json.dumps(detail, ensure_ascii=False, default=str)
+        if detail
+        else None,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _search_pattern(raw: str) -> str:
+    """Kısmi arama deseni. LIKE joker karakterleri kaçırılır.
+
+    Kaçırma olmadan "%" yazan bir arama tüm tabloyu, "_" ise rastgele
+    satırları getirirdi — yönetici aradığını bulduğunu sanırdı.
+    Harf duyarsızlık `ilike` ile sağlanır (bkz. _ilike).
+    """
+    escaped = raw.strip().replace("\\", r"\\").replace("%", r"\%").replace("_", r"\_")
+    return f"%{escaped}%"
+
+
+def _ilike(column, pattern: str):
+    """Harf duyarsız kısmi eşleşme.
+
+    ilike kullanılıyor çünkü iki tarafa da AYNI dönüşümü uyguluyor: Postgres'te
+    gerçek ILIKE, SQLite'ta `lower(sütun) LIKE lower(desen)`. Elle
+    `func.lower(col).like(q.lower())` yazsaydık Python'un ve veritabanının
+    küçük harf kuralları Türkçe harflerde ayrışırdı (Python "İ".lower() ucuna
+    birleşen nokta ekler, SQLite hiç dokunmaz) ve arama sessizce boş dönerdi.
+
+    NOT: SQLite yalnızca ASCII harflerde duyarsızdır; "AYŞE" araması
+    "Ayşe"yi orada bulmaz (Postgres'te bulur). Yerel geliştirmeye özgü bir
+    kısıt olduğu için ayrıca bir çözüm eklenmedi.
+    """
+    return column.ilike(pattern, escape="\\")
+
+
+# Yönetici ilan satırında olduğu gibi taşınan alanlar (ListingOut ile aynı).
+_LISTING_FIELDS: tuple[str, ...] = (
+    "id",
+    "type",
+    "title",
+    "description",
+    "district",
+    "neighborhood",
+    "photos",
+    "rent",
+    "room_count",
+    "smoking_allowed",
+    "pets_allowed",
+    *FEATURE_FIELDS,
+    "budget_min",
+    "budget_max",
+    "is_active",
+    "created_at",
+)
+
+
+def _admin_listing_row(row: models.Listing) -> dict:
+    """İlanın yönetici görünümü — moderasyon durumu dahil."""
+    codes, text = _reasons(row.flag_reasons)
+    data = {name: getattr(row, name) for name in _LISTING_FIELDS}
+    data["photos"] = row.photos or []
+    return data | {
+        "owner_id": row.owner_id,
+        "owner_name": row.owner.name if row.owner else None,
+        "owner_university": row.owner.university if row.owner else None,
+        "owner_suspended": bool(row.owner.is_suspended) if row.owner else False,
+        "moderation_removed": bool(row.moderation_removed),
+        "active_before_removal": (
+            None
+            if row.active_before_removal is None
+            else bool(row.active_before_removal)
+        ),
+        "is_flagged": bool(row.is_flagged),
+        "flag_reasons": codes,
+        "flag_reasons_text": text,
+        "reviewed_by": row.reviewed_by,
+        "reviewed_at": row.reviewed_at,
+        "review_note": row.review_note,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +950,252 @@ def restore_removed(
 
 
 # ---------------------------------------------------------------------------
+# ilan yönetimi — arama, düzenleme, yayına alma, KALICI SİLME
+# ---------------------------------------------------------------------------
+
+@router.get("/listings", response_model=list[AdminListingOut])
+def admin_listings(
+    q: str | None = Query(
+        None,
+        max_length=80,
+        description="Başlık, ilçe ya da sahip (ad/e-posta) içinde kısmi arama",
+    ),
+    status: Literal["all", "active", "inactive", "removed", "flagged"] = Query(
+        "all",
+        description=(
+            "all: hepsi, active: yayında, inactive: SAHİBİNİN kapattığı, "
+            "removed: YÖNETİCİNİN kaldırdığı, flagged: incelenmemiş işaretli"
+        ),
+    ),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _admin: models.User = Depends(require_admin),
+):
+    """TÜM ilanlar — pasifler ve yöneticinin kaldırdıkları dâhil.
+
+    NEDEN AYRI BİR UÇ: /api/listings tasarımı gereği yalnız yayındaki ve
+    sahibi askıda OLMAYAN ilanları döner. Yönetici tam da o filtrenin
+    gizlediklerine bakmak zorunda; oradan bakıldığında "sahibi askıya alınmış
+    ilan" ya da "kapatılmış ilan" hiç yokmuş gibi görünüyordu.
+
+    `status=inactive` ile `status=removed` ayrımı önemli: ikisinde de
+    is_active False'tur ama ilki SAHİBİNİN kararı, ikincisi YÖNETİCİNİN.
+    Yayına alma ucu yalnız ilkine dokunur (bkz. publish_listing).
+
+    E-posta arama koşulunda kullanılır ama yanıtta DÖNMEZ (bkz. ilke 3).
+    """
+    stmt = (
+        select(models.Listing)
+        .options(selectinload(models.Listing.owner))
+        .order_by(models.Listing.created_at.desc(), models.Listing.id.desc())
+    )
+
+    if status == "active":
+        stmt = stmt.where(models.Listing.is_active.is_(True))
+    elif status == "inactive":
+        # Sahibinin kapattığı: pasif AMA yönetici kaldırması değil.
+        stmt = stmt.where(
+            models.Listing.is_active.is_(False),
+            models.Listing.moderation_removed.is_(False),
+        )
+    elif status == "removed":
+        stmt = stmt.where(models.Listing.moderation_removed.is_(True))
+    elif status == "flagged":
+        stmt = stmt.where(models.Listing.is_flagged.is_(True))
+
+    if q and q.strip():
+        pattern = _search_pattern(q)
+        owners = select(models.User.id).where(
+            _ilike(models.User.name, pattern) | _ilike(models.User.email, pattern)
+        )
+        stmt = stmt.where(
+            _ilike(models.Listing.title, pattern)
+            | _ilike(models.Listing.district, pattern)
+            | models.Listing.owner_id.in_(owners)
+        )
+
+    rows = db.scalars(stmt.offset(offset).limit(limit)).all()
+    return [_admin_listing_row(row) for row in rows]
+
+
+@router.patch("/listings/{listing_id}", response_model=AdminListingOut)
+def admin_update_listing(
+    listing_id: int,
+    payload: ListingUpdate,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin),
+):
+    """Herhangi bir ilanı düzenler — sahiplik şartı YOK.
+
+    PATCH /api/listings/{id} sahibinden başkasına 403 verir ve pasif ilanı hiç
+    bulmaz; yönetici için bu, "ya tamamen kaldır ya hiç dokunma" demekti.
+    Oysa sorunların çoğu tek bir satır metin düzeltmesiyle çözülüyor:
+    açıklamadaki telefon numarasını silmek, yanlış ilçeyi düzeltmek.
+
+    İÇERİK DENETİMİ ÇALIŞIR AMA ENGELLEMEZ. Kullanıcı yolunda "block" sonucu
+    422'dir; burada 422 atmak, düzeltmeye gelen yöneticiyi düzeltmek istediği
+    metnin kendisi yüzünden dışarıda bırakırdı. Sonuç kayda İŞARET olarak
+    yazılır (is_flagged / flag_reasons), yani yöneticinin bıraktığı metin de
+    inceleme kuyruğunda görünür — denetimden muaf değil, sadece engellenmiyor.
+
+    reviewed_by / reviewed_at'e DOKUNULMAZ: onlar "kaldır/temizle" kararının
+    izidir, düzenleme o karar değildir. moderation_removed de değişmez —
+    kaldırılmış bir ilanın metni düzeltilebilir, ama kaldırılmış kalır.
+    """
+    row = db.get(models.Listing, listing_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+
+    # null gönderilen alanlar "değiştirme" sayılır — sahibin ucundaki kuralın
+    # aynısı: zorunlu alanlar PATCH ile boşaltılıp kayıt bozulmasın.
+    updates = {
+        k: v
+        for k, v in payload.model_dump(exclude_unset=True).items()
+        if v is not None
+    }
+    eff_min = updates.get("budget_min", row.budget_min)
+    eff_max = updates.get("budget_max", row.budget_max)
+    if eff_min is not None and eff_max is not None and eff_min > eff_max:
+        raise HTTPException(
+            status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
+        )
+
+    changed = {k: v for k, v in updates.items() if getattr(row, k) != v}
+    if not changed:
+        # Değişen bir şey yok: denetim kaydını gereksiz yere şişirmeyelim.
+        return _admin_listing_row(row)
+
+    new_title = changed.get("title", row.title)
+    new_description = changed.get("description", row.description)
+    before = {"title": row.title, "description": row.description}
+    if "title" in changed or "description" in changed:
+        result = moderate_listing_text(new_title, new_description)
+        # "block" da "flag" da işaret demektir: yönetici engellenmez ama
+        # yazdığı metin denetimden muaf değildir (bkz. listings.flag_state).
+        row.is_flagged, row.flag_reasons = flag_state(result)
+
+    for key, value in changed.items():
+        setattr(row, key, value)
+
+    # Düzenleme "geri alınabilir" görünür ama ÖNCEKİ METİN YOK OLUR; sahibinin
+    # ne yazdığı yalnızca burada kalır.
+    detail = {"fields": sorted(changed)}
+    if "title" in changed or "description" in changed:
+        detail["before"] = before
+    _record_action(
+        db, admin, "listing_update", "listing", row.id, detail=detail
+    )
+    db.commit()
+    db.refresh(row)
+    return _admin_listing_row(row)
+
+
+@router.post("/listings/{listing_id}/publish", response_model=ListingPublishOut)
+def publish_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin),
+):
+    """İlanı yayına alır (is_active=True).
+
+    Bu uç, SAHİBİNİN kendi kapattığı ilan için var. Kapatma kullanıcı
+    açısından tek yönlüydü (bkz. listings.deactivate_listing): yanlışlıkla
+    kapatan biri destek isteyince yapılabilecek hiçbir şey yoktu.
+
+    YÖNETİCİNİN KALDIRDIĞI İLANA DOKUNMAZ — 409 döner. Sebebi yetki değil,
+    tek yazarlık: moderation_removed=True olan kaydın is_active'i
+    active_before_removal'a göre geri alınır ve o iş POST
+    /api/admin/listing/{id}/restore'a aittir. İki ucun aynı alanı iki farklı
+    kuralla yazması, üçüncü bir durumda hangisinin kazandığını kimsenin
+    bilemediği bir hataya dönüşür.
+    """
+    row = db.get(models.Listing, listing_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+    if row.moderation_removed:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Bu ilan yönetici tarafından kaldırılmış. Yayına almak için "
+                "POST /api/admin/listing/{id}/restore kullan."
+            ),
+        )
+
+    changed = not row.is_active
+    if changed:
+        row.is_active = True
+        _record_action(db, admin, "listing_publish", "listing", row.id)
+        db.commit()
+        db.refresh(row)
+
+    return {
+        "id": row.id,
+        "is_active": bool(row.is_active),
+        "changed": changed,
+        "moderation_removed": bool(row.moderation_removed),
+        # Sahibi askıdaysa ilan yayında SAYILIR ama kimseye görünmez; arayüz
+        # "yayına alındı" derken bunu da söylemeli.
+        "owner_suspended": bool(row.owner.is_suspended) if row.owner else False,
+    }
+
+
+@router.delete("/listings/{listing_id}", response_model=AdminDeleteOut)
+def delete_listing(
+    listing_id: int,
+    payload: DeleteIn,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin),
+):
+    """İlanı KALICI siler — satır gider, geri alınamaz.
+
+    ÖNCE "kaldır"ı düşün (POST /flagged/listing/{id}/review, action=remove):
+    o karar geri alınabilir ve satır durur. Bu uç, satırın gerçekten gitmesi
+    gereken durumlar için: hukuki kaldırma talebi, üçüncü kişinin izinsiz
+    paylaşılan adresi/fotoğrafı gibi "gizlemek yetmez" halleri.
+
+    SOHBET YAŞAR. İlana bağlı eşleşmelerin listing_id'si NULL'a çekilir,
+    eşleşme ve mesajlar durur (bkz. listings.purge_listing). İlan bir
+    tanışmanın sebebiydi; sebebi silmek konuşmayı silmez.
+
+    Gerekçe zorunlu ve models.AdminAction'a yazılır: silinen satır geri
+    gelmeyeceği için "neyi neden sildim" sorusunun cevabı başka hiçbir yerde
+    kalmıyor.
+    """
+    row = db.get(models.Listing, listing_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+
+    # Satır silinmeden ÖNCE okunmalı: sonrasında okunacak bir yer kalmıyor.
+    detail = {
+        "title": row.title,
+        "district": row.district,
+        "type": row.type,
+        "owner_id": row.owner_id,
+        "owner_name": row.owner.name if row.owner else None,
+        "created_at": row.created_at,
+    }
+    cleanup = purge_listing(db, row)
+    action = _record_action(
+        db,
+        admin,
+        "listing_delete",
+        "listing",
+        listing_id,
+        reason=payload.reason,
+        detail=detail,
+    )
+    db.commit()
+    return {
+        "kind": "listing",
+        "id": listing_id,
+        "deleted": True,
+        "action_id": action.id,
+        "cleanup": cleanup,
+    }
+
+
+# ---------------------------------------------------------------------------
 # kullanıcı askıya alma
 # ---------------------------------------------------------------------------
 
@@ -748,34 +1223,88 @@ def _admin_user_row(row: models.User) -> dict:
     }
 
 
+def _protect_admin_accounts(
+    target: models.User, admin: models.User, verb: str
+) -> None:
+    """Yönetici KENDİNE ya da BAŞKA BİR YÖNETİCİYE bu işlemi uygulayamaz.
+
+    BU BİR YETKİ KISITI DEĞİL, EMNİYET KİLİDİDİR. Askıya alma ve kalıcı silme
+    yöneticinin kendi erişimini de kesen işlemler: son yönetici kendini askıya
+    alır ya da silerse platformun yönetimi GERİ DÖNÜLEMEZ biçimde kaybolur —
+    askıyı kaldıracak, hesabı geri getirecek bir uç yok, çünkü o uçlara
+    girebilecek kimse kalmıyor. Aynı gerekçe yöneticiler arasında da geçerli:
+    iki yönetici birbirini silebilseydi bir hesabın ele geçirilmesi tüm
+    moderasyon ekibinin silinmesine yeterdi.
+
+    KİŞİNİN KENDİ HESABINI SİLME HAKKI KAPANMIYOR: DELETE /api/auth/me
+    yöneticiye de açık ve orada şifre doğrulaması var. Kapatılan şey, tek
+    tıkla ve gerekçe kutusuyla yapılan kazara bir yönetici silmesi; bilinçli
+    ve doğrulanmış silme yolu duruyor.
+    """
+    # Sıra önemli: yönetici kendisi de yönetici olduğu için önce "kendini"
+    # kontrolü gelmeli, yoksa 400 yerine 403 dönerdi.
+    if target.id == admin.id:
+        raise HTTPException(status_code=400, detail=f"Kendini {verb}.")
+    if target.is_admin:
+        raise HTTPException(
+            status_code=403, detail=f"Başka bir yöneticiyi {verb}."
+        )
+
+
 @router.get("/users", response_model=list[AdminUserOut])
 def admin_users(
-    suspended: bool = Query(
-        ...,
+    q: str | None = Query(
+        None,
+        max_length=254,
+        description="E-posta VEYA ad içinde kısmi, harf duyarsız arama",
+    ),
+    suspended: bool | None = Query(
+        None,
         description=(
-            "ZORUNLU. true: askıdakiler, false: aktifler. Filtresiz çağrı "
-            "yok: tüm kullanıcı tabanını dökmek hiçbir karar için gerekmiyor."
+            "true: askıdakiler, false: aktifler, boş: hepsi. "
+            "Sonuç her hâlükârda sayfalıdır (limit/offset)."
         ),
     ),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _admin: models.User = Depends(require_admin),
 ):
-    """Kullanıcı listesi — "Askıdakiler" sekmesi suspended=true ile çeker."""
-    if suspended:
+    """Kullanıcı listesi — arama ve sayfalama ile.
+
+    FİLTRE NEDEN ARTIK ZORUNLU DEĞİL: `suspended` bir süre ZORUNLU tutuldu,
+    çünkü uç eskiden filtresiz çağrıda tüm kullanıcı tabanını e-postalarıyla
+    döküyordu. Asıl sorun filtrenin yokluğu değil, iki ayrı şeydi: sınırsız
+    sayfa ve koşulsuz e-posta. İkisi de kapandı — sayfalama zorunlu (limit
+    varsayılan 50), e-posta yalnız askıdaki hesaplar için dönüyor
+    (_admin_user_row). Geriye kalan "tüm kullanıcılarda ada göre ara"
+    ihtiyacı ise gerçek: bir bildirimde adı geçen kişiyi bulmanın başka yolu
+    yoktu, çünkü askıda olup olmadığı zaten önceden bilinmiyor.
+
+    ARAMA E-POSTAYA BAKAR AMA E-POSTAYI GÖSTERMEZ: "şu adresi bul" ihtiyacı,
+    tüm adresleri listelemeyi gerektirmiyor (bkz. modül ilkesi 3).
+    """
+    stmt = select(models.User)
+    if suspended is True:
         # Askıdakiler en son askıya alınan başta görünsün.
-        stmt = (
-            select(models.User)
-            .where(models.User.is_suspended.is_(True))
-            .order_by(models.User.suspended_at.desc(), models.User.id.desc())
+        stmt = stmt.where(models.User.is_suspended.is_(True)).order_by(
+            models.User.suspended_at.desc(), models.User.id.desc()
+        )
+    elif suspended is False:
+        stmt = stmt.where(models.User.is_suspended.is_(False)).order_by(
+            models.User.id.desc()
         )
     else:
-        stmt = (
-            select(models.User)
-            .where(models.User.is_suspended.is_(False))
-            .order_by(models.User.id.desc())
+        stmt = stmt.order_by(models.User.id.desc())
+
+    if q and q.strip():
+        pattern = _search_pattern(q)
+        stmt = stmt.where(
+            _ilike(models.User.email, pattern) | _ilike(models.User.name, pattern)
         )
-    return [_admin_user_row(row) for row in db.scalars(stmt.limit(limit)).all()]
+
+    rows = db.scalars(stmt.offset(offset).limit(limit)).all()
+    return [_admin_user_row(row) for row in rows]
 
 
 @router.post("/users/{user_id}/suspend", response_model=AdminUserOut)
@@ -792,14 +1321,7 @@ def suspend_user(
     target = db.get(models.User, user_id)
     if target is None:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
-    # Sıra önemli: yönetici kendisi de yönetici olduğu için önce "kendini"
-    # kontrolü gelmeli, yoksa 400 yerine 403 dönerdi.
-    if target.id == admin.id:
-        raise HTTPException(status_code=400, detail="Kendini askıya alamazsın.")
-    if target.is_admin:
-        raise HTTPException(
-            status_code=403, detail="Başka bir yöneticiyi askıya alamazsın."
-        )
+    _protect_admin_accounts(target, admin, "askıya alamazsın")
 
     target.is_suspended = True
     target.suspended_at = _utcnow()
@@ -854,3 +1376,118 @@ def unsuspend_user(
     db.refresh(target)
     # Askı kalktığı an e-posta da dönmez: artık gösterilecek bir gerekçe yok.
     return _admin_user_row(target)
+
+
+@router.delete("/users/{user_id}", response_model=AdminDeleteOut)
+def delete_user(
+    user_id: int,
+    payload: DeleteIn,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin),
+):
+    """Hesabı ve ona bağlı tüm verileri KALICI siler — geri alınamaz.
+
+    ÖNCE ASKIYA ALMAYI DÜŞÜN (POST /users/{id}/suspend): giriş kapanır,
+    ilanları görünmez olur, hiçbir veri kaybolmaz ve karar yanlışsa geri
+    alınır. Bu uç, askının yetmediği hâller için: silme talebi, gerçek kişiye
+    ait veri, ısrarla yeniden açılan sahte hesap.
+
+    NE SİLİNİR: ilanları, kaydırmaları, eşleşmeleri ve o eşleşmelerdeki
+    mesajlar (karşı tarafınkiler dâhil — sohbetin yarısını bırakmanın anlamı
+    yok), açtığı ve hedefi olduğu raporlar, oturumları. Başkalarının
+    satırlarındaki denetim izleri SİLİNMEZ, yalnız aktörü NULL'a çekilir:
+    kararın kendisi kalır, imzası gider.
+
+    Silme mantığı auth.purge_user'da, DELETE /api/auth/me ile ORTAK. Ayrı iki
+    liste tutulsaydı users.id'ye bakan yeni bir sütun eklendiğinde biri
+    güncellenir öbürü unutulur ve o uç yabancı anahtar hatasıyla 500 verirdi
+    (bu proje o hatayı üç kez yaşadı).
+
+    Yöneticiler korumalıdır (bkz. _protect_admin_accounts).
+    """
+    target = db.get(models.User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    _protect_admin_accounts(target, admin, "silemezsin")
+
+    # Satır gitmeden önce okunur; sonrasında hesabın kim olduğunu söyleyecek
+    # başka bir kayıt kalmıyor. E-posta denetim kaydında SAKLANIR: "hangi
+    # hesabı sildim" sorusunun cevabı yalnızca id ise, cevap yok demektir.
+    detail = {
+        "email": target.email,
+        "name": target.name,
+        "university": target.university,
+        "was_suspended": bool(target.is_suspended),
+        "created_at": target.created_at,
+    }
+    cleanup = purge_user(db, target)
+    action = _record_action(
+        db,
+        admin,
+        "user_delete",
+        "user",
+        user_id,
+        reason=payload.reason,
+        detail=detail,
+    )
+    db.commit()
+    return {
+        "kind": "user",
+        "id": user_id,
+        "deleted": True,
+        "action_id": action.id,
+        "cleanup": cleanup,
+    }
+
+
+# ---------------------------------------------------------------------------
+# denetim kaydı
+# ---------------------------------------------------------------------------
+
+@router.get("/actions", response_model=list[AdminActionOut])
+def admin_actions(
+    action: str | None = Query(
+        None, max_length=40, description="Tek bir eylem türüne süz"
+    ),
+    target_type: Literal["listing", "user"] | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _admin: models.User = Depends(require_admin),
+):
+    """Yönetici denetim kaydı, en yeni önce.
+
+    Burada yalnızca GERİ ALINAMAZ eylemler ve önceki metni yok eden ilan
+    düzenlemeleri var. Askıya alma, işaret temizleme, kaldırma ve geri alma
+    izlerini kendi sütunlarında taşır; ilgili kuyruklardan okunur.
+
+    Kaydın kendisi DEĞİŞTİRİLEMEZ: yazma ucu yok, silme ucu yok. Bir denetim
+    kaydını düzenleyebilen yönetici için o kayıt hiçbir şey ifade etmezdi.
+    """
+    stmt = (
+        select(models.AdminAction)
+        .options(selectinload(models.AdminAction.actor))
+        .order_by(
+            models.AdminAction.created_at.desc(), models.AdminAction.id.desc()
+        )
+    )
+    if action:
+        stmt = stmt.where(models.AdminAction.action == action)
+    if target_type is not None:
+        stmt = stmt.where(models.AdminAction.target_type == target_type)
+
+    rows = db.scalars(stmt.offset(offset).limit(limit)).all()
+    return [
+        {
+            "id": row.id,
+            "actor_id": row.actor_id,
+            "actor_name": row.actor.name if row.actor else None,
+            "action": row.action,
+            "target_type": row.target_type,
+            "target_id": row.target_id,
+            "reason": row.reason,
+            "detail": row.detail,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]

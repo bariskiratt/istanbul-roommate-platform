@@ -267,6 +267,55 @@ class Message(Base):
     sender: Mapped[User] = relationship(foreign_keys=[sender_id])
 
 
+class AdminAction(Base):
+    """Yönetici denetim kaydı — GERİ ALINAMAZ eylemlerin tek izi.
+
+    NEDEN AYRI BİR TABLO: geri alınabilir moderasyon eylemleri izini kendi
+    satırında bırakır (reviewed_by, suspended_by, resolved_by). Kalıcı silme
+    böyle bir yer bırakamaz: satırın kendisi gider. "Geçen hafta hangi ilanı
+    neden sildim" sorusunun cevabı silinen satırda duramayacağı için burada
+    durur.
+
+    Yazılan eylemler (app/admin.py):
+      listing_delete  ilan kalıcı silindi           — reason ZORUNLU
+      user_delete     hesap kalıcı silindi          — reason ZORUNLU
+      listing_update  yönetici başkasının ilanını düzenledi
+      listing_publish yönetici ilanı yayına aldı
+    Son ikisi geri alınabilir görünür ama düzenleme ÖNCEKİ METNİ yok eder;
+    o metnin nereye gittiği yalnızca buradaki `detail` alanından okunur.
+
+    Askıya alma / işaret temizleme / kaldırma BURAYA YAZILMAZ: onlar kendi
+    sütunlarında zaten aktörü ve zamanı taşıyor, iki yerde tutmak ikisinin
+    çelişmesi demektir.
+    """
+
+    __tablename__ = "admin_actions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Eylemi yapan yönetici. NULL olabilir: o yönetici kendi hesabını
+    # silerse kayıt AKTÖRÜNÜ kaybeder ama KAYBOLMAZ (bkz. auth.purge_user).
+    # Denetim kaydının silinen hesapla birlikte yok olması, kaydı tutmanın
+    # amacını ortadan kaldırırdı.
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True
+    )
+    # "listing_delete" | "user_delete" | "listing_update" | "listing_publish"
+    action: Mapped[str] = mapped_column(String(40), index=True)
+    # "listing" | "user"
+    target_type: Mapped[str] = mapped_column(String(20), index=True)
+    # Hedefin id'si. YABANCI ANAHTAR DEĞİL — hedef zaten silinmiş olabilir;
+    # kısıt koysaydık kaydı yazamazdık.
+    target_id: Mapped[int] = mapped_column(Integer, index=True)
+    # Yıkıcı uçlarda zorunlu (uç doğrular), diğerlerinde NULL olabilir.
+    reason: Mapped[str | None] = mapped_column(String(500))
+    # Serbest ek bilgi: silinen ilanın başlığı, düzenlemede değişen alanlar ve
+    # önceki metin. Silinen satırdan geriye kalan tek şey burasıdır.
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id])
+
+
 class Report(Base):
     """Kullanıcı şikâyeti (ilan / kullanıcı / mesaj).
 

@@ -19,7 +19,8 @@ export type AdminActionKind =
   | "restoreMessage"
   | "clear"
   | "suspend"
-  | "unsuspend";
+  | "unsuspend"
+  | "deleteUser";
 
 interface ActionConfig {
   titleKey: TranslationKey;
@@ -28,6 +29,13 @@ interface ActionConfig {
   input: "none" | "note" | "reason";
   /** Yıkıcı eylemler onay düğmesini kırmızı gösterir. */
   destructive: boolean;
+  /**
+   * Zorunlu sebep alanının başlığı/ipucu. Verilmezse askıya almanın metni
+   * kullanılır — sebep isteyen tek eylem uzun süre o olduğu için metin
+   * sabitti; hesap silmede "Askı sebebi" yazmak yanlış olurdu.
+   */
+  reasonLabelKey?: TranslationKey;
+  reasonPlaceholderKey?: TranslationKey;
 }
 
 const configs: Record<AdminActionKind, ActionConfig> = {
@@ -64,6 +72,16 @@ const configs: Record<AdminActionKind, ActionConfig> = {
     descKey: "admin.dlgUnsuspendDesc",
     input: "none",
     destructive: false,
+  },
+  // Sebep ZORUNLU: silinen satır geri gelmiyor ve denetim kaydına yazılacak
+  // tek açıklama bu. Sunucu da boş gerekçeyi 422 ile reddediyor.
+  deleteUser: {
+    titleKey: "admin.dlgDeleteUserTitle",
+    descKey: "admin.dlgDeleteUserDesc",
+    input: "reason",
+    destructive: true,
+    reasonLabelKey: "admin.dlgDeleteUserReasonLabel",
+    reasonPlaceholderKey: "admin.dlgDeleteUserReasonPlaceholder",
   },
 };
 
@@ -216,7 +234,11 @@ const AdminActionDialog = ({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-bold text-foreground">
-                      {t(config.input === "reason" ? "admin.dlgReasonLabel" : "admin.dlgNoteLabel")}
+                      {t(
+                        config.input === "reason"
+                          ? (config.reasonLabelKey ?? "admin.dlgReasonLabel")
+                          : "admin.dlgNoteLabel",
+                      )}
                     </h3>
                     <span className="text-[11px] text-muted-foreground tabular-nums">
                       {t("report.noteCounter", { count: note.length, max: NOTE_MAX })}
@@ -228,7 +250,9 @@ const AdminActionDialog = ({
                     onChange={e => setNote(e.target.value.slice(0, NOTE_MAX))}
                     maxLength={NOTE_MAX}
                     placeholder={t(
-                      config.input === "reason" ? "admin.dlgReasonPlaceholder" : "admin.dlgNotePlaceholder",
+                      config.input === "reason"
+                        ? (config.reasonPlaceholderKey ?? "admin.dlgReasonPlaceholder")
+                        : "admin.dlgNotePlaceholder",
                     )}
                     className="rounded-2xl min-h-[96px] resize-none"
                   />

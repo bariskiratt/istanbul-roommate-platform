@@ -35,6 +35,13 @@ class _Column:
 
 # Tablo -> eklenecek sütunlar. Yeni bir alan eklerken hem models.py'ye hem
 # buraya yazılmalı.
+#
+# YALNIZCA VAR OLAN TABLOYA EKLENEN SÜTUNLAR BURAYA YAZILIR. Yepyeni bir tablo
+# (ör. models.AdminAction -> admin_actions) buraya YAZILMAZ: create_all onu
+# zaten son hâliyle doğurur ve db.init_db'de create_all bu dosyadan ÖNCE
+# koşar. Yeni tablo için boş bir kayıt açmak, listeyi "hangi tablolar var"
+# sanılan ikinci bir şema tanımına dönüştürürdü — oysa burası yalnızca
+# create_all'ın YAPAMADIĞI işin listesi.
 _SCHEMA: dict[str, tuple[_Column, ...]] = {
     "users": (
         # Askıya alma — eski satırlar aktif sayılır.
