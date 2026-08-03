@@ -277,6 +277,15 @@ def reset_otp_key_cache() -> None:
     _otp_warned.clear()
 
 
+def otp_key_available() -> bool:
+    """OTP kodları HMAC ile mi saklanıyor (yani OTP_KEY geçerli mi)?
+
+    Dağıtım sonrası doğrulama için: crypto.key_available() ile aynı işi görür.
+    False dönerse kodlar tuzsuz SHA-256 ile saklanıyor demektir.
+    """
+    return _otp_key_bytes() is not None
+
+
 def _otp_key_bytes() -> bytes | None:
     global _otp_key, _otp_key_loaded
     if _otp_key_loaded:

@@ -248,3 +248,20 @@ def test_logout_invalidates_token(client):
     headers = {"Authorization": f"Bearer {token}"}
     assert client.post("/api/auth/logout", headers=headers).status_code == 204
     assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+
+def test_otp_key_available_ortam_degiskenine_bagli(monkeypatch):
+    """Dağıtım sonrası doğrulama yardımcısı gerçeği söylemeli."""
+    from app import auth
+
+    monkeypatch.delenv(auth.OTP_KEY_ENV, raising=False)
+    auth.reset_otp_key_cache()
+    assert auth.otp_key_available() is False
+
+    monkeypatch.setenv(auth.OTP_KEY_ENV, "x" * auth.MIN_OTP_KEY_LENGTH)
+    auth.reset_otp_key_cache()
+    assert auth.otp_key_available() is True
+
+    monkeypatch.setenv(auth.OTP_KEY_ENV, "kisa")
+    auth.reset_otp_key_cache()
+    assert auth.otp_key_available() is False
