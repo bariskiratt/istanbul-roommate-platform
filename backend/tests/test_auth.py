@@ -265,3 +265,55 @@ def test_otp_key_available_ortam_degiskenine_bagli(monkeypatch):
     monkeypatch.setenv(auth.OTP_KEY_ENV, "kisa")
     auth.reset_otp_key_cache()
     assert auth.otp_key_available() is False
+
+
+# ---- .edu.tr kısıtı yalnızca KAYIT için ----
+# Kısıt bir dönem EmailIn üzerinden giriş ve OTP uçlarına da uygulandı ve
+# kuraldan önce kaydolmuş kullanıcıları kendi hesaplarından kilitledi
+# (üretimde yaşandı). Aşağıdaki testler o davranışın geri gelmesini engeller.
+
+
+def _eski_kullanici(client, email="eski@ornek.com", password="Sifre1234"):
+    """Kısıttan önce kaydolmuş, .edu.tr olmayan doğrulanmış bir hesap kurar.
+
+    Kayıt ucundan geçilemez (kural onu reddeder), o yüzden satır doğrudan
+    veritabanına yazılır — kuraldan ÖNCE var olan hesabı taklit eder.
+    """
+    from app import models
+    from app.auth import _hash_password
+    from app.db import get_db
+    from app.main import app as _app
+
+    db = next(_app.dependency_overrides[get_db]())
+    db.add(
+        models.User(
+            email=email, password_hash=_hash_password(password), verified=True
+        )
+    )
+    db.commit()
+    return email, password
+
+
+def test_edu_tr_disi_mevcut_hesap_giris_yapabilir(client):
+    email, password = _eski_kullanici(client)
+
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
+
+    assert res.status_code == 200, res.text
+    assert res.json()["token"]
+
+
+def test_edu_tr_disi_mevcut_hesap_kod_isteyebilir(client):
+    email, _ = _eski_kullanici(client, email="eski2@ornek.com")
+
+    res = client.post("/api/auth/request-otp", json={"email": email})
+
+    assert res.status_code == 200, res.text
+
+
+def test_edu_tr_disi_adresle_KAYIT_hala_reddedilir(client):
+    res = client.post(
+        "/api/auth/register", json={"email": "yeni@gmail.com", "password": "Sifre1234"}
+    )
+
+    assert res.status_code == 422

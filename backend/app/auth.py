@@ -400,6 +400,28 @@ STUDENT_EMAIL_ERROR = (
 
 
 class EmailIn(BaseModel):
+    """Adresi yalnızca NORMALİZE eder; alan adı kısıtı UYGULAMAZ.
+
+    Giriş, kod isteme ve kod doğrulama bunu kullanır. Kısıtın burada
+    olmaması bilinçlidir: kural kimin HESAP AÇABİLECEĞİNİ belirler, kimin
+    var olan hesabına GİREBİLECEĞİNİ değil. Kısıt giriş ucuna da uygulanınca
+    kuraldan önce kaydolmuş herkes (demo hesapları ve gerçek kullanıcılar)
+    kendi hesabından kilitlendi — üretimde yaşandı. Hesap ya vardır ya
+    yoktur; adresini yeniden yargılamak yalnızca sahibini dışarıda bırakır.
+    """
+
+    email: str = Field(..., min_length=6, max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def _normalize(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("Geçerli bir e-posta adresi girin.")
+        return v
+
+
+class StudentEmailIn(EmailIn):
     email: str = Field(..., min_length=6, max_length=254)
 
     @field_validator("email")
@@ -430,7 +452,7 @@ class EmailIn(BaseModel):
         return v
 
 
-class RegisterIn(EmailIn):
+class RegisterIn(StudentEmailIn):
     password: str = Field(..., min_length=8, max_length=128)
 
 
