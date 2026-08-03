@@ -258,7 +258,10 @@ def respond_to_like(
     if row is None or row.direction != "like":
         raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
     if row.listing.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Bu beğeni senin ilanına değil.")
+        # 404, 403 DEĞİL: 403 "böyle bir beğeni var ama senin değil" derdi ve
+        # id gezerek platformdaki beğenileri saymaya yarardı (bulgu L4).
+        # Yanıt, olmayan bir id ile birebir aynı.
+        raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
     if row.swiper is not None and row.swiper.is_suspended:
         raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
 

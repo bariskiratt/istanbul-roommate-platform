@@ -27,14 +27,21 @@ advisor**, a **budget heatmap** of 968 neighborhoods, and rail-network-based
 | **Message encryption** | Chat messages are stored AES-256-GCM encrypted (`MESSAGE_KEY`, base64 of 32 bytes) and decrypted on read. This is **at-rest** encryption, not end-to-end — the server holds the key. Without the key the app still runs, but messages are stored as plain text. |
 | **Theming** | Hinge-inspired editorial design; light & dark themes (default dark). |
 
+## 📚 Documentation
+
+Long-form engineering documentation lives in [`docs/`](docs/) — architecture,
+the fair-rent model, the non-ML algorithms, the frontend, and a security audit.
+[`docs/README.md`](docs/README.md) says which document answers which question
+and in what order to read them. Deployment is [DEPLOY.md](DEPLOY.md).
+
 ## 🧠 Models & method
 
-Details in `backend/README.md`. Summary:
+Details in [`docs/MODEL.md`](docs/MODEL.md). Summary:
 
 - **Fair rent (module 1):** target `log(rent)`; LightGBM quantile regression
   (q25/q50/q75) yields an interval instead of a point estimate. 5-fold CV
   median error **15.1%** vs. a 25% neighborhood-median baseline. Outputs are
-  **CPI-indexed** from the training period (2026-01) to the current month
+  **CPI-indexed** from the training period (2025-02) to the current month
   (`app/indexing.py` — add one line per month as TÜİK publishes).
 - **Budget heatmap (module 2):** ~600 B per request (geometry downloaded once
   and cached client-side).

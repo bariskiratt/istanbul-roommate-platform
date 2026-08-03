@@ -2,7 +2,7 @@
 
 import pytest
 
-from app import auth
+from app import auth, content_limits
 from app import db as app_db  # noqa: F401 — SQLite FK dinleyicisini kurar
 
 # NOT: "PRAGMA foreign_keys=ON" burada TEKRARLANMAZ. Dinleyici app/db.py
@@ -15,8 +15,25 @@ from app import db as app_db  # noqa: F401 — SQLite FK dinleyicisini kurar
 def _clear_rate_limits():
     """Bellek-içi hız limiti testler arasında taşınmasın."""
     auth._RATE_BUCKETS.clear()
+    # İçerik uçlarının sayacı (app.content_limits) süreç ömrü boyunca yaşar;
+    # temizlenmezse bir testte açılan ilanlar sonraki testin kotasını yerdi.
+    content_limits.reset()
     yield
     auth._RATE_BUCKETS.clear()
+    content_limits.reset()
+
+
+@pytest.fixture(autouse=True)
+def _allow_fixture_photo_host(monkeypatch):
+    """Testlerdeki example.com fotoğraf adresleri kabul edilsin.
+
+    Fotoğraf adresi artık kapalı bir listeye göre doğrulanıyor
+    (app.uploads.is_allowed_photo_url) ve üretim listesinde example.com YOKTUR.
+    Sınamalar RFC 2606'nın ayırdığı bu adı kullandığı için listeyi üretimde de
+    gevşetmek yerine, dağıtıma özel ek barındırıcı değişkeni testlerde
+    dolduruluyor.
+    """
+    monkeypatch.setenv("EXTRA_PHOTO_HOSTS", "example.com")
 
 
 @pytest.fixture(autouse=True)

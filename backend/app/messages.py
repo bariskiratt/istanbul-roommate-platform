@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import crypto, models, moderation
+from app import content_limits, crypto, models, moderation
 from app.auth import get_current_user
 from app.db import get_db
 
@@ -50,11 +50,16 @@ def _to_out(row: models.Message) -> dict:
 def _require_participant(
     match_id: int, user: models.User, db: Session
 ) -> models.Match:
+    """Eşleşmeyi verir; taraf olmayana YOK muamelesi yapar.
+
+    Taraf olmayana 404 döner, 403 DEĞİL: 403 "bu eşleşme var ama senin değil"
+    demektir ve id gezerek hangi eşleşmelerin var olduğunu saymaya yarardı
+    (bulgu L4). Kendi eşleşmesi olmayan biri için var olan ve olmayan id
+    artık ayırt edilemez.
+    """
     match = db.get(models.Match, match_id)
-    if match is None:
+    if match is None or user.id not in (match.user_a_id, match.user_b_id):
         raise HTTPException(status_code=404, detail="Eşleşme bulunamadı.")
-    if user.id not in (match.user_a_id, match.user_b_id):
-        raise HTTPException(status_code=403, detail="Bu eşleşmenin tarafı değilsin.")
     return match
 
 
@@ -105,6 +110,10 @@ def send_message(
     user: models.User = Depends(get_current_user),
 ):
     match = _require_participant(match_id, user, db)
+    # Mesaj yağmuruna karşı kullanıcı başına sınır (bulgu H3). Taraf kontrolü
+    # ÖNCE koşar: sınır, yabancı bir eşleşmeye yazmaya çalışan için de sayaç
+    # tutup "bu id var mı" sorusuna dolaylı cevap vermesin.
+    content_limits.check("message_send", user.id)
 
     # Askıdaki kullanıcıya yeni mesaj gitmez. Sohbet /api/matches listesinde
     # zaten görünmüyor; buna rağmen mesaj kabul etmek karşı tarafın hiç

@@ -78,6 +78,46 @@ ADMIN_EMAILS = {
     if e.strip()
 }
 
+# ÖĞRENCİ E-POSTASI ZORUNLULUĞU — ADMIN_EMAILS'İN İKİNCİ İŞLEVİ
+#
+# Ürün "yalnızca .edu.tr adresiyle girilir" diye pazarlanıyor (arayüzdeki
+# güvenlik metinleri bunu bir güvence olarak sunuyor), ama bu kural uzun süre
+# YALNIZCA tarayıcıdaki bir if'ti: API'ye doğrudan istek atan biri
+# saldirgan@gmail.com ile kayıt olup hesabı doğrulayabiliyordu. Kural artık
+# sunucuda, app/auth.py içindeki EmailIn doğrulayıcısında zorlanıyor
+# (bkz. auth.is_student_email).
+#
+# MUAFİYET: yukarıdaki ADMIN_EMAILS adresleri kuraldan MUAFTIR. Sebebi
+# pratik: yöneticinin adreslerinden biri gmail.com'dur ve kural muafiyetsiz
+# uygulanırsa yönetici KENDİ HESABINI AÇAMAZ — moderasyon uçlarının tamamı
+# is_admin'e, o da e-posta eşleşmesine bağlı olduğu için sistem yöneticisiz
+# kalır.
+#
+# Muafiyetin sınırı: bu liste elle yazılan, dağıtımı yapan kişinin kontrol
+# ettiği bir ortam değişkenidir; dışarıdan bir kullanıcı buraya giremez. Yani
+# muafiyet "gmail'e izin" değil, "işletmecinin kendi adreslerine izin"dir.
+# Kendi dağıtımında ADMIN_EMAILS'i ezerken bunu da hatırla: buraya yazdığın
+# her adres öğrenci doğrulamasını da atlar.
+#
+# Öğrenci adresi sayılanlar (auth.is_student_email):
+#   - alan adı "edu.tr" ya da ".edu.tr" ile biten her adres
+#   - app/universities.py DOMAINS listesindeki alan adları ve alt alanları.
+#     Bu ikinci kural sabancıuniv.edu gibi .edu.tr OLMAYAN ama tanınan Türk
+#     üniversitesi alan adları içindir; o öğrencileri kapıda bırakmamak için.
+
+# Ters vekil (reverse proxy) arkasında mıyız?
+#
+# Hız limiti artık IP boyutu da taşıyor. Doğrudan internete bakan bir sunucuda
+# istemcinin IP'si request.client.host'tur. Render/Nginx gibi bir vekilin
+# arkasındaysak orası HER İSTEKTE vekilin IP'sini gösterir; o zaman tüm
+# dünya tek bir kovaya düşer ve IP limiti anlamsızlaşır.
+#
+# X-Forwarded-For KOŞULSUZ okunamaz: başlık istemci tarafından uydurulabilir,
+# yani her istekte farklı bir değer göndererek IP limiti tamamen atlanır.
+# Bu yüzden varsayılan KAPALI; yalnızca gerçekten vekil arkasındaysan ve o
+# vekil başlığı kendisi yazıyorsa TRUST_PROXY_HEADERS=1 ver.
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "0") == "1"
+
 # Kullanıcı fotoğrafları (yerelde üretilir, git'e girmez).
 # Yayında kalıcı disk bağlanan yolu UPLOADS_DIR env ile ver.
 UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))

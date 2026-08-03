@@ -35,6 +35,25 @@ services:
       # Doğrulama adımları: DEPLOY.md.
       - key: MESSAGE_KEY
         generateValue: true
+      # OTP kodları bu anahtarla HMAC'lenerek saklanır. Tanımlı değilse kodlar
+      # tuzsuz SHA-256 ile saklanır ve 6 hanenin arama uzayı 10^6 olduğu için
+      # veritabanını gören biri kodu saniyeler içinde geri bulabilir.
+      # En az 32 karakter gerekir; generateValue bunu sağlar.
+      - key: OTP_KEY
+        generateValue: true
+      # Yüklenen fotoğrafların URL'i bu tabandan üretilir. Tanımlı DEĞİLSE
+      # isteğin Host başlığı kullanılır ve saldırgan kendi alan adını taşıyan
+      # bir fotoğraf URL'i kaydettirebilir (başkalarına <img src> olarak
+      # servis edilir, IP/User-Agent sızar).
+      - key: PUBLIC_BASE_URL
+        value: https://api.evdes.tr
+      # Uygulama Render'ın ters vekilinin arkasında çalışır: gerçek istemci IP'si
+      # yalnızca X-Forwarded-For'da bulunur. Bu bayrak KAPALIYKEN tüm istekler
+      # vekilin IP'sinden geliyormuş gibi görünür ve IP tabanlı hız sınırları
+      # (kayıt taraması, giriş kilitleme koruması) işlevsiz kalır.
+      # Vekil arkasında OLMAYAN bir kurulumda AÇMA: başlık uydurulabilir.
+      - key: TRUST_PROXY_HEADERS
+        value: "1"
       - key: DATABASE_URL
         fromDatabase:
           name: roommatch-db

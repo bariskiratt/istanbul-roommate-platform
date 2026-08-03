@@ -13,19 +13,26 @@ import hmac
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app import models
+from app import config, models
 from app.db import get_db
 from app.departments import DEPARTMENT_GROUPS, is_valid as is_valid_department
 from app.emailer import send_otp_email
-from app.universities import university_from_email
+from app.universities import DOMAINS as UNIVERSITY_DOMAINS, university_from_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -39,23 +46,131 @@ MIN_AGE, MAX_AGE = 17, 30
 
 _SCRYPT_PARAMS = {"n": 2**14, "r": 8, "p": 1}
 
-# Basit bellek-içi hız limiti: (uç, e-posta) başına pencere içi istek sayısı.
-# Tek süreçli dağıtım için yeterli; restart'ta sıfırlanır.
+# ---- hız limiti ----
+#
+# Basit bellek-içi sayaç: kova anahtarı başına pencere içi istek sayısı.
+# Tek süreçli dağıtım için yeterli; restart'ta sıfırlanır. (Birden çok
+# worker'a çıkılırsa bu sayaç süreç başına ayrı tutulacağı için gerçek limit
+# worker sayısıyla çarpılır — o noktada Redis'e taşınmalı.)
 RATE_LIMIT = 5
 RATE_WINDOW = timedelta(minutes=15)
-_RATE_BUCKETS: dict[tuple[str, str], list[datetime]] = {}
+
+# IP BAŞINA KAYIT LİMİTİ.
+#
+# E-posta anahtarlı sayaç kütle kaydı hiç engellemiyordu: her istekte farklı
+# bir adres kullanan bir betik tek oturumda onlarca hesap açabiliyordu (yerelde
+# tek IP'den 80 kayıt denendi, hepsi 201 döndü). Sahte hesap üretimi bu üründe
+# doğrudan taciz/dolandırıcılık kapısı olduğu için ikinci bir boyut şart.
+#
+# Aynı sayaç e-posta taramasını da pahalılaştırıyor: /register hâlâ 409 ile
+# "bu adres kayıtlı" diyor (kayıt akışını bozmamak için bilerek korundu), ama
+# saatte 10 tahminle liste taramak anlamsız.
+#
+# Değer seçimi: yurt/kampüs NAT'ı arkasından birden çok öğrencinin aynı IP ile
+# kayıt olması normaldir, o yüzden 5 değil 10; pencere de 15 dakika değil
+# 1 saat, çünkü kütle kayıt yavaşlatılınca değil ancak uzun pencerede durur.
+REGISTER_IP_LIMIT = 10
+REGISTER_IP_WINDOW = timedelta(hours=1)
+
+# IP başına kod isteme limiti. Amaç e-posta bombardımanı: /request-otp
+# başkasının adresine posta gönderten tek uç, e-posta anahtarlı sayaç ise
+# saldırganın her istekte başka bir kurban seçmesini engellemiyor.
+OTP_IP_LIMIT = 15
+OTP_IP_WINDOW = timedelta(hours=1)
+
+_RATE_BUCKETS: dict[tuple[str, ...], list[datetime]] = {}
+
+# Kovaların budanması (L2). Sözlük eskiden hiç temizlenmiyordu: her yeni
+# e-posta/IP ikilisi kalıcı bir giriş açtığı için uzun süre ayakta kalan bir
+# süreçte bu sözlük sınırsız büyüyordu — kayıt ucunu döven biri onu tek başına
+# şişirebilirdi. Artık pencereden çıkmış kovalar atılıyor.
+_BUCKET_TTL = max(RATE_WINDOW, REGISTER_IP_WINDOW, OTP_IP_WINDOW)
+_PRUNE_INTERVAL = timedelta(minutes=1)
+# Bu sayının üstünde budama beklemeden hemen koşar (sel altında TTL yetmez).
+_MAX_BUCKETS = 10_000
+_last_prune = datetime.min.replace(tzinfo=timezone.utc)
 
 
-def _rate_limit(action: str, email: str) -> None:
+def _prune_buckets(now: datetime) -> None:
+    """Süresi geçmiş kovaları atar. Amortize: dakikada bir ya da sözlük
+    büyüdüğünde koşar, her istekte değil."""
+    global _last_prune
+    if (
+        now - _last_prune < _PRUNE_INTERVAL
+        and len(_RATE_BUCKETS) < _MAX_BUCKETS
+    ):
+        return
+    _last_prune = now
+    for key, stamps in list(_RATE_BUCKETS.items()):
+        if not stamps or now - stamps[-1] >= _BUCKET_TTL:
+            del _RATE_BUCKETS[key]
+    # Budamaya rağmen tavanın üstündeysek (hepsi taze, yani aktif bir sel var)
+    # en eskiden başlayarak kırp: bellek tüketimi her hâlükârda sınırlı kalmalı.
+    if len(_RATE_BUCKETS) > _MAX_BUCKETS:
+        for key, _ in sorted(
+            _RATE_BUCKETS.items(), key=lambda kv: kv[1][-1]
+        )[: len(_RATE_BUCKETS) - _MAX_BUCKETS]:
+            del _RATE_BUCKETS[key]
+
+
+def _too_many(window: timedelta) -> HTTPException:
+    minutes = max(1, int(window.total_seconds() // 60))
+    unit = f"{minutes // 60} saat" if minutes >= 60 else f"{minutes} dakika"
+    return HTTPException(
+        status_code=429,
+        detail=f"Çok fazla deneme yapıldı. {unit} sonra tekrar dene.",
+    )
+
+
+def _rate_limit(
+    action: str,
+    *parts: str,
+    limit: int = RATE_LIMIT,
+    window: timedelta = RATE_WINDOW,
+) -> None:
+    """Kovayı bir istek ilerletir; limit aşıldıysa 429 fırlatır.
+
+    Anahtar serbest sayıda parçadan oluşur — çağıran e-posta, IP ya da ikisini
+    birden verebilir. Boyut seçimi güvenlik kararıdır, bkz. uçlardaki notlar.
+    """
     now = datetime.now(timezone.utc)
-    bucket = _RATE_BUCKETS.setdefault((action, email), [])
-    bucket[:] = [t for t in bucket if now - t < RATE_WINDOW]
-    if len(bucket) >= RATE_LIMIT:
-        raise HTTPException(
-            status_code=429,
-            detail="Çok fazla deneme yapıldı. 15 dakika sonra tekrar dene.",
-        )
+    _prune_buckets(now)
+    bucket = _RATE_BUCKETS.setdefault((action, *parts), [])
+    bucket[:] = [t for t in bucket if now - t < window]
+    if len(bucket) >= limit:
+        raise _too_many(window)
     bucket.append(now)
+
+
+def _reset_rate_limit(action: str, *parts: str) -> None:
+    """Kovayı tamamen sıfırlar (başarılı girişten sonra)."""
+    _RATE_BUCKETS.pop((action, *parts), None)
+
+
+def _client_ip(request: Request) -> str:
+    """İsteğin kaynak IP'si.
+
+    X-Forwarded-For YALNIZCA config.TRUST_PROXY_HEADERS açıkken okunur:
+    başlık istemci tarafından uydurulabilir, her istekte başka bir değer
+    göndermek IP limitini tamamen anlamsız kılar. Ters vekil arkasında
+    değilsen (varsayılan) doğrudan soketin adresi kullanılır.
+    """
+    if config.TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            # EN SAĞDAKİ değer alınır, en soldaki DEĞİL.
+            #
+            # X-Forwarded-For soldan sağa büyür: her vekil kendinden önceki
+            # adresi sona ekler. İstemci de kendi başlığını gönderebilir, o
+            # yüzden SOLDAKİ değer saldırgan tarafından uydurulabilir —
+            # soldan okumak IP limitini tamamen anlamsız kılardı (her istekte
+            # başka bir "IP" yazıp sınırsız deneme yapılabilirdi).
+            #
+            # Bu kurulumda uygulamanın önünde TEK vekil var (Render), yani
+            # bize ulaşan zincirin son elemanını yazan odur ve güvenilirdir.
+            # Vekil sayısı değişirse burası da değişmeli.
+            return forwarded.split(",")[-1].strip()[:64] or "bilinmiyor"
+    return request.client.host if request.client else "bilinmiyor"
 
 
 # Askıya alınmış hesap için verilen yanıt. Sebebi gizlemek kullanıcıyı neyi
@@ -125,9 +240,94 @@ def _verify_password(password: str, stored: str) -> bool:
         return False
 
 
+# ---- OTP saklama ----
+#
+# OTP 6 HANEDİR, yani arama uzayı 10^6. Düz SHA-256 ile saklandığında bu
+# "hash" hiçbir şey gizlemez: veritabanını, bir yedeği ya da parametreleri
+# sızdıran bir log satırını gören biri bir milyon adayı saniyeler içinde
+# deneyip kodu geri bulur ve /verify-otp ile hesabı devralır (şifre hiç
+# gerekmez). Tuz eklemek de yetmez — tuz satırın yanında durur.
+#
+# Çözüm: SUNUCUDA DURAN bir sırla HMAC. Sır veritabanında olmadığı için
+# yalnızca DB'yi ele geçiren saldırgan kodu geri bulamaz.
+#
+# Sır yoksa bugünkü davranışa (düz SHA-256) DÜŞÜLÜR ve bir kez uyarı basılır;
+# yerel geliştirme kırılmasın diye. Aynı desen MESSAGE_KEY'de de kullanılıyor
+# (bkz. app/crypto.py) — oradaki gibi kısa/zayıf değerler kabul edilmez.
+OTP_KEY_ENV = "OTP_KEY"
+MIN_OTP_KEY_LENGTH = 32
+
+_otp_key: bytes | None = None
+_otp_key_loaded = False
+_otp_warned: set[str] = set()
+
+
+def _otp_warn_once(message: str) -> None:
+    if message in _otp_warned:
+        return
+    _otp_warned.add(message)
+    print(f"⚠️  {message}", flush=True)
+
+
+def reset_otp_key_cache() -> None:
+    """Sır önbelleğini temizler — testlerde ortam değişkeni değiştirmek için."""
+    global _otp_key, _otp_key_loaded
+    _otp_key = None
+    _otp_key_loaded = False
+    _otp_warned.clear()
+
+
+def _otp_key_bytes() -> bytes | None:
+    global _otp_key, _otp_key_loaded
+    if _otp_key_loaded:
+        return _otp_key
+    _otp_key_loaded = True
+
+    raw = os.getenv(OTP_KEY_ENV, "").strip()
+    if not raw:
+        _otp_warn_once(
+            f"{OTP_KEY_ENV} tanımlı değil — OTP kodları tuzsuz SHA-256 ile "
+            f"saklanacak. 6 hane = 10^6 arama uzayı; veritabanını gören biri "
+            f"kodu geri bulabilir. Üretimde MUTLAKA tanımla "
+            f"(en az {MIN_OTP_KEY_LENGTH} karakter rastgele dize)."
+        )
+        return None
+    if len(raw) < MIN_OTP_KEY_LENGTH:
+        _otp_warn_once(
+            f"{OTP_KEY_ENV} çok kısa ({len(raw)} karakter; en az "
+            f"{MIN_OTP_KEY_LENGTH} gerekir) — tuzsuz SHA-256'ya düşülüyor."
+        )
+        return None
+    _otp_key = raw.encode()
+    return _otp_key
+
+
+def _otp_digest(code: str) -> str:
+    """Saklanacak OTP özeti: sır varsa HMAC-SHA256, yoksa düz SHA-256."""
+    key = _otp_key_bytes()
+    if key is None:
+        return _sha256(code)
+    return hmac.new(key, code.encode(), hashlib.sha256).hexdigest()
+
+
+def _otp_matches(stored: str, code: str) -> bool:
+    """Kod, saklanan özetle uyuşuyor mu?
+
+    HMAC'in yanında ESKİ düz SHA-256 biçimi de kabul edilir: OTP_KEY yeni
+    tanımlandığında o an dolaşımda olan (en fazla 10 dakikalık) kodlar eski
+    biçimde saklanmıştır ve kullanıcı doğrulamayı yarıda bırakmamalıdır.
+    İki karşılaştırma da sabit zamanlıdır; eski biçimi kabul etmek yeni
+    kodların güvenliğini düşürmez, çünkü hangi biçimin geçerli olduğunu
+    saldırgan değil SATIRDAKİ DEĞER belirler.
+    """
+    if hmac.compare_digest(stored, _otp_digest(code)):
+        return True
+    return hmac.compare_digest(stored, _sha256(code))
+
+
 def _issue_otp(user: models.User) -> str:
     code = f"{secrets.randbelow(1_000_000):06d}"
-    user.otp_hash = _sha256(code)
+    user.otp_hash = _otp_digest(code)
     user.otp_expires = datetime.now(timezone.utc) + OTP_TTL
     return code
 
@@ -156,15 +356,68 @@ def _deliver_otp(email: str, code: str) -> dict:
 
 # ---- şemalar ----
 
+def is_student_email(email: str) -> bool:
+    """Adres bir Türk üniversitesi öğrenci/personel adresi mi?
+
+    KABUL EDİLENLER
+      1. Alan adı "edu.tr" ya da ".edu.tr" ile biten her adres — Türkiye'de
+         edu.tr alt alanları yalnızca YÖK'e bağlı kurumlara verilir, yani
+         bu kural "üniversiteye ait adres" için makul bir vekildir.
+      2. app/universities.py DOMAINS listesindeki alan adları ve alt alanları.
+         Bu ikinci kural tek bir somut boşluk için var: sabanciuniv.edu
+         (ve ileride eklenebilecek benzerleri) tanınan bir Türk üniversitesi
+         alan adı olduğu hâlde .edu.tr DEĞİLDİR. Yalnızca birinci kural
+         uygulansaydı o üniversitenin öğrencileri kapıda kalırdı — üstelik
+         üniversiteleri sistemde zaten tanımlı olduğu için sessizce.
+
+    Muafiyet (config.ADMIN_EMAILS) burada DEĞİL, çağıran doğrulayıcıda
+    uygulanır; bu fonksiyon saf bir "öğrenci adresi mi" testidir.
+    """
+    domain = email.rsplit("@", 1)[-1].strip().lower()
+    if not domain:
+        return False
+    if domain == "edu.tr" or domain.endswith(".edu.tr"):
+        return True
+    return any(
+        domain == known or domain.endswith("." + known)
+        for known in UNIVERSITY_DOMAINS
+    )
+
+
+STUDENT_EMAIL_ERROR = (
+    "Yalnızca üniversite e-posta adresiyle (.edu.tr) kayıt olunabilir. "
+    "Okulunun sana verdiği adresi kullan."
+)
+
+
 class EmailIn(BaseModel):
     email: str = Field(..., min_length=6, max_length=254)
 
     @field_validator("email")
     @classmethod
     def _normalize(cls, v: str) -> str:
+        """Adresi normalize eder ve ÖĞRENCİ ADRESİ olmasını zorlar.
+
+        Bu kural eskiden yalnızca tarayıcıdaki bir if'ti (Onboarding.tsx).
+        API'ye doğrudan istek atan biri gmail adresiyle kayıt olup OTP'yi
+        doğrulayarak tam yetkili hesap açabiliyordu — oysa ürün ".edu.tr
+        zorunlu" ifadesini bir GÜVENLİK GÜVENCESİ olarak pazarlıyor (arayüzün
+        güvenlik metinleri ve Safety sayfası). Yani doğrulama eksik değil,
+        kullanıcıya verilen söz yalandı. Kural artık sunucuda.
+
+        MUAFİYET: config.ADMIN_EMAILS adresleri geçer. Yöneticinin
+        adreslerinden biri gmail.com ve is_admin tamamen e-posta eşleşmesine
+        bağlı; muafiyet olmasaydı yönetici kendi hesabını hiç açamaz, sistem
+        moderatörsüz kalırdı. Liste işletmecinin kontrolündeki bir ortam
+        değişkeninden gelir, dışarıdan kimse ekleyemez (bkz. app/config.py).
+        """
         v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
             raise ValueError("Geçerli bir e-posta adresi girin.")
+        if v in config.ADMIN_EMAILS:
+            return v
+        if not is_student_email(v):
+            raise ValueError(STUDENT_EMAIL_ERROR)
         return v
 
 
@@ -205,6 +458,32 @@ class UserOut(BaseModel):
     is_admin: bool = False
 
 
+# LİSTE ALANLARININ SINIRLARI — HEM ÖĞE SAYISI HEM ÖĞE UZUNLUĞU.
+#
+# Eskiden photos yalnızca ELEMAN SAYISIYLA (6) sınırlıydı, preferred_districts
+# ise hiç sınırlı değildi. Öğe uzunluğu serbest kalınca sayı sınırı bir şey
+# ifade etmiyor: 6 tane 2 MB'lık dize gönderen bir PATCH kabul ediliyor ve tek
+# kullanıcı satırı 32 MB'a çıkıyordu. Bu satır sonra HER profil/ilan
+# yanıtında okunup ağdan geçtiği için, tek bir yazma isteği kalıcı bir
+# bant genişliği ve bellek yükü bırakıyordu (anonim GET /api/listings 12 MB
+# döndürebiliyordu).
+#
+# Değerler gerçek kullanıma göre seçildi: İstanbul ilçe adlarının en uzunu
+# 20 karakterin altında (40 bol bir tavan), kendi ürettiğimiz fotoğraf URL'i
+# ~90 karakter; 500 dış barındırıcıların uzun sorgu dizelerine yer bırakır.
+MAX_DISTRICTS = 10
+MAX_DISTRICT_LENGTH = 40
+MAX_PHOTOS = 6
+MAX_PHOTO_URL_LENGTH = 500
+
+DistrictName = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=MAX_DISTRICT_LENGTH)
+]
+PhotoUrl = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=MAX_PHOTO_URL_LENGTH)
+]
+
+
 class UserUpdate(BaseModel):
     """PATCH /me — yalnızca gönderilen alanlar güncellenir.
 
@@ -243,9 +522,11 @@ class UserUpdate(BaseModel):
     pets: bool | None = None
     alcohol: bool | None = None
     sleep_schedule: str | None = Field(None, max_length=10)
-    preferred_districts: list[str] | None = None
+    preferred_districts: list[DistrictName] | None = Field(
+        None, max_length=MAX_DISTRICTS
+    )
     bio: str | None = Field(None, max_length=2000)
-    photos: list[str] | None = Field(None, max_length=6)
+    photos: list[PhotoUrl] | None = Field(None, max_length=MAX_PHOTOS)
 
 
 class TokenOut(BaseModel):
@@ -308,12 +589,35 @@ def get_current_user(
 # ---- uçlar ----
 
 @router.post("/register", status_code=201)
-def register(payload: RegisterIn, db: Session = Depends(get_db)):
+def register(
+    payload: RegisterIn, request: Request, db: Session = Depends(get_db)
+):
+    ip = _client_ip(request)
+    # İki boyut birden: e-posta sayacı aynı adresin dövülmesini, IP sayacı
+    # HER İSTEKTE BAŞKA adres kullanan kütle kaydı/adres taramasını durdurur.
     _rate_limit("register", payload.email)
+    _rate_limit(
+        "register-ip",
+        ip,
+        limit=REGISTER_IP_LIMIT,
+        window=REGISTER_IP_WINDOW,
+    )
     existing = db.scalar(
         select(models.User).where(models.User.email == payload.email)
     )
     if existing is not None:
+        # 409 BİLEREK KORUNDU (e-posta numaralandırmasına açık olduğu hâlde).
+        #
+        # Tekdüze yanıt vermek burada kayıt akışını bozar: adres zaten
+        # kayıtlıysa ve 201 dönersek, kullanıcı gelmeyecek bir kodu bekler;
+        # "kayıt oldum ama kod gelmedi" desteğe düşer. Alternatif olan "sessizce
+        # var olan hesaba kod gönder" ise daha kötüsü — bir yabancı, başkasının
+        # adresiyle kayıt olmaya çalışarak o hesaba giriş kodu tetikleyebilir.
+        #
+        # Bunun yerine sızıntının DEĞERİ düşürüldü: yukarıdaki IP sayacı
+        # sayesinde tarama saatte 10 adresle sınırlı, yani liste taramak
+        # pratikte işe yaramıyor. Gerçek numaralandırma kapısı olan
+        # /request-otp'un 404'ü ise kaldırıldı (bkz. request_otp).
         raise HTTPException(
             status_code=409, detail="Bu e-posta zaten kayıtlı. Giriş yap."
         )
@@ -332,13 +636,36 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 
 
 @router.post("/request-otp")
-def request_otp(payload: EmailIn, db: Session = Depends(get_db)):
+def request_otp(payload: EmailIn, request: Request, db: Session = Depends(get_db)):
+    """Giriş kodu ister. YANIT, ADRESİN KAYITLI OLUP OLMADIĞINI SÖYLEMEZ.
+
+    Eskiden kayıtlı olmayan adres için 404 "Bu e-posta kayıtlı değil"
+    dönüyordu. Bu, kimlik doğrulaması istemeyen bir uçtan ÜYELİK SORGUSUdur:
+    elindeki adres listesini tek tek deneyen biri, kimin bu platformda hesabı
+    olduğunu öğrenir. Ev arkadaşı arama platformunda üyeliğin kendisi hassas
+    bir bilgidir (kişinin taşınmak istediğini, muhtemelen bütçesini ve
+    üniversitesini ima eder) ve e-posta anahtarlı hız limiti bu taramayı hiç
+    yavaşlatmıyordu — her istek FARKLI bir adresle geliyor.
+
+    Artık iki durumda da aynı 200 ve aynı metin döner; kod yalnızca gerçekten
+    kayıtlı adrese gider. Bedeli: adresini yanlış yazan kullanıcı "kod
+    gönderildi" görüp bekler. Bunu kabul ediyoruz çünkü kayıt akışında
+    (/register) yanlış adres zaten 201 ile ilerliyor ve kullanıcı kodu
+    alamayınca tekrar deniyor; buradaki tek fark hatanın bir istek geç fark
+    edilmesi.
+
+    dev_code de yalnızca gerçek kullanıcı için döner — aksi hâlde yanıtın
+    varlığı/yokluğu numaralandırmayı geri getirirdi.
+    """
+    ip = _client_ip(request)
     _rate_limit("request-otp", payload.email)
+    # IP boyutu: e-posta sayacı, her istekte başka bir kurban seçen birini
+    # engellemiyor. Bu uç başkasının gelen kutusuna posta gönderten tek uç.
+    _rate_limit("request-otp-ip", ip, limit=OTP_IP_LIMIT, window=OTP_IP_WINDOW)
+
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if user is None:
-        raise HTTPException(
-            status_code=404, detail="Bu e-posta kayıtlı değil. Önce kayıt ol."
-        )
+        return {"detail": "Doğrulama kodu gönderildi."}
     # Askıdaki hesaba kod göndermenin anlamı yok; verify-otp zaten reddedecek.
     # Gerekçe EKLENMEZ: bu uç hiçbir kimlik doğrulaması istemiyor.
     _reject_if_suspended(user)
@@ -356,9 +683,32 @@ def _issue_token(db: Session, user: models.User) -> str:
 
 
 @router.post("/login", response_model=TokenOut)
-def login(payload: LoginIn, db: Session = Depends(get_db)):
-    """E-posta + şifre ile giriş (OTP'siz)."""
-    _rate_limit("login", payload.email)
+def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
+    """E-posta + şifre ile giriş (OTP'siz).
+
+    HIZ LİMİTİ KOVASI (e-posta, IP) İKİLİSİYLE ANAHTARLANIR ve başarılı
+    girişte SIFIRLANIR. İkisi de bir DoS'u kapatmak için:
+
+    Kova yalnızca e-postayla anahtarlanıyor ve başarı onu temizlemiyorken,
+    kurbanın adresini bilen herkes 5 yanlış şifre göndererek o hesabı 15
+    dakika boyunca KENDİ DOĞRU ŞİFRESİYLE bile giremez hâle getiriyordu; her
+    15 dakikada bir 5 istek tekrarlanarak kilit süresiz uzatılabiliyordu.
+    Yani kaba kuvvete karşı konan önlem, hesabı ele geçirmenin değil
+    kapatmanın aracına dönüşmüştü.
+
+    Artık saldırgan yalnızca KENDİ IP'sinin kovasını doldurur; kurban başka
+    bir adresten geldiği için etkilenmez, doğru şifreyle girdiği anda da kova
+    tamamen sıfırlanır.
+
+    KALAN RİSK, bilerek kabul edildi: farklı IP'lere sahip bir saldırgan
+    hesap başına IP başına 5 deneme yapabilir. Şifreler scrypt ile
+    saklandığı ve en az 8 karakter olduğu için bu, kurbanı süresiz kilitleme
+    garantisinden daha küçük bir risk. Aynı NAT'ın (yurt/kampüs) arkasındaki
+    biri hâlâ komşusunu kilitleyebilir — dağıtık sayaç (Redis) ve
+    IP+hesap ayrımı bir sonraki adım.
+    """
+    ip = _client_ip(request)
+    _rate_limit("login", payload.email, ip)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if (
         user is None
@@ -374,6 +724,10 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     # Şifre DOĞRULANDIKTAN sonra: karşıdaki hesabın sahibi, gerekçeyi görebilir.
     _reject_if_suspended(user, include_reason=True)
 
+    # Başarılı giriş kovayı sıfırlar: kimliğini kanıtlayan kişinin, daha önceki
+    # başarısız denemeler yüzünden bir sonraki girişte kilitlenmesi anlamsız.
+    _reset_rate_limit("login", payload.email, ip)
+
     token = _issue_token(db, user)
     db.commit()
     return {"token": token, "user": user}
@@ -381,7 +735,15 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
 
 @router.post("/verify-otp", response_model=TokenOut)
 def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
-    # 6 haneli kodun kaba kuvvetle denenmesini engeller (5 deneme / 15 dk)
+    # 6 haneli kodun kaba kuvvetle denenmesini engeller (5 deneme / 15 dk).
+    #
+    # BURADA KOVA BİLEREK IP BOYUTU TAŞIMIYOR (login'in aksine). Sebebi
+    # ödünleşimin ters yönde olması: IP eklenirsek her IP'ye ayrı 5 hak
+    # doğar ve botnet'i olan biri 10^6'lık kod uzayını paralel tarayabilir —
+    # yani kaba kuvvet gerçekten mümkün hâle gelir. Hesap başına tek sayaç
+    # bunu kapatır; bedeli, kurbanın adresini bilen birinin OTP ile giriş
+    # yolunu 15 dakika tıkayabilmesidir. Bu bir DoS ama TAM DEĞİL: şifreyle
+    # giriş yolu açık kalır ve doğru kod girilince (aşağıda) kova sıfırlanır.
     _rate_limit("verify-otp", payload.email)
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     # Askı kontrolü koddan ÖNCE: doğru kodu bilmek askıyı delmemeli.
@@ -397,12 +759,16 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
         expires = expires.replace(tzinfo=timezone.utc)  # SQLite tz bilgisini düşürür
     if expires is None or expires < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Kodun süresi doldu. Yeni kod iste.")
-    if not hmac.compare_digest(user.otp_hash, _sha256(payload.code)):
+    if not _otp_matches(user.otp_hash, payload.code):
         raise HTTPException(status_code=400, detail="Kod hatalı.")
 
     user.verified = True
     user.otp_hash = None
     user.otp_expires = None
+
+    # Doğru kodu bilen kişi kimliğini kanıtladı; kovayı sıfırla ki daha önceki
+    # başarısız denemeler bir sonraki girişini engellemesin.
+    _reset_rate_limit("verify-otp", payload.email)
 
     token = _issue_token(db, user)
     db.commit()
@@ -500,6 +866,29 @@ def _nullable_user_fk_columns() -> list:
     ]
 
 
+def _delete_photo_files(urls: list[str]) -> int:
+    """Kullanıcının yüklediği fotoğraf DOSYALARINI diskten siler.
+
+    İşi app.uploads.delete_local_photos yapar; burada yalnızca çağrılır (o
+    modül yalnızca UPLOADS_DIR içinde kalan ve BİZİM ürettiğimiz ad desenine
+    uyan yolları siler, dış URL'leri atlar, yol geçişine kapalıdır).
+
+    İMPORT NEDEN FONKSİYON İÇİNDE: app.uploads, app.auth'tan get_current_user
+    alıyor. Modül seviyesinde import etmek döngü kurar.
+
+    delete_local_photos yoksa sessizce 0 döner. Bu, hesap silmenin bir
+    yardımcı fonksiyon eksikliği yüzünden 500 vermemesi içindir — dosya
+    temizliği önemli ama hesabın silinmesi DAHA önemli.
+    """
+    if not urls:
+        return 0
+    try:
+        from app.uploads import delete_local_photos
+    except ImportError:  # pragma: no cover — uploads her zaman var
+        return 0
+    return delete_local_photos(urls)
+
+
 def purge_user(db: Session, user: models.User) -> dict[str, int]:
     """Kullanıcıyı ve ona bağlı TÜM verileri siler. COMMIT ETMEZ.
 
@@ -547,6 +936,13 @@ def purge_user(db: Session, user: models.User) -> dict[str, int]:
     listing_ids = [
         l.id for l in db.query(models.Listing.id).filter_by(owner_id=uid)
     ]
+    # Fotoğraf URL'leri satırlar silinmeden ÖNCE toplanır: silindikten sonra
+    # hangi dosyaların bu kullanıcıya ait olduğunu söyleyecek hiçbir kayıt
+    # kalmaz ve dosyalar /uploads/ altında sonsuza kadar erişilebilir durur.
+    photo_urls: list[str] = list(user.photos or [])
+    for row in db.query(models.Listing.photos).filter_by(owner_id=uid):
+        photo_urls.extend(row.photos or [])
+
     deleted_swipes = 0
     if listing_ids:
         deleted_swipes += db.query(models.Swipe).filter(
@@ -608,12 +1004,31 @@ def purge_user(db: Session, user: models.User) -> dict[str, int]:
 
     db.delete(user)
     db.flush()
+
+    # SON ADIM: DİSKTEKİ FOTOĞRAFLAR.
+    #
+    # Bunlar silinmediğinde hesap silme sözü tutulmuş olmuyordu: arayüz
+    # "hesabını silmek kalıcıdır, tamamen silinir" diyor, oysa /uploads/
+    # girişsiz servis edildiği için kullanıcının yüzünün olduğu dosya, hesap
+    # silindikten SONRA da URL'i bilen herkese 200 dönmeye devam ediyordu.
+    # KVKK açısından bu bir silme talebinin yerine getirilmemesidir.
+    #
+    # İşlem sınırının DIŞINDA: dosya silme geri alınamaz, veritabanı ise bu
+    # noktada henüz commit edilmedi. Çağıran rollback ederse dosyalar gitmiş,
+    # satırlar durmuş olur (yetim URL). Bilinçli tercih: iki çağıran da
+    # (DELETE /api/auth/me ve DELETE /api/admin/users/{id}) hemen ardından
+    # commit ediyor ve buradan sonra hata verebilecek bir adım kalmıyor;
+    # ters yönde hata yapmak — yani veri silinmiş görünürken fotoğrafın
+    # yayında kalması — kullanıcı için çok daha ağır.
+    deleted_photos = _delete_photo_files(photo_urls)
+
     return {
         "listings": deleted_listings,
         "matches": deleted_matches,
         "messages": deleted_messages,
         "swipes": deleted_swipes,
         "reports": deleted_reports,
+        "photos": deleted_photos,
     }
 
 

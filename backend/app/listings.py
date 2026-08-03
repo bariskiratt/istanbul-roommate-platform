@@ -8,15 +8,21 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
 
-from app import models, moderation
+from app import content_limits, models, moderation
 from app.auth import get_current_user, get_optional_user
 from app.db import get_db
+from app.uploads import (
+    MAX_PHOTO_URL_LENGTH,
+    delete_local_photos,
+    is_allowed_photo_url,
+    local_photo_name,
+)
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
 
@@ -37,6 +43,36 @@ FEATURE_FIELDS: tuple[str, ...] = (
 
 # Denetim reddinde hangi alanın sorunlu olduğu arayüze bu adlarla bildirilir.
 _FIELD_LABELS = {"title": "Başlıkta", "description": "Açıklamada"}
+
+
+def _check_photos(value: list[str] | None) -> list[str] | None:
+    """Fotoğraf listesindeki HER ÖĞEYİ tek tek doğrular.
+
+    Eskiden yalnızca öğe SAYISI sınırlıydı (min 3, en fazla 6); öğenin kendisi
+    istenen uzunlukta, istenen içerikte bir dizeydi. 2 MB'lık altı "data:"
+    dizesiyle açılan bir ilan hem satırı hem de anonim liste ucunun yanıtını
+    megabaytlara çıkarıyordu (bulgu H2). Ayrıca adres serbest olduğu için
+    ilan fotoğrafı saldırganın sunucusundan çekilebiliyordu.
+
+    Kural: her öğe en fazla MAX_PHOTO_URL_LENGTH karakter VE
+    uploads.is_allowed_photo_url'den geçmeli (kendi yüklemelerimiz + kapalı
+    listedeki barındırıcılar).
+    """
+    if value is None:
+        return value
+    for url in value:
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError("Fotoğraf adresi boş olamaz.")
+        if len(url) > MAX_PHOTO_URL_LENGTH:
+            raise ValueError(
+                f"Fotoğraf adresi {MAX_PHOTO_URL_LENGTH} karakterden uzun olamaz."
+            )
+        if not is_allowed_photo_url(url):
+            raise ValueError(
+                "Fotoğraf adresi kabul edilmiyor: yalnızca uygulamaya "
+                "yüklenen fotoğraflar ve izin verilen barındırıcılar geçerli."
+            )
+    return value
 
 
 def _reject(field: str, reasons: list[str]) -> HTTPException:
@@ -133,6 +169,35 @@ def flag_state(result: moderation.ModerationResult) -> tuple[bool, str | None]:
     return True, ",".join(result.reasons)
 
 
+def _photos_in_use_elsewhere(db: Session, listing_id: int) -> set[str]:
+    """Başka kayıtların kullandığı yerel fotoğraf DOSYA ADLARI.
+
+    Aynı dosya birden fazla yerde geçebilir: kullanıcı fotoğrafını hem
+    profiline hem ilanına koyabilir ya da iki ilanında aynı görseli
+    kullanabilir. Silinen ilan yüzünden hâlâ kullanılan bir dosyayı silmek
+    başka bir ilanı kırık görselle bırakırdı.
+
+    Karşılaştırma DOSYA ADI üzerinden yapılır, URL metni üzerinden değil:
+    aynı dosya bir kayıtta göreli ("/uploads/ab..jpg"), diğerinde mutlak
+    adresle durabilir.
+    """
+    used: set[str] = set()
+    others = db.scalars(
+        select(models.Listing.photos).where(models.Listing.id != listing_id)
+    ).all()
+    for photos in others:
+        for url in photos or []:
+            name = local_photo_name(url) if isinstance(url, str) else None
+            if name:
+                used.add(name)
+    for photos in db.scalars(select(models.User.photos)).all():
+        for url in photos or []:
+            name = local_photo_name(url) if isinstance(url, str) else None
+            if name:
+                used.add(name)
+    return used
+
+
 def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
     """İlanı KALICI siler ve ona bağlı kayıtları temizler. COMMIT ETMEZ.
 
@@ -152,6 +217,13 @@ def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
     yabancı anahtar kısıtı taşır, atlanırsa DELETE reddedilir ve uç 500 verir.
     (SQLite'ta kısıtlar varsayılan kapalı olduğu için hata testte değil
     üretimde görünürdü.)
+
+    FOTOĞRAF DOSYALARI da silinir (bulgu H6): satır gidip dosya kalırsa
+    /uploads/<ad> adresi girişsiz ve süresiz erişilebilir olmaya devam eder.
+    Yalnızca BİZİM ürettiğimiz ve BAŞKA HİÇBİR kayıtta kullanılmayan dosyalar
+    silinir. Dosya silme geri alınamaz; çağıran taraf işlemi geri sararsa
+    (rollback) satır geri gelir ama görseller gelmez — bu uç zaten "kalıcı
+    silme" ucudur, çağrıldığı yerde commit ediliyor.
     """
     lid = row.id
     swipes = db.query(models.Swipe).filter(
@@ -165,9 +237,24 @@ def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
         models.Match.listing_id == lid
     ).update({models.Match.listing_id: None}, synchronize_session=False)
 
+    photos = list(row.photos or [])
     db.delete(row)
     db.flush()
-    return {"swipes": swipes, "reports": reports, "detached_matches": matches}
+
+    in_use = _photos_in_use_elsewhere(db, lid)
+    orphans = [
+        url
+        for url in photos
+        if isinstance(url, str) and (local_photo_name(url) or "") not in in_use
+    ]
+    deleted_photos = delete_local_photos(orphans)
+
+    return {
+        "swipes": swipes,
+        "reports": reports,
+        "detached_matches": matches,
+        "photos": deleted_photos,
+    }
 
 
 def _suspended_user_ids():
@@ -241,6 +328,11 @@ class ListingIn(BaseModel):
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
     budget_max: int | None = Field(None, gt=0, le=10_000_000)
 
+    @field_validator("photos")
+    @classmethod
+    def _check_photo_urls(cls, value):
+        return _check_photos(value)
+
     @model_validator(mode="after")
     def _check_type_fields(self):
         if self.type == "ev_ilani":
@@ -286,6 +378,22 @@ class ListingOut(BaseModel):
     owner_university: str | None = None
 
 
+def _hide_owner(row: models.Listing) -> ListingOut:
+    """İlanı sahibinin adı ve üniversitesi olmadan döndürür.
+
+    GİRİŞSİZ istemciye ilan sahibinin adı ve okuduğu üniversite gitmemeli:
+    ikisi birlikte, hesap bile açmadan tek istekle toplanabilen bir kişi
+    listesi üretiyordu (bulgu L3). Bilgi giriş yapan kullanıcıya aynen
+    dönmeye devam eder — kimin ilanına baktığını görmek ürünün özü.
+
+    owner_id KALIR: kimliğe götüren bir isim değil, arayüzün "bu benim ilanım"
+    ve raporlama akışlarında kullandığı iç anahtar.
+    """
+    return ListingOut.model_validate(row).model_copy(
+        update={"owner_name": None, "owner_university": None}
+    )
+
+
 @router.post("", status_code=201, response_model=ListingOut)
 def create_listing(
     payload: ListingIn,
@@ -293,6 +401,10 @@ def create_listing(
     user: models.User = Depends(get_current_user),
 ):
     """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı."""
+    # Giriş ŞARTI tek başına yetmiyordu: tek jetonla yüzlerce ilan açılıp
+    # deste ve arama sonuçları doldurulabiliyordu (bulgu H3).
+    content_limits.check("listing_create", user.id)
+
     result = _moderate(payload.title, payload.description)
     row = models.Listing(
         **payload.model_dump(),
@@ -360,14 +472,25 @@ def list_listings(
             (models.Listing.type != "ev_ilani")
             | getattr(models.Listing, key).is_(True)
         )
-    return db.scalars(stmt).all()
+    rows = db.scalars(stmt).all()
+    if user is None:
+        return [_hide_owner(row) for row in rows]
+    return rows
 
 
 @router.get("/{listing_id}", response_model=ListingOut)
-def get_listing(listing_id: int, db: Session = Depends(get_db)):
+def get_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    user: models.User | None = Depends(get_optional_user),
+):
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active or _owner_suspended(row):
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+    # Liste ucuyla aynı kural: girişsiz istemci sahibin adını/üniversitesini
+    # görmez, yoksa tek tek id gezerek aynı listeyi toplamak yeterdi.
+    if user is None:
+        return _hide_owner(row)
     return row
 
 
@@ -422,6 +545,11 @@ class ListingUpdate(BaseModel):
     natural_gas: bool | None = None
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
     budget_max: int | None = Field(None, gt=0, le=10_000_000)
+
+    @field_validator("photos")
+    @classmethod
+    def _check_photo_urls(cls, value):
+        return _check_photos(value)
 
 
 @router.patch("/{listing_id}", response_model=ListingOut)

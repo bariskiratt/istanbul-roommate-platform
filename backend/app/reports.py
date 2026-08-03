@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models
+from app import content_limits, models
 from app.auth import get_current_user
 from app.db import get_db
 
@@ -73,6 +73,43 @@ def _existing_report(
     ) is not None
 
 
+def _reportable(
+    db: Session, target_type: str, target_id: int, user: models.User
+) -> bool:
+    """Bu kullanıcı bu hedefi görebiliyor mu — yani raporlayabilir mi?
+
+    Eskiden tek koşul "satır var mı" idi. Bunun iki sonucu vardı (bulgu H4):
+
+    1. MESAJ: eşleşmenin tarafı olmayan biri, yalnızca id vererek BAŞKALARININ
+       özel yazışmasını moderasyon kuyruğuna sokabiliyordu. Kuyruk yöneticiye
+       mesaj metnini DÜZ OKUNUR gösterdiği için bu, herhangi bir yabancının
+       istediği özel mesajı üçüncü bir kişiye okutabilmesi demekti.
+    2. HER TÜR: var olan id 201, olmayan id 404 döndüğü için uç bir kimlik
+       sayacına dönüşüyordu (kaç kullanıcı, kaç mesaj var).
+
+    Artık erişilemeyen hedef, olmayan hedefle aynı yanıtı (404) alır.
+    """
+    target = db.get(_TARGET_MODELS[target_type], target_id)
+    if target is None:
+        return False
+
+    if target_type == "message":
+        match = db.get(models.Match, target.match_id)
+        return match is not None and user.id in (match.user_a_id, match.user_b_id)
+
+    if target_type == "listing":
+        # Görünmeyen ilan (sahibi kapatmış, yönetici kaldırmış ya da sahibi
+        # askıda) GET /api/listings/{id} ucundan da 404 dönüyor; raporlama
+        # oradaki görünürlükle aynı çizgide kalır.
+        if not target.is_active:
+            return False
+        return not (target.owner is not None and target.owner.is_suspended)
+
+    # user: askıdaki hesap arayüzün hiçbir yerinde görünmüyor; onu "raporlanan
+    # yeni hesap" diye kuyruğa sokmak yalnızca askının varlığını sızdırırdı.
+    return not target.is_suspended
+
+
 class ReportIn(BaseModel):
     target_type: TargetType
     target_id: int = Field(..., ge=1)
@@ -112,8 +149,11 @@ def create_report(
     if payload.target_type == "user" and payload.target_id == user.id:
         raise HTTPException(status_code=400, detail="Kendini raporlayamazsın.")
 
-    target = db.get(_TARGET_MODELS[payload.target_type], payload.target_id)
-    if target is None:
+    # Farklı hedefleri hızla tarayıp kuyruğu doldurmaya karşı (bulgu H3).
+    # Aynı hedefin tekrarı zaten tekillik kısıtıyla engelli.
+    content_limits.check("report_create", user.id)
+
+    if not _reportable(db, payload.target_type, payload.target_id, user):
         raise HTTPException(status_code=404, detail="Raporlanacak içerik bulunamadı.")
 
     if _existing_report(db, user.id, payload.target_type, payload.target_id):

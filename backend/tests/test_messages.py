@@ -105,14 +105,16 @@ def test_outsider_cannot_read_or_send(client):
     _, _, match_id = _matched_pair(client)
     deniz = _make_user(client, "deniz@uni.edu.tr", "Deniz")
 
+    # 404 (403 DEĞİL): taraf olmayan için var olan eşleşme ile olmayan
+    # eşleşme ayırt edilemez olmalı — bkz. app/messages.py _require_participant.
     assert client.get(
         f"/api/matches/{match_id}/messages", headers=deniz["headers"]
-    ).status_code == 403
+    ).status_code == 404
     assert client.post(
         f"/api/matches/{match_id}/messages",
         headers=deniz["headers"],
         json={"content": "merhaba"},
-    ).status_code == 403
+    ).status_code == 404
 
 
 def test_unknown_match_404(client):

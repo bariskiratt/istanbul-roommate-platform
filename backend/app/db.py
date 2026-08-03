@@ -41,15 +41,45 @@ if _url.startswith("postgres://"):
 elif _url.startswith("postgresql://"):
     _url = _url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-engine = create_engine(
-    _url,
-    # check_same_thread yalnız SQLite için: FastAPI istekleri farklı
-    # thread'lerden gelebilir; oturumlar istek başına açılıp kapanıyor.
-    connect_args=(
-        {"check_same_thread": False} if _url.startswith("sqlite") else {}
-    ),
-    pool_pre_ping=not _url.startswith("sqlite"),
-)
+def build_engine(url: str):
+    """Verilen URL için motoru proje ayarlarıyla kurar.
+
+    Ayrı bir fonksiyon olmasının sebebi test edilebilirlik: aşağıdaki modül
+    seviyesindeki `engine` import anında kuruluyor, dolayısıyla ayarlarının
+    doğruluğu ancak "engine.<özellik> doğru mu" diye bakarak sınanabilirdi.
+    Bu fonksiyonla test kendi motorunu AYNI ayarlarla kurup davranışı
+    (ör. parametre gizleme) gerçekten deneyebiliyor.
+    """
+    return create_engine(
+        url,
+        # check_same_thread yalnız SQLite için: FastAPI istekleri farklı
+        # thread'lerden gelebilir; oturumlar istek başına açılıp kapanıyor.
+        connect_args=(
+            {"check_same_thread": False} if url.startswith("sqlite") else {}
+        ),
+        pool_pre_ping=not url.startswith("sqlite"),
+        # SQL HATA MESAJLARINDA PARAMETRELERİ GİZLE.
+        #
+        # Varsayılan davranışta SQLAlchemy, patlayan sorgunun bağlı
+        # parametrelerini istisna metnine ekler. Bu tabloda ne olduğu
+        # düşünülünce ciddi bir sızıntıdır: users satırına yapılan hatalı bir
+        # INSERT/UPDATE, password_hash ve otp_hash değerlerini DÜZ METİN
+        # olarak log'a, Sentry'ye ve (DEBUG açıksa) HTTP yanıtına taşır.
+        #
+        # otp_hash özellikle kritik: tuzsuz SHA-256(6 hane), yani arama uzayı
+        # 10^6. Hash'i gören biri kodu saniyeler içinde geri bulur ve
+        # /verify-otp ile hesabı devralır. (Bu yüzden otp_hash'in kendisi de
+        # artık HMAC ile üretiliyor — bkz. app/auth.py.)
+        #
+        # hide_parameters=True ile istisna metni parametre yerine
+        # "[SQL parameters hidden due to hide_parameters=True]" yazar.
+        # Bedeli: hata ayıklarken hangi değerin patlattığını göremeyiz; sorgu
+        # metni ve istisna tipi yerinde kaldığı için bu kabul edilebilir.
+        hide_parameters=True,
+    )
+
+
+engine = build_engine(_url)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 

@@ -159,7 +159,8 @@ def test_received_likes_and_respond(client):
         headers=ayse["headers"],
         json={"accept": True},
     )
-    assert res.status_code == 403
+    # 404: başkasının beğenisi, olmayan beğeniden ayırt edilemez (bulgu L4).
+    assert res.status_code == 404
 
     # Ali kabul eder -> eşleşme
     res = client.post(

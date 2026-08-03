@@ -84,8 +84,17 @@ def test_wrong_otp_rejected(client):
 
 
 def test_request_otp_unknown_email(client):
+    """Kayıtlı olmayan adres de 200 alır — üyelik sızdırılmaz.
+
+    DAVRANIŞ BİLEREK DEĞİŞTİ: burası eskiden 404 "Bu e-posta kayıtlı değil"
+    diyordu, yani kimlik doğrulaması istemeyen bir uçtan üyelik sorgusuydu.
+    Ayrıntılı gerekçe app/auth.py::request_otp içinde.
+    """
     res = client.post("/api/auth/request-otp", json={"email": "yok@uni.edu.tr"})
-    assert res.status_code == 404
+    assert res.status_code == 200
+    # Kod gerçekten üretilmedi: dev modda bile dev_code dönmez, yoksa
+    # yanıtın şekli numaralandırmayı geri getirirdi.
+    assert "dev_code" not in res.json()
 
 
 def test_profile_update(client):
