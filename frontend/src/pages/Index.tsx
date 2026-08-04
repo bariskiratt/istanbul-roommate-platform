@@ -390,7 +390,7 @@ const Index = () => {
             {/* Gerçek <a>: semt sayfaları SPA rotası değil, derleme anında
                 üretilen statik HTML. Buradaki bağlantı arama motorunun ana
                 sayfadan onlara ulaşmasını sağlar (iç bağlantı). */}
-            <a href="/semt/" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
+            <a href="/semt" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
           </div>
           <p className="text-xs text-muted-foreground">© 2026 RoomMatch</p>
         </div>

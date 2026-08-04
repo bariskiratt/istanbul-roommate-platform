@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { slug, slugDropsCharacters } from "./slug.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
@@ -64,17 +65,8 @@ function readCsv() {
 
 // ---- yardımcılar ----------------------------------------------------------
 
-const TR_MAP = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", İ: "i", I: "i" };
-
-/** "Kadıköy" -> "kadikoy" (URL için). */
-function slug(name) {
-  return name
-    .trim()
-    .replace(/[çğıöşüİI]/g, ch => TR_MAP[ch] ?? ch)
-    .toLocaleLowerCase("tr")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+// slug() bilerek ayrı dosyada: bu betik import edilir edilmez siteyi
+// üretiyor, testin yalnızca o fonksiyona erişebilmesi gerekiyor.
 
 const nf = new Intl.NumberFormat("tr-TR");
 const money = v => `${nf.format(Math.round(v))} ₺`;
@@ -196,6 +188,21 @@ const districts = [...byDistrict.entries()]
   .filter(d => d.median != null)
   .sort((a, b) => b.listings - a.listings);
 
+// Bozuk adresle yayına çıkmaktansa derleme patlasın: yanlış adres bir kez
+// indekslenirse geri almak yönlendirme + yeniden tarama demek.
+const bozuk = districts.filter(d => slugDropsCharacters(d.name));
+if (bozuk.length) {
+  throw new Error(
+    `Slug harf düşürüyor: ${bozuk.map(d => `${d.name} -> ${d.slug}`).join(", ")}`,
+  );
+}
+const cakisan = districts.filter(
+  (d, i) => districts.findIndex(o => o.slug === d.slug) !== i,
+);
+if (cakisan.length) {
+  throw new Error(`Slug çakışması: ${cakisan.map(d => d.slug).join(", ")}`);
+}
+
 /** Oda payı: yatak odası sayısına bölünür, salon kimseye fatura edilmez. */
 const roomShare = flat => flat / 2;   // 2+1 (iki yatak odası) örneği üzerinden
 
@@ -273,7 +280,7 @@ piyasaya uyup uymadığını görürsün.</p>
 göre yeşilden kırmızıya renklenir.</p>
 
 <nav class="links"><strong>Diğer semtler:</strong><br>${komsular}<br>
-<a href="/semt/">Tüm semtler</a></nav>
+<a href="/semt">Tüm semtler</a></nav>
 `;
 
   const jsonLd = {
@@ -300,7 +307,7 @@ göre yeşilden kırmızıya renklenir.</p>
 }
 
 function indexPage(list) {
-  const url = `${SITE}/semt/`;
+  const url = `${SITE}/semt`;
   const title = "İstanbul semtlerinde oda kiraları ve ev arkadaşı — evdes.tr";
   const description =
     `İstanbul'un ${list.length} ilçesinde kiralık daire ve oda payı medyanları, ` +
@@ -365,7 +372,10 @@ writeFileSync(join(OUT_DIR, "index.html"), indexPage(districts));
 const bugun = new Date().toISOString().slice(0, 10);
 const urls = [
   { loc: `${SITE}/`, pri: "1.0" },
-  { loc: `${SITE}/semt/`, pri: "0.9" },
+  // Sondaki eğik çizgi YOK: barındırma "/semt/" adresini "/semt" adresine
+  // 308'liyor, sitemap'te yönlendirilen adres listelemek Search Console'da
+  // "yönlendirmesi olan sayfa" uyarısı üretir.
+  { loc: `${SITE}/semt`, pri: "0.9" },
   { loc: `${SITE}/safety`, pri: "0.5" },
   { loc: `${SITE}/onboarding`, pri: "0.6" },
   ...districts.map(d => ({ loc: `${SITE}/semt/${d.slug}`, pri: "0.8" })),
