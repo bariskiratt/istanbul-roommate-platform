@@ -111,7 +111,8 @@ function layout({ title, description, canonical, jsonLd, body }) {
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${canonical}">
 <meta property="og:locale" content="tr_TR">
-<link rel="icon" href="/favicon.ico">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.png" type="image/png">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 <style>
 :root{color-scheme:light dark;--fg:#1c1914;--muted:#6b6459;--line:#e5e0d8;--bg:#faf7f2;--accent:#3f2d63}
