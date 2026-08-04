@@ -91,6 +91,7 @@ const tr = {
   "landing.why3Desc":
     "968 mahalle bütçene göre yeşil/sarı/kırmızı renklenir — hangi semtin bütçene uyduğunu tek bakışta gör.",
   "landing.footerListings": "İlanlar",
+  "landing.districtPrices": "Semt kiraları",
 
   // ---- keşfet (kaydırma) ----
   "swipe.emptyTitle": "Şimdilik bu kadar!",
@@ -966,6 +967,7 @@ const en: Record<TranslationKey, string> = {
   "landing.why3Desc":
     "968 neighborhoods colored green/yellow/red against your budget — see at a glance which ones you can afford.",
   "landing.footerListings": "Listings",
+  "landing.districtPrices": "District rents",
 
   // ---- discover (swipe) ----
   "swipe.emptyTitle": "That's everything for now!",

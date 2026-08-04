@@ -28,3 +28,7 @@ istanbul-real-estate-heatmap/
 
 # yerel yardımcı: iş akışı durumu (depoya girmez)
 .workflow-status.sh
+
+# Derleme anında üretilir (npm run seo / prebuild)
+frontend/public/semt/
+frontend/public/sitemap.xml

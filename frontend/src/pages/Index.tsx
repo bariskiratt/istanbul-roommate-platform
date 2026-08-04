@@ -387,6 +387,10 @@ const Index = () => {
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
             <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</button>
             <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">{t("landing.footerListings")}</button>
+            {/* Gerçek <a>: semt sayfaları SPA rotası değil, derleme anında
+                üretilen statik HTML. Buradaki bağlantı arama motorunun ana
+                sayfadan onlara ulaşmasını sağlar (iç bağlantı). */}
+            <a href="/semt/" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
           </div>
           <p className="text-xs text-muted-foreground">© 2026 RoomMatch</p>
         </div>

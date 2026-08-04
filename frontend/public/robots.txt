@@ -1,14 +1,16 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Arama motorları için: her şey açık, sitemap aşağıda.
+# Giriş gerektiren sayfalar taranmasın — içeriği yalnızca oturum açanlar
+# görür, taranması hem boşuna hem de "içeriksiz sayfa" sinyali verir.
 User-agent: *
 Allow: /
+Disallow: /swipe
+Disallow: /matches
+Disallow: /messages
+Disallow: /chat/
+Disallow: /profile
+Disallow: /settings
+Disallow: /create-listing
+Disallow: /admin
+Disallow: /listings
+
+Sitemap: https://evdes.tr/sitemap.xml
