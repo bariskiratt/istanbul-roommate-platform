@@ -17,8 +17,8 @@ BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 # ucunu uzun süre kilitlememek için kısa tutulur.
 TIMEOUT = 6
 
-# Gönderen adı alan adıyla hizalı olmalı: "RoomMatch <noreply@evdes.tr>" gibi
-# marka/alan uyuşmazlığı spam filtrelerinde olumsuz puan alır.
+# Gönderen adı alan adıyla hizalı olmalı: "Falanca <noreply@evdes.tr>" gibi
+# bir marka/alan uyuşmazlığı spam filtrelerinde olumsuz puan alır.
 DEFAULT_SENDER_NAME = "evdes.tr"
 
 

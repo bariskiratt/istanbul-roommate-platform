@@ -22,6 +22,7 @@ import FairPriceBadge from "@/components/FairPriceBadge";
 import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
+import { BRAND } from "@/lib/brand";
 
 // Deste kartı: mock tipine ek olarak gerçek ilanın ev özelliklerini taşır.
 type DeckListing = Listing & {
@@ -268,7 +269,7 @@ const SwipeScreen = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
       <AppHeader
-        title="RoomMatch"
+        title={BRAND}
         rightAction={
           <div className="flex items-center gap-2">
             {/* Deste sıfırlama — yalnızca yönetici (sunucu ucu da öyle) */}

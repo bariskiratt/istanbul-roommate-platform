@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings } from "@/lib/api";
+import { BRAND } from "@/lib/brand";
 import { useI18n } from "@/i18n";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -65,7 +66,7 @@ const Index = () => {
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-bold text-xl text-foreground tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-              RoomMatch
+              {BRAND}
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
@@ -348,7 +349,7 @@ const Index = () => {
         </section>
       )}
 
-      {/* ─── Neden RoomMatch ─── */}
+      {/* ─── Neden evdes.tr ─── */}
       <section className="max-w-5xl mx-auto px-6 py-16">
         <div className="grid md:grid-cols-3 gap-10">
           {[
@@ -381,7 +382,7 @@ const Index = () => {
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
               <Home className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-foreground" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>RoomMatch</span>
+            <span className="font-bold text-foreground" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>{BRAND}</span>
           </div>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
@@ -392,7 +393,7 @@ const Index = () => {
                 sayfadan onlara ulaşmasını sağlar (iç bağlantı). */}
             <a href="/semt" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 RoomMatch</p>
+          <p className="text-xs text-muted-foreground">© 2026 {BRAND}</p>
         </div>
       </footer>
     </div>

@@ -2,6 +2,7 @@ import { ArrowLeft, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
+import { BRAND } from "@/lib/brand";
 
 interface AppHeaderProps {
   title: string;
@@ -24,12 +25,15 @@ const AppHeader = ({ title, showBack = false, rightAction, hideControls = false 
           <ArrowLeft className="w-5 h-5" />
         </button>
       )}
-      {!showBack && title === "RoomMatch" ? (
+      {/* Başlık markanın kendisiyse başlık yerine logo göster. Karşılaştırma
+          BRAND üzerinden: iki yerde elle yazılsaydı biri değişince logo
+          sessizce kaybolurdu. */}
+      {!showBack && title === BRAND ? (
         <div className="flex items-center gap-2 flex-1 cursor-pointer" onClick={() => navigate("/")}>
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
             <Home className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
+          <span className="font-extrabold text-lg text-foreground tracking-tight">{BRAND}</span>
         </div>
       ) : (
         <h1 className="font-bold text-xl flex-1 text-foreground">{title}</h1>

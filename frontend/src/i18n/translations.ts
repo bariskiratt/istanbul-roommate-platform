@@ -207,7 +207,7 @@ const tr = {
 
   // ---- giriş kapısı ----
   "gate.title": "Devam etmek için giriş yap",
-  "gate.desc": "RoomMatch'te ev arkadaşı bulmak için ücretsiz hesap oluştur.",
+  "gate.desc": "evdes.tr'de ev arkadaşı bulmak için ücretsiz hesap oluştur.",
   "gate.login": "Giriş Yap",
   "gate.signup": "Kayıt Ol",
   "gate.note": "Kayıt tamamen ücretsiz · .edu.tr gerekli",
@@ -1083,7 +1083,7 @@ const en: Record<TranslationKey, string> = {
 
   // ---- auth gate ----
   "gate.title": "Log in to continue",
-  "gate.desc": "Create a free account to find a roommate on RoomMatch.",
+  "gate.desc": "Create a free account to find a roommate on evdes.tr.",
   "gate.login": "Log in",
   "gate.signup": "Sign up",
   "gate.note": "Signing up is free · .edu.tr required",

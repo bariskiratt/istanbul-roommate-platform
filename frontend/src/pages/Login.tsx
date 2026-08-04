@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginWithPassword, requestOtp, verifyOtp } from "@/lib/api";
+import { BRAND } from "@/lib/brand";
 import PasswordInput from "@/components/PasswordInput";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -94,7 +95,7 @@ const Login = () => {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
+            <span className="font-extrabold text-lg text-foreground tracking-tight">{BRAND}</span>
           </button>
           <div className="flex items-center gap-2">
             <LanguageToggle />

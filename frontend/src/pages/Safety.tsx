@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
+import { BRAND } from "@/lib/brand";
 
 const Safety = () => {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ const Safety = () => {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-extrabold text-lg text-foreground tracking-tight">RoomMatch</span>
+            <span className="font-extrabold text-lg text-foreground tracking-tight">{BRAND}</span>
           </button>
           <div className="flex items-center gap-2">
             <LanguageToggle />
@@ -90,9 +91,9 @@ const Safety = () => {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Home className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            <span className="font-extrabold text-foreground">RoomMatch</span>
+            <span className="font-extrabold text-foreground">{BRAND}</span>
           </button>
-          <p className="text-xs text-muted-foreground">© 2026 RoomMatch. {t("safety.rights")}</p>
+          <p className="text-xs text-muted-foreground">© 2026 {BRAND}. {t("safety.rights")}</p>
         </div>
       </footer>
     </div>
