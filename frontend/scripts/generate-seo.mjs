@@ -348,8 +348,14 @@ ${satirlar}
 rmSync(OUT_DIR, { recursive: true, force: true });
 mkdirSync(OUT_DIR, { recursive: true });
 
+// Her sayfa kendi klasöründe index.html olarak yazılır: /semt/kadikoy adresi
+// böylece ek bir yapılandırma bayrağı olmadan çözülür. Daha önce dosyalar
+// düz .html olarak yazılıp Vercel'in `cleanUrls` bayrağıyla temizleniyordu;
+// o bayrak "/index.html" hedefli yönlendirmeleri bozdu ve TÜM uygulama
+// rotaları 404 döndü (üretimde yaşandı).
 for (const d of districts) {
-  writeFileSync(join(OUT_DIR, `${d.slug}.html`), districtPage(d, districts));
+  mkdirSync(join(OUT_DIR, d.slug), { recursive: true });
+  writeFileSync(join(OUT_DIR, d.slug, "index.html"), districtPage(d, districts));
 }
 writeFileSync(join(OUT_DIR, "index.html"), indexPage(districts));
 
