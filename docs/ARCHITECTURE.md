@@ -100,9 +100,13 @@ when `ANTHROPIC_API_KEY` is present, and any exception inside it degrades
 silently to the rule-based result (`backend/app/moderation.py:710-719`). The
 platform runs, with reduced function, when both are absent.
 
-**A scheduled GitHub Action pings the API every ten minutes**
-(`.github/workflows/keepalive.yml`) because Render's free plan sleeps an idle
-service after 15 minutes and a cold start has to reload everything in section 4.
+**An external uptime monitor pings the API every five minutes** because Render's
+free plan sleeps an idle service after 15 minutes and a cold start has to reload
+everything in section 4. This used to be a GitHub Actions cron; GitHub delivered
+10% of the requested schedule and every gap exceeded the sleep threshold, so it
+was removed (measurements in DEPLOY.md §5). Nothing in this repository enforces
+the ping — it lives in an account outside version control, which is its own
+single point of failure.
 
 ---
 
@@ -956,14 +960,15 @@ Stated plainly, because a document that only lists strengths is not useful.
 13. **No structured logging, metrics or error tracking.** Diagnostics are
     `print()` calls to stdout (`backend/app/main.py:73`,
     `backend/app/migrate.py:176-177`, `backend/app/crypto.py:62-67`). There is
-    no request log correlation and no alerting; the only liveness signal is the
-    keepalive ping.
+    no request log correlation and no alerting beyond whatever the external
+    uptime monitor sends (DEPLOY.md §5); that ping is the only liveness signal.
 
 14. **A cold start is not free.** Free-plan sleep plus the ~0.6 s data load
     plus process startup means the first request after idling is noticeably
-    slow. The 10-minute keepalive is a workaround, and GitHub disables
-    scheduled workflows on repositories without commits for 60 days
-    (`.github/workflows/keepalive.yml:2-4`).
+    slow — measured at 42.9 s on the live deployment. An external 5-minute
+    uptime ping is the workaround (DEPLOY.md §5); it is configured outside this
+    repository, so nothing here fails visibly if someone deletes it. Prerendered
+    `/semt/*` pages do not call the API and so are unaffected.
 
 ---
 

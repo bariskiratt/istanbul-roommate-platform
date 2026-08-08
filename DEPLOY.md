@@ -257,7 +257,47 @@ Four limits worth knowing before you rely on this:
 | Rate limiting | Auth endpoints are limited to 5 requests per 15 min per email, but the counter lives **in process memory**: it resets on restart and is not shared between instances. Other endpoints are unlimited. |
 | Message encryption | At rest only, and only while `MESSAGE_KEY` is set correctly (section 1.1). Not end-to-end. |
 | Moderation | Rule-based and therefore bypassable; the AI layer is optional and off by default. Reports and flagged content are reviewed by hand in the admin panel (section 1.4) by accounts listed in `ADMIN_EMAILS` — no automatic enforcement, and no appeal flow for the person acted on. Every removal has an undo, within the limits in section 1.4. Undoing keeps no history: reopening a report or lifting a suspension clears the reverted decision rather than recording it. |
-| Sleep mode | `.github/workflows/keepalive.yml` pings the API every 10 minutes to keep the free service awake. |
+| Sleep mode | Render's free plan sleeps after 15 idle minutes and a cold start costs ~43 s. An **external uptime monitor** must ping `https://api.evdes.tr/` every 5 minutes — see section 5. Do not use a GitHub Actions cron for this; the repository tried one and it did not work (section 5 has the measurements). |
+
+## 5) Keeping the API awake
+
+Render's free plan stops an idle service after 15 minutes. The next request then
+pays a cold start: process boot plus the ~0.6 s data load of section 4 in
+ARCHITECTURE.md. Measured on the live deployment, that first request took
+**42.9 seconds**. Static pages are unaffected — `/semt/*` is prerendered and
+never calls the API — but the first person to sign in waits the full time.
+
+Use an external uptime monitor. UptimeRobot's free tier is enough:
+
+1. Sign up at <https://uptimerobot.com> and choose **+ New monitor**.
+2. Monitor type **HTTP(s)**, URL `https://api.evdes.tr/`, interval **5 minutes**.
+3. Save. Downtime alerts to the account's email come with it, which the
+   deployment otherwise has none of (ARCHITECTURE.md §13).
+
+`GET /` is the right target: it returns a static dict with no database access
+and answers `HEAD` as well (`backend/app/main.py:415-435`), so a 5-minute check
+costs nothing.
+
+### Why not GitHub Actions
+
+The repository ran `.github/workflows/keepalive.yml` on `cron: "*/10 * * * *"`
+from 31 Jul to 8 Aug 2026. GitHub drops high-frequency scheduled runs under
+load, and the schedule was never honoured:
+
+| | |
+|---|---|
+| Runs expected at `*/10` over 192 h | 1155 |
+| Runs that actually fired | **121 (10%)** |
+| Median gap between runs | **75 min** |
+| Longest gap | 350 min |
+| Gaps longer than the 15-min sleep threshold | **120 of 120 (100%)** |
+
+Every single interval exceeded the sleep threshold, so the service slept
+between every ping and the workflow achieved nothing. It also emailed a failure
+whenever GitHub could not allocate a runner (`The job was not acquired by Runner
+of type hosted even after multiple attempts` — twice in 121 runs). The workflow
+was removed rather than retuned: a shorter cron does not help when GitHub is
+already delivering 10% of the requested schedule.
 
 ## Environment variables (backend)
 

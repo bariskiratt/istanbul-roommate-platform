@@ -211,9 +211,11 @@ unrecoverable. SECURITY.md §7.1–7.3.
   contents if a reference looks off.
 - **The measured numbers are a snapshot** of commit `51e5bb4` on `main`: 381
   backend tests passing, 71 frontend tests passing, a clean `tsc`, a successful
-  build. Nothing re-verifies them: the repository's only GitHub Actions workflow
-  is a keepalive ping (`.github/workflows/keepalive.yml`), so every command above
-  is manual — as FRONTEND.md §11 also notes for `tsc`, `vitest` and `eslint`.
+  build. Nothing re-verifies them: the repository has **no** GitHub Actions
+  workflows at all, so every command above is manual — as FRONTEND.md §11 also
+  notes for `tsc`, `vitest` and `eslint`. (There was one keepalive ping; it was
+  removed once measurement showed GitHub honoured 10% of its schedule, see
+  DEPLOY.md §5.)
 - **The five documents are not uniformly current.** Only SECURITY.md pins itself
   to a commit (`51e5bb4`, §15); the others carry no staleness marker, so a
   claim's `file:line` reference is the only reliable freshness check.

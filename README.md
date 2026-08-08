@@ -195,8 +195,9 @@ work for them.
 See [DEPLOY.md](DEPLOY.md). Short version: Render builds `backend/Dockerfile`
 (the model is trained during the image build) with a free Postgres via the
 root `render.yaml` blueprint; Vercel serves `frontend/` with `VITE_API_URL`
-pointing at the API. A GitHub Actions job pings the API every 10 minutes to
-keep the free instance awake.
+pointing at the API. An external uptime monitor pings `https://api.evdes.tr/`
+every 5 minutes to keep the free instance awake — see DEPLOY.md for why this is
+not a GitHub Actions cron.
 
 Backend environment variables: `DATABASE_URL`, `CORS_ORIGINS`, `DEV_OTP`,
 `MESSAGE_KEY`, `OTP_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY_HEADERS`,

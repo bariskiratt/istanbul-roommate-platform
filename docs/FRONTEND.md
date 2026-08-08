@@ -1031,9 +1031,9 @@ Honest list, all verified against the current tree.
 
 **Tooling**
 
-- CI runs no frontend checks. The only GitHub Actions workflow keeps the Render
-  backend awake (`.github/workflows/keepalive.yml`); `tsc`, `vitest` and `eslint`
-  are manual.
+- CI runs no frontend checks — the repository has no GitHub Actions workflows at
+  all, so `tsc`, `vitest` and `eslint` are manual. (Keeping the Render backend
+  awake is now an external uptime monitor, DEPLOY.md §5.)
 - `npm run lint` is not clean: one error (`@typescript-eslint/no-require-imports`
   on `frontend/tailwind.config.ts:140`) and 17 warnings. Also
   `@typescript-eslint/no-unused-vars` is switched off entirely
