@@ -21,6 +21,7 @@ import CreateListing from "./pages/CreateListing";
 import Listings from "./pages/Listings";
 import Explore from "./pages/Explore";
 import Safety from "./pages/Safety";
+import Privacy from "./pages/Privacy";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="/listings" element={<Listings />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/safety" element={<Safety />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/login" element={<Login />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/account" element={<AccountSettings />} />

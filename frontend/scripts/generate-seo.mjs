@@ -422,6 +422,7 @@ const urls = [
   // "yönlendirmesi olan sayfa" uyarısı üretir.
   { loc: `${SITE}/semt`, pri: "0.9" },
   { loc: `${SITE}/safety`, pri: "0.5" },
+  { loc: `${SITE}/privacy`, pri: "0.3" },
   { loc: `${SITE}/onboarding`, pri: "0.6" },
   ...districts.map(d => ({ loc: `${SITE}/semt/${d.slug}`, pri: "0.8" })),
 ];

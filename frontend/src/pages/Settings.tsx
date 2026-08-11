@@ -36,7 +36,9 @@ const Settings = () => {
       ? [{ icon: ShieldAlert, label: t("settings.moderation"), action: () => navigate("/admin") }]
       : []),
     { icon: User, label: t("settings.account"), action: () => navigate("/settings/account") },
-    { icon: Lock, label: t("settings.privacy"), action: () => navigate("/safety") },
+    // Bu bağlantı /safety'ye gidiyordu: kullanıcı gizlilik politikası bekleyip
+    // güvenlik ipuçları buluyordu.
+    { icon: Lock, label: t("settings.privacy"), action: () => navigate("/privacy") },
     {
       icon: LogOut,
       label: t("settings.logout"),

@@ -909,6 +909,77 @@ const tr = {
   "meta.accountSettings": "Hesap ayarları",
   "meta.admin": "Yönetim",
   "meta.notFound": "Sayfa bulunamadı",
+  "meta.privacy": "Gizlilik ve KVKK aydınlatma metni",
+  "meta.privacyDesc":
+    "evdes.tr hangi kişisel verileri topluyor, neden topluyor, kimlerle paylaşıyor ve nasıl siliyor.",
+
+  // ---- gizlilik / KVKK ----
+  // DİKKAT: buradaki her cümle kodun gerçekte yaptığını anlatır. Davranış
+  // değişirse metin de değişmeli — yanlış beyan eden bir aydınlatma metni,
+  // hiç olmamasından kötüdür.
+  "landing.privacy": "Gizlilik",
+  "privacy.title": "Gizlilik ve KVKK aydınlatma metni",
+  "privacy.updated": "Son güncelleme: 10 Ağustos 2026",
+  "privacy.intro":
+    "Bu metin, evdes.tr'yi kullandığında hangi kişisel verilerinin işlendiğini, neden işlendiğini ve bunlar üzerinde hangi haklara sahip olduğunu anlatır. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında hazırlanmıştır.",
+
+  "privacy.controllerTitle": "1. Veri sorumlusu",
+  "privacy.controllerBody":
+    "Veri sorumlusu Hasan Barış Kırat'tır. Gizlilikle ilgili her soru ve KVKK başvurusu için: hkirat@asu.edu",
+
+  "privacy.dataTitle": "2. İşlenen veriler",
+  "privacy.dataAccount":
+    "Hesap: okul e-posta adresin (.edu.tr zorunlu) ve şifren. Şifre asla düz metin olarak saklanmaz; scrypt ile özetlenir. Giriş kodları da saklanmadan önce HMAC-SHA256 ile özetlenir.",
+  "privacy.dataProfile":
+    "Profil: adın, üniversiten, bölümün, doğum yılın, bütçe aralığın, yaşam alışkanlığı tercihlerin ve yüklediğin fotoğraflar.",
+  "privacy.dataListing":
+    "İlan: başlık, açıklama, ilçe, mahalle, bütçe ve ilan fotoğrafları.",
+  "privacy.dataActivity":
+    "Etkinlik: hangi ilanları beğendiğin veya geçtiğin, eşleşmelerin, gönderdiğin mesajlar ve açtığın bildirimler.",
+  "privacy.dataTechnical":
+    "Teknik: giriş denemelerini sınırlamak için IP adresin. Bu sayaç yalnızca sunucunun belleğinde tutulur, veritabanına yazılmaz ve sunucu her yeniden başladığında sıfırlanır.",
+  "privacy.dataNoTracking":
+    "Sitede reklam çerezi, izleme pikseli veya analitik aracı yoktur.",
+
+  "privacy.purposeTitle": "3. İşleme amacı ve hukuki sebep",
+  "privacy.purposeBody":
+    "Veriler yalnızca hizmeti çalıştırmak için işlenir: hesabını doğrulamak, sana uygun ev arkadaşı adaylarını göstermek, eşleşme ve mesajlaşmayı yürütmek, kural ihlallerini incelemek. Hukuki sebep, üyelik ilişkisinin kurulması ve sürdürülmesi bakımından sözleşmenin ifası; kötüye kullanımın engellenmesi bakımından ise meşru menfaattir. Okul e-postası zorunluluğu, platformu öğrencilerle sınırlı tutma amacına dayanır.",
+
+  "privacy.shareTitle": "4. Aktarım",
+  "privacy.shareBody":
+    "Verilerin şu hizmet sağlayıcılar üzerinden işlenir ve bu sağlayıcıların sunucuları yurt dışındadır:",
+  "privacy.shareRender":
+    "Render — uygulama sunucusu ve veritabanı. Hesap, profil, ilan, mesaj ve etkinlik verilerinin burada saklanır.",
+  "privacy.shareVercel":
+    "Vercel — arayüzün dağıtımı. Sitenin sayfalarını buradan indirirsin.",
+  "privacy.shareBrevo":
+    "Brevo — e-posta gönderimi. Giriş kodu göndermek için e-posta adresin buraya iletilir.",
+  "privacy.shareNoAi":
+    "Yapay zekâ tabanlı içerik denetimi şu anda kapalıdır; yazdıkların herhangi bir yapay zekâ sağlayıcısına gönderilmez. Kural tabanlı süzgeç tamamen kendi sunucumuzda çalışır.",
+  "privacy.shareNoSale":
+    "Verilerin satılmaz, reklam amacıyla paylaşılmaz ve bu listenin dışında kimseye aktarılmaz.",
+
+  "privacy.securityTitle": "5. Güvenlik",
+  "privacy.securityBody":
+    "Şifreler scrypt ile özetlenir, giriş kodları HMAC-SHA256 ile özetlenir, mesajlar veritabanında AES-256-GCM ile şifreli tutulur. Bağlantı HTTPS üzerindendir.",
+  "privacy.securityNotE2e":
+    "Mesajlaşma uçtan uca şifreli DEĞİLDİR. Şifreleme yalnızca veritabanındaki kayda uygulanır; sunucuya ve şifreleme anahtarına erişimi olan bir yönetici mesaj içeriğini okuyabilir. Bir mesaj şikâyet edildiğinde içeriği incelemek üzere yöneticiye gösterilir.",
+
+  "privacy.retentionTitle": "6. Saklama ve silme",
+  "privacy.retentionBody":
+    "Verilerin hesabın açık kaldığı sürece saklanır. Hesabını Ayarlar > Hesap Ayarları üzerinden kendin silebilirsin; silme kalıcıdır ve şu kayıtları geri dönüşsüz kaldırır: profilin, ilanların, kaydırmaların, eşleşmelerin, eşleşmelerindeki mesajlar (karşı tarafın yazdıkları dahil), açtığın ve hakkında açılan şikâyetler, oturum anahtarların ve sunucudaki fotoğraf dosyaların.",
+  "privacy.retentionAudit":
+    "Tek istisna yönetici denetim kaydıdır. Bir yönetici kalıcı silme veya düzenleme yaptığında bu işlem gerekçesiyle birlikte kaydedilir ve hesabın silinse bile bu kayıt durur; yalnızca kullanıcı bağlantısı koparılır. Bir ilanın metni yönetici tarafından düzenlendiyse, düzenleme öncesindeki metin bu kayıtta kalabilir. Amaç, kimin neyi neden kaldırdığının sonradan denetlenebilmesidir.",
+
+  "privacy.rightsTitle": "7. Hakların",
+  "privacy.rightsBody":
+    "KVKK'nın 11. maddesi uyarınca; kişisel verinin işlenip işlenmediğini öğrenme, işlenmişse buna ilişkin bilgi talep etme, işlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme, yurt içinde veya yurt dışında verinin aktarıldığı üçüncü kişileri bilme, eksik veya yanlış işlenmişse düzeltilmesini isteme, silinmesini veya yok edilmesini isteme, bu işlemlerin verinin aktarıldığı üçüncü kişilere bildirilmesini isteme, münhasıran otomatik sistemlerle analiz edilmesi suretiyle aleyhine bir sonuç doğmasına itiraz etme ve kanuna aykırı işleme sebebiyle zarara uğraman hâlinde zararın giderilmesini talep etme hakların vardır.",
+  "privacy.rightsHow":
+    "Bu haklarını kullanmak için hkirat@asu.edu adresine yazabilirsin. Talebin en geç otuz gün içinde sonuçlandırılır. Silme talebinin karşılığını beklemeden, hesabını uygulama içinden kendin de silebilirsin.",
+
+  "privacy.changesTitle": "8. Değişiklikler",
+  "privacy.changesBody":
+    "Bu metin platform değiştikçe güncellenir. Güncel sürüm her zaman bu sayfada yayımlanır ve en üstteki tarih değişir.",
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -1799,6 +1870,74 @@ const en: Record<TranslationKey, string> = {
   "meta.accountSettings": "Account settings",
   "meta.admin": "Admin",
   "meta.notFound": "Page not found",
+  "meta.privacy": "Privacy and data protection notice",
+  "meta.privacyDesc":
+    "What personal data evdes.tr collects, why, who it is shared with and how it is deleted.",
+
+  // ---- privacy / KVKK ----
+  "landing.privacy": "Privacy",
+  "privacy.title": "Privacy and data protection notice",
+  "privacy.updated": "Last updated: 10 August 2026",
+  "privacy.intro":
+    "This notice explains which of your personal data evdes.tr processes when you use it, why, and what rights you have over it. It is written under Turkish data protection law (KVKK, law no. 6698).",
+
+  "privacy.controllerTitle": "1. Data controller",
+  "privacy.controllerBody":
+    "The data controller is Hasan Barış Kırat. For any privacy question or data protection request: hkirat@asu.edu",
+
+  "privacy.dataTitle": "2. Data we process",
+  "privacy.dataAccount":
+    "Account: your university email address (.edu.tr required) and your password. The password is never stored in plain text; it is hashed with scrypt. Sign-in codes are hashed with HMAC-SHA256 before storage.",
+  "privacy.dataProfile":
+    "Profile: your name, university, department, birth year, budget range, lifestyle preferences and the photos you upload.",
+  "privacy.dataListing":
+    "Listing: title, description, district, neighbourhood, budget and listing photos.",
+  "privacy.dataActivity":
+    "Activity: which listings you liked or passed, your matches, the messages you send and the notifications you open.",
+  "privacy.dataTechnical":
+    "Technical: your IP address, used to rate-limit sign-in attempts. That counter lives only in the server's memory, is never written to the database and resets whenever the server restarts.",
+  "privacy.dataNoTracking":
+    "The site carries no advertising cookies, tracking pixels or analytics tools.",
+
+  "privacy.purposeTitle": "3. Purpose and legal basis",
+  "privacy.purposeBody":
+    "Data is processed only to run the service: verifying your account, showing you suitable roommate candidates, operating matching and messaging, and reviewing rule violations. The legal basis is performance of the contract for creating and maintaining membership, and legitimate interest for preventing abuse. Requiring a university email serves the purpose of keeping the platform limited to students.",
+
+  "privacy.shareTitle": "4. Transfers",
+  "privacy.shareBody":
+    "Your data is processed through the following providers, whose servers are located outside Turkey:",
+  "privacy.shareRender":
+    "Render — application server and database. Your account, profile, listing, message and activity data is stored here.",
+  "privacy.shareVercel":
+    "Vercel — interface delivery. You download the site's pages from here.",
+  "privacy.shareBrevo":
+    "Brevo — email delivery. Your email address is passed here to send sign-in codes.",
+  "privacy.shareNoAi":
+    "AI-based content moderation is currently switched off; what you write is not sent to any AI provider. The rule-based filter runs entirely on our own server.",
+  "privacy.shareNoSale":
+    "Your data is not sold, not shared for advertising, and not transferred to anyone outside this list.",
+
+  "privacy.securityTitle": "5. Security",
+  "privacy.securityBody":
+    "Passwords are hashed with scrypt, sign-in codes with HMAC-SHA256, and messages are held encrypted in the database with AES-256-GCM. Connections run over HTTPS.",
+  "privacy.securityNotE2e":
+    "Messaging is NOT end-to-end encrypted. The encryption applies only to the stored record; an administrator with access to the server and the encryption key can read message content. When a message is reported, its content is shown to a moderator for review.",
+
+  "privacy.retentionTitle": "6. Retention and deletion",
+  "privacy.retentionBody":
+    "Your data is kept for as long as your account exists. You can delete the account yourself under Settings > Account settings; deletion is permanent and irreversibly removes your profile, your listings, your swipes, your matches, the messages in those matches (including those written by the other person), reports you filed and reports filed about you, your session tokens and your photo files on the server.",
+  "privacy.retentionAudit":
+    "The one exception is the administrator audit log. When an administrator permanently deletes or edits something, that action is recorded with its reason, and the record survives even if your account is deleted; only the link to the user is severed. If an administrator edited a listing's text, the text as it stood before the edit may remain in that record. The purpose is to keep who removed what, and why, auditable afterwards.",
+
+  "privacy.rightsTitle": "7. Your rights",
+  "privacy.rightsBody":
+    "Under article 11 of the KVKK you have the right to learn whether your personal data is processed; to request information if it has been; to learn the purpose of processing and whether it is used accordingly; to know the third parties to whom it is transferred at home or abroad; to request correction if it is incomplete or wrong; to request its erasure or destruction; to request that these actions be notified to the third parties it was transferred to; to object to a result against you produced solely by automated analysis; and to claim compensation if you suffer loss through unlawful processing.",
+  "privacy.rightsHow":
+    "To exercise these rights, write to hkirat@asu.edu. Your request will be concluded within thirty days at the latest. You do not have to wait for a reply to a deletion request — you can delete your account yourself from inside the app.",
+
+  "privacy.changesTitle": "8. Changes",
+  "privacy.changesBody":
+    "This notice is updated as the platform changes. The current version is always published on this page and the date at the top changes with it.",
 };
 
 export const translations = { tr, en } as const;

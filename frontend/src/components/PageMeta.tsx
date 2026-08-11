@@ -31,6 +31,7 @@ const ROUTES: Record<string, Meta> = {
   "/login": { title: "meta.login", desc: "meta.loginDesc" },
   "/explore": { title: "meta.explore", desc: "meta.exploreDesc" },
   "/safety": { title: "meta.safety", desc: "meta.safetyDesc" },
+  "/privacy": { title: "meta.privacy", desc: "meta.privacyDesc" },
   "/swipe": { title: "meta.swipe" },
   "/notifications": { title: "meta.notifications" },
   "/matches": { title: "meta.matches" },
