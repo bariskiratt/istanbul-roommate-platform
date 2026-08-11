@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { I18nProvider } from "@/i18n";
+import PageMeta from "@/components/PageMeta";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import SwipeScreen from "./pages/SwipeScreen";
@@ -36,6 +37,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          {/* Rota değişiminde sekme başlığını ve meta açıklamasını günceller. */}
+          <PageMeta />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/onboarding" element={<Onboarding />} />

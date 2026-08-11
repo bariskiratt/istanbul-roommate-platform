@@ -68,6 +68,21 @@ function readCsv() {
 // slug() bilerek ayrı dosyada: bu betik import edilir edilmez siteyi
 // üretiyor, testin yalnızca o fonksiyona erişebilmesi gerekiyor.
 
+/** Kırıntı yolunu schema.org BreadcrumbList'e çevirir. Görünen <nav> ile
+ *  AYNI adımları almalı: Google ikisinin uyuşmasını bekliyor. */
+function breadcrumbs(steps) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: steps.map(([name, item], i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name,
+      item,
+    })),
+  };
+}
+
 const nf = new Intl.NumberFormat("tr-TR");
 const money = v => `${nf.format(Math.round(v))} ₺`;
 
@@ -111,6 +126,13 @@ function layout({ title, description, canonical, jsonLd, body }) {
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${canonical}">
 <meta property="og:locale" content="tr_TR">
+<meta property="og:site_name" content="evdes.tr">
+<meta property="og:image" content="${SITE}/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="evdes.tr — İstanbul'da ev arkadaşı bul">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${SITE}/og.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/favicon.png" type="image/png">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
@@ -126,6 +148,8 @@ h2{font-size:1.25rem;margin:2.5rem 0 .75rem}
 p{margin:.75rem 0}
 a{color:var(--accent)}
 .lead{font-size:1.05rem;color:var(--muted)}
+nav.crumbs{font-size:.85rem;color:var(--muted);margin-bottom:1rem}
+nav.crumbs a{color:var(--muted)}
 .big{font-size:2.1rem;font-weight:700;letter-spacing:-.02em}
 table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.94rem}
 th,td{text-align:left;padding:.55rem .5rem;border-bottom:1px solid var(--line)}
@@ -234,6 +258,8 @@ function districtPage(d, others) {
     .join(" · ");
 
   const body = `
+<nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a> ›
+<a href="/semt">Semtler</a> › <span aria-current="page">${esc(d.name)}</span></nav>
 <h1>${esc(d.name)}'de ev arkadaşı ve oda kiraları</h1>
 <p class="lead">${esc(d.list.length)} mahalle · ${nf.format(d.listings)} ilan · veriler ${esc(FACTOR.indexedTo)} düzeyinde</p>
 
@@ -284,25 +310,35 @@ göre yeşilden kırmızıya renklenir.</p>
 <a href="/semt">Tüm semtler</a></nav>
 `;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: title,
-    description,
-    url,
-    inLanguage: "tr-TR",
-    isPartOf: { "@type": "WebSite", name: "evdes.tr", url: SITE },
-    about: {
-      "@type": "Place",
-      name: `${d.name}, İstanbul`,
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: d.name,
-        addressRegion: "İstanbul",
-        addressCountry: "TR",
+  // Dizi olarak yayımlanıyor: tek script bloğunda birden çok üst düzey nesne
+  // JSON-LD'de geçerli. BreadcrumbList'i Google arama sonucunda adresin
+  // yerine kırıntı yolu olarak gösteriyor.
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: title,
+      description,
+      url,
+      inLanguage: "tr-TR",
+      isPartOf: { "@type": "WebSite", name: "evdes.tr", url: SITE },
+      about: {
+        "@type": "Place",
+        name: `${d.name}, İstanbul`,
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: d.name,
+          addressRegion: "İstanbul",
+          addressCountry: "TR",
+        },
       },
     },
-  };
+    breadcrumbs([
+      ["Ana sayfa", `${SITE}/`],
+      ["Semtler", `${SITE}/semt`],
+      [d.name, url],
+    ]),
+  ];
 
   return layout({ title, description, canonical: url, jsonLd, body });
 }
@@ -326,6 +362,8 @@ function indexPage(list) {
     .join("\n");
 
   const body = `
+<nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a> ›
+<span aria-current="page">Semtler</span></nav>
 <h1>İstanbul'da semt semt oda kiraları</h1>
 <p class="lead">${list.length} ilçe · ${nf.format(TOTAL_LISTINGS)} ilan · veriler ${esc(FACTOR.indexedTo)} düzeyinde</p>
 <p>Aşağıdaki rakamlar kiralık daire ilanlarının medyanı ve iki yatak odalı bir evde
@@ -339,14 +377,20 @@ ${satirlar}
 <p><a class="cta" href="/onboarding">Ev arkadaşı aramaya başla</a></p>
 `;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: title,
-    description,
-    url,
-    inLanguage: "tr-TR",
-  };
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: title,
+      description,
+      url,
+      inLanguage: "tr-TR",
+    },
+    breadcrumbs([
+      ["Ana sayfa", `${SITE}/`],
+      ["Semtler", url],
+    ]),
+  ];
 
   return layout({ title, description, canonical: url, jsonLd, body });
 }

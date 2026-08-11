@@ -877,6 +877,38 @@ const tr = {
   "admin.emptyActionsDesc":
     "Geri alınamayan bir yönetici eylemi henüz yapılmamış.",
   "admin.emptyActionsFilteredDesc": "Bu süzgece uyan bir kayıt yok.",
+
+  // ---- sekme başlıkları (bkz. components/PageMeta.tsx) ----
+  // Tarayıcı sekmesinde, geçmişte ve yer imlerinde görünür. "/", "/onboarding",
+  // "/explore", "/safety" ve "/login" robots.txt'de açık, yani bunlar arama
+  // sonucunda da çıkıyor; gerisi yalnızca kullanıcı için.
+  "meta.home": "evdes.tr — İstanbul'da ev arkadaşı bul",
+  "meta.homeDesc":
+    "Üniversite öğrencilerine özel ev arkadaşı bulma platformu: adil kira danışmanı, bütçe haritası ve eşleşme.",
+  "meta.onboarding": "Ücretsiz kayıt ol",
+  "meta.onboardingDesc":
+    "Okul e-postanla dakikalar içinde kayıt ol, İstanbul'da sana uygun ev arkadaşını bul.",
+  "meta.login": "Giriş yap",
+  "meta.loginDesc": "evdes.tr hesabına giriş yap.",
+  "meta.explore": "Bütçe haritası",
+  "meta.exploreDesc":
+    "İstanbul'da 968 mahallenin kira seviyesini bütçene göre renklenen harita üzerinde gör.",
+  "meta.safety": "Güvenlik",
+  "meta.safetyDesc":
+    "evdes.tr'de güvenli ev arkadaşı arama: doğrulama, mesajlaşma kuralları ve bildirim.",
+  "meta.swipe": "Keşfet",
+  "meta.notifications": "Bildirimler",
+  "meta.matches": "Beğeniler",
+  "meta.messages": "Mesajlar",
+  "meta.chat": "Sohbet",
+  "meta.profile": "Profilim",
+  "meta.profileEdit": "Profili düzenle",
+  "meta.createListing": "İlan oluştur",
+  "meta.listings": "Evler",
+  "meta.settings": "Ayarlar",
+  "meta.accountSettings": "Hesap ayarları",
+  "meta.admin": "Yönetim",
+  "meta.notFound": "Sayfa bulunamadı",
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -1738,6 +1770,35 @@ const en: Record<TranslationKey, string> = {
   "admin.emptyActionsTitle": "The audit log is empty",
   "admin.emptyActionsDesc": "No irreversible admin action has been taken yet.",
   "admin.emptyActionsFilteredDesc": "No entry matches this filter.",
+
+  // ---- tab titles (see components/PageMeta.tsx) ----
+  "meta.home": "evdes.tr — find a roommate in Istanbul",
+  "meta.homeDesc":
+    "A roommate platform for university students: fair-rent guidance, a budget map and matching.",
+  "meta.onboarding": "Sign up free",
+  "meta.onboardingDesc":
+    "Sign up with your university email in minutes and find the right roommate in Istanbul.",
+  "meta.login": "Sign in",
+  "meta.loginDesc": "Sign in to your evdes.tr account.",
+  "meta.explore": "Budget map",
+  "meta.exploreDesc":
+    "See rent levels across 968 Istanbul neighbourhoods on a map coloured by your budget.",
+  "meta.safety": "Safety",
+  "meta.safetyDesc":
+    "Searching safely on evdes.tr: verification, messaging rules and reporting.",
+  "meta.swipe": "Discover",
+  "meta.notifications": "Notifications",
+  "meta.matches": "Likes",
+  "meta.messages": "Messages",
+  "meta.chat": "Chat",
+  "meta.profile": "My profile",
+  "meta.profileEdit": "Edit profile",
+  "meta.createListing": "Create a listing",
+  "meta.listings": "Houses",
+  "meta.settings": "Settings",
+  "meta.accountSettings": "Account settings",
+  "meta.admin": "Admin",
+  "meta.notFound": "Page not found",
 };
 
 export const translations = { tr, en } as const;
