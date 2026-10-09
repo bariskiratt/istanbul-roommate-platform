@@ -288,8 +288,10 @@ of:
   or a token limited to another bucket. Uploads answer 503 until it is fixed.
 - `⚠️ Fotoğraflar konteyner diskinde` — `S3_BUCKET` is not set.
 
-Then upload a photo on the site, trigger **Manual Deploy**, and check the photo
-still loads.
+The same result is public at <https://api.evdes.tr/api/health>:
+`"photo_bucket": "ok"` once the check has run (`"unchecked"` in the first
+seconds after startup). Then upload a photo on the site, trigger **Manual
+Deploy**, and check the photo still loads.
 
 **Photos uploaded before the switch** lived on the container disk and are
 already gone; listings that point at them show broken images until their owners
@@ -343,6 +345,7 @@ that wakes it in well under a second, and the engine's `pool_pre_ping`
 **Verification.** The tables are created on startup (`init_db` in
 `backend/app/db.py`), so a fresh database needs no manual step. In **Logs**,
 `Application startup complete.` means the API reached the database; then
+<https://api.evdes.tr/api/health> should show `"database": "ok"` and
 `https://api.evdes.tr/api/listings` should answer `[]` instead of an error.
 Sign up once to confirm writes work. Demo listings are optional
 (`python -m scripts.seed_demo` needs Shell, see the notes in section 1).
@@ -374,7 +377,8 @@ choice.
 - [ ] `ADMIN_EMAILS` is set to your own addresses, not the repo defaults
 - [ ] `DATABASE_URL` points at Neon and `/api/listings` answers `[]` or a list,
       not an error (section 1.6)
-- [ ] Logs show `✅ Fotoğraf kovası çalışıyor` after a deploy (section 1.5)
+- [ ] `/api/health` answers 200 with `"database": "ok"` and
+      `"photo_bucket": "ok"` (sections 1.5 and 1.6)
 - [ ] A photo uploaded before a redeploy still loads after it
 - [ ] `/admin` returns 403 for a normal account and loads for an admin one
 
@@ -404,6 +408,10 @@ Use an external uptime monitor. UptimeRobot's free tier is enough:
 2. Monitor type **HTTP(s)**, URL `https://api.evdes.tr/`, interval **5 minutes**.
 3. Save. Downtime alerts to the account's email come with it, which the
    deployment otherwise has none of (ARCHITECTURE.md §13).
+
+Do **not** point the monitor at `/api/health`: that endpoint queries the
+database on every call, so a 5-minute check would keep Neon from ever
+suspending and use up its monthly compute hours.
 
 `GET /` is the right target: it returns a static dict with no database access
 and answers `HEAD` as well (`backend/app/main.py:415-435`), so a 5-minute check
