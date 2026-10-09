@@ -31,6 +31,12 @@ LIMITS: dict[str, tuple[int, timedelta]] = {
     # Rapor: tekillik kısıtı zaten aynı hedefi tekrarlatmıyor; buradaki sınır
     # farklı hedefleri tarayarak kuyruk doldurmayı engeller.
     "report_create": (10, timedelta(hours=1)),
+    # Fotoğraf: ilan başına en çok 6, profilde en çok 6. Günde 100 yükleme
+    # birkaç ilanı baştan kurmaya bile fazlasıyla yeter. Asıl sebep maliyet:
+    # fotoğraflar kovada (R2) duruyor ve 10 GB'lık ücretsiz kotanın üstü
+    # ücretlendiriliyor; sınır, tek hesabın betikle günde en çok ~500 MB
+    # (100 x 5 MB) yazabilmesini sağlar.
+    "photo_upload": (100, timedelta(days=1)),
 }
 
 _BUCKETS: dict[tuple[str, int], list[datetime]] = {}
