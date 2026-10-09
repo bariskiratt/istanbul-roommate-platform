@@ -1,14 +1,29 @@
-"""Fotoğraf yükleme ve fotoğraf URL politikası.
+"""Fotoğraf yükleme, saklama ve fotoğraf URL politikası.
 
-Dosyalar data/uploads/ altına rastgele adla yazılır ve /uploads/... yolundan
-statik servis edilir. Dönen URL mutlaktır — ilan/profil fotoğrafı olarak
-doğrudan <img src> içinde kullanılabilir.
-Yayına alırken kalıcı depolama (S3 vb.) ve CDN düşünülmeli.
+Dosyalar rastgele adla saklanır ve /uploads/<ad> yolundan bu modüldeki
+serve_photo ucuyla servis edilir. Dönen URL mutlaktır — ilan/profil fotoğrafı
+olarak doğrudan <img src> içinde kullanılabilir.
+
+İki depo var, seçim S3_BUCKET ortam değişkeniyle yapılır:
+
+  S3_BUCKET boş   -> konteyner diski (UPLOADS_DIR). Yerel geliştirme için.
+                     Render'ın ücretsiz planında disk kalıcı DEĞİLDİR: her
+                     yeniden dağıtımda ve servis uykuya her geçtiğinde
+                     dosyalar silinir.
+  S3_BUCKET dolu  -> S3 uyumlu kova (Cloudflare R2, AWS S3, Backblaze B2...).
+                     Yayın için bu. Kurulum: DEPLOY.md §1.5.
+
+URL iki depoda da AYNIDIR (api.evdes.tr/uploads/<ad>); fotoğraf baytları
+kovadan bu sunucu üzerinden geçer. Böylece depo değişince ne veritabanındaki
+adresler ne de arayüzün CSP'si (img-src) değişmek zorunda kalır.
 
 Bu modül ayrıca iki ORTAK yardımcıyı barındırır (diğer uçlar buradan çağırır):
 
   is_allowed_photo_url(url) -> bool   hangi fotoğraf adresleri kabul edilir
-  delete_local_photos(urls) -> int    bizim ürettiğimiz dosyaları diskten siler
+  delete_local_photos(urls) -> int    bizim ürettiğimiz dosyaları depodan siler
+
+("local" burada "diskte" değil "BİZİM ürettiğimiz" demektir; kova kullanılırken
+de aynı isimler geçerlidir.)
 
 İkisi de tek bir soruya dayanır: "bu URL bizim ürettiğimiz bir dosya mı?"
 Cevap dosya ADININ desenine bakılarak verilir (secrets.token_hex(16) + izinli
@@ -16,19 +31,31 @@ uzantı); böylece kullanıcının uydurduğu bir yol ("/uploads/../../etc/passw
 ne kabul edilir ne de silinir.
 """
 
+import functools
 import os
 import re
 import secrets
+import threading
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import unquote, urlparse
 
+import boto3
+from botocore.config import Config as BotoConfig
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, Response
 
 from app import models
 from app.auth import get_current_user
 from app.config import UPLOADS_DIR
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+
+# /uploads/<ad> — fotoğrafın kendisi. Ayrı yönlendirici, çünkü yolu /api
+# önekinin dışında (eski StaticFiles bağlamasıyla aynı adres).
+files_router = APIRouter(tags=["uploads"])
 
 MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -38,13 +65,22 @@ ALLOWED = {
     "image/png": "png",
     "image/webp": "webp",
 }
+# Servis ederken ters yön: uzantı -> içerik türü
+CONTENT_TYPES = {ext: ctype for ctype, ext in ALLOWED.items()}
+
+# Tarayıcı fotoğrafı bir hafta önbellekte tutar. Dosya adı rastgele ve içerik
+# hiç değişmez (aynı adla ikinci yazma yok), yani bayat kopya riski yoktur.
+# "private": araya giren paylaşımlı önbellekler (CDN) SAKLAMASIN — hesap
+# silinince fotoğrafın başkalarına servis edilmeye devam etmemesi için (H6).
+PHOTO_CACHE_CONTROL = "private, max-age=604800, immutable"
 
 # Fotoğraf URL'si için üst sınır. Alan sınırsızken 2 MB'lık bir "data:" dizesi
 # ilan fotoğrafı diye kaydedilebiliyordu (bulgu H2): satır şişiyor, anonim
 # liste ucu megabaytlarca veri döndürüyordu.
 MAX_PHOTO_URL_LENGTH = 500
 
-# Statik montaj noktası (bkz. app/main.py: app.mount("/uploads", ...)).
+# Fotoğrafların servis edildiği yol (bkz. serve_photo). Kovada da nesne
+# anahtarı bu önekle başlar: "uploads/<ad>".
 UPLOADS_PREFIX = "/uploads/"
 
 # Bizim ürettiğimiz dosya adı: secrets.token_hex(16) -> 32 onaltılık karakter.
@@ -112,6 +148,156 @@ def public_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+# ---------------------------------------------------------------------------
+# Depo: konteyner diski ya da S3 uyumlu kova
+# ---------------------------------------------------------------------------
+
+
+class BucketSettings(NamedTuple):
+    bucket: str
+    endpoint_url: str | None
+    access_key_id: str | None
+    secret_access_key: str | None
+    region: str
+
+
+def bucket_settings() -> BucketSettings | None:
+    """Kova ayarları; S3_BUCKET boşsa None (disk kullanılır).
+
+    Ortam değişkenleri HER ÇAĞRIDA okunur (PUBLIC_BASE_URL ile aynı gerekçe).
+    Cloudflare R2 için:
+      S3_BUCKET             kova adı
+      S3_ENDPOINT_URL       https://<hesap-id>.r2.cloudflarestorage.com
+      S3_ACCESS_KEY_ID      R2 API jetonunun erişim anahtarı
+      S3_SECRET_ACCESS_KEY  R2 API jetonunun gizli anahtarı
+      S3_REGION             boş bırak ("auto" — R2'nin beklediği değer)
+    """
+    bucket = os.getenv("S3_BUCKET", "").strip()
+    if not bucket:
+        return None
+    return BucketSettings(
+        bucket=bucket,
+        endpoint_url=os.getenv("S3_ENDPOINT_URL", "").strip() or None,
+        access_key_id=os.getenv("S3_ACCESS_KEY_ID", "").strip() or None,
+        secret_access_key=os.getenv("S3_SECRET_ACCESS_KEY", "").strip() or None,
+        region=os.getenv("S3_REGION", "").strip() or "auto",
+    )
+
+
+@functools.lru_cache(maxsize=4)
+def _s3_client(settings: BucketSettings):
+    """Ayar başına tek istemci.
+
+    İstemci iş parçacığı güvenlidir ama boto3'ün paylaşılan varsayılan
+    oturumu DEĞİLDİR: açılıştaki kova sınaması ile ilk istek aynı anda istemci
+    kurarsa ortak oturum bozulabilir. Bu yüzden her istemci kendi oturumundan.
+    """
+    return boto3.session.Session().client(
+        "s3",
+        endpoint_url=settings.endpoint_url,
+        aws_access_key_id=settings.access_key_id,
+        aws_secret_access_key=settings.secret_access_key,
+        region_name=settings.region,
+        config=BotoConfig(
+            # Varsayılan 60 sn'lik bekleme, kova erişilemezken yükleme
+            # isteğini dakikalarca asılı bırakırdı.
+            connect_timeout=5,
+            read_timeout=15,
+            retries={"max_attempts": 3, "mode": "standard"},
+            # Yeni boto3 sürümleri her isteğe varsayılan olarak CRC
+            # sağlama toplamı ekliyor; her S3 uyumlu sağlayıcı bunu
+            # desteklemiyor. Yalnız zorunlu olduğunda gönderilsin.
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
+    )
+
+
+def _object_key(name: str) -> str:
+    return f"{UPLOADS_PREFIX.strip('/')}/{name}"
+
+
+def _store_photo(name: str, data: bytes, content_type: str) -> None:
+    """Dosyayı yapılandırılmış depoya yazar. Kova hatası yukarı fırlar."""
+    settings = bucket_settings()
+    if settings is None:
+        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+        (UPLOADS_DIR / name).write_bytes(data)
+        return
+    _s3_client(settings).put_object(
+        Bucket=settings.bucket,
+        Key=_object_key(name),
+        Body=data,
+        ContentType=content_type,
+        CacheControl=PHOTO_CACHE_CONTROL,
+    )
+
+
+def _is_missing(exc: ClientError) -> bool:
+    code = str(exc.response.get("Error", {}).get("Code", ""))
+    return code in {"NoSuchKey", "NotFound", "404"}
+
+
+def bucket_available() -> bool:
+    """Kova yapılandırılmış VE yazma/okuma/silme gerçekten çalışıyor mu?
+
+    Açılışta report_photo_storage bunu çağırır ve sonucu loga yazar
+    (DEPLOY.md §1.5). Shell'i olan bir kurulumda elle de çalıştırılabilir:
+
+        python -c "from app import uploads; print(uploads.bucket_available())"
+
+    False iki anlama gelir ve çıktı hangisi olduğunu söyler: S3_BUCKET hiç
+    tanımlı değil (fotoğraflar hâlâ geçici diskte) ya da tanımlı ama anahtar,
+    uç adresi veya kova adı yanlış.
+
+    Sınama nesnesinin adı fotoğraf desenine UYMAZ; serve_photo onu asla
+    servis etmez, yarıda kalırsa da hiçbir kayıt ona işaret etmez.
+    """
+    settings = bucket_settings()
+    if settings is None:
+        print("S3_BUCKET tanımlı değil: fotoğraflar konteyner diskinde.")
+        return False
+    client = _s3_client(settings)
+    key = _object_key("_deploy-check")
+    try:
+        client.put_object(Bucket=settings.bucket, Key=key, Body=b"ok")
+        body = client.get_object(Bucket=settings.bucket, Key=key)["Body"]
+        try:
+            ok = body.read() == b"ok"
+        finally:
+            body.close()
+        client.delete_object(Bucket=settings.bucket, Key=key)
+    except (BotoCoreError, ClientError) as exc:
+        print(f"Kovaya erişilemedi ({settings.bucket}): {exc}")
+        return False
+    return ok
+
+
+def report_photo_storage() -> None:
+    """Açılışta hangi deponun kullanıldığını, kovanın da çalışıp çalışmadığını
+    loga yazar.
+
+    Render'ın ücretsiz planında Shell yok; dağıtımdan sonra kovayı doğrulamanın
+    tek yolu Logs sekmesindeki bu satırdır (DEPLOY.md §1.5). Sınama ağ isteği
+    olduğu için ayrı iş parçacığında koşar: kova erişilemezken bile açılışı
+    bekletmez.
+    """
+    settings = bucket_settings()
+    if settings is None:
+        print("⚠️  Fotoğraflar konteyner diskinde — Render'ın ücretsiz planında "
+              "yeniden dağıtımda ve uykuda silinir. Kalıcı depo: DEPLOY.md §1.5")
+        return
+
+    def check() -> None:
+        if bucket_available():
+            print(f"✅ Fotoğraf kovası çalışıyor: {settings.bucket}")
+        else:
+            print(f"❌ Fotoğraf kovasına yazılamıyor ({settings.bucket}) — "
+                  f"yüklemeler 503 verecek. Ayarlar: DEPLOY.md §1.5")
+
+    threading.Thread(target=check, name="photo-bucket-check", daemon=True).start()
+
+
 def local_photo_name(url: str) -> str | None:
     """URL bizim ürettiğimiz bir dosyayı gösteriyorsa dosya adını verir.
 
@@ -177,10 +363,12 @@ def is_allowed_photo_url(url: str) -> bool:
 
 
 def delete_local_photos(urls: list[str]) -> int:
-    """Verilen adreslerden BİZE AİT olanların dosyalarını siler.
+    """Verilen adreslerden BİZE AİT olanların dosyalarını depodan siler.
 
     Dış barındırıcıdaki adresler (Unsplash vb.) ve tanımadığımız desendeki
-    yollar atlanır. Silinen dosya sayısını döner.
+    yollar atlanır. Silinen dosya sayısını döner. Kovada S3 silme isteği
+    nesnenin var olup olmadığını söylemez; orada sayı, hatasız tamamlanan
+    silme isteklerinin sayısıdır.
 
     Neden gerekli: hesap/ilan silmede yalnızca veritabanı satırı siliniyordu;
     yüklenen fotoğraflar /uploads/ altında girişsiz ve kalıcı kalıyordu —
@@ -189,17 +377,35 @@ def delete_local_photos(urls: list[str]) -> int:
     Bu fonksiyon VERİTABANINA BAKMAZ: bir dosyanın başka bir kayıtta hâlâ
     kullanılıp kullanılmadığını ÇAĞIRAN taraf kontrol etmelidir
     (bkz. listings.purge_listing).
+
+    Hata FIRLATMAZ: çağıranlar hesap ve ilan silme uçlarıdır; kovaya o an
+    ulaşılamıyor diye silme işleminin kendisi 500 vermemeli. Silinemeyen
+    nesne loga yazılır.
     """
-    if not urls:
+    names: list[str] = []
+    for url in urls or []:
+        name = local_photo_name(url) if isinstance(url, str) else None
+        if name is not None and name not in names:
+            names.append(name)
+    if not names:
         return 0
+
+    settings = bucket_settings()
+    if settings is not None:
+        client = _s3_client(settings)
+        deleted = 0
+        for name in names:
+            try:
+                client.delete_object(Bucket=settings.bucket, Key=_object_key(name))
+            except (BotoCoreError, ClientError) as exc:
+                print(f"⚠️  Fotoğraf kovadan silinemedi ({name}): {exc}")
+                continue
+            deleted += 1
+        return deleted
+
     base = Path(UPLOADS_DIR).resolve()
     deleted = 0
-    seen: set[str] = set()
-    for url in urls:
-        name = local_photo_name(url) if isinstance(url, str) else None
-        if name is None or name in seen:
-            continue
-        seen.add(name)
+    for name in names:
         target = (base / name).resolve()
         # Kuşak kemer: desen zaten "/" içeremiyor, yine de sembolik bağ ya da
         # ileride gevşetilecek bir desen UPLOADS_DIR dışına çıkarmasın.
@@ -244,8 +450,60 @@ async def upload_photo(
             detail="Dosya içeriği görüntü formatıyla uyuşmuyor.",
         )
 
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     name = f"{secrets.token_hex(16)}.{ext}"
-    (UPLOADS_DIR / name).write_bytes(data)
+    try:
+        # Kovaya yazma bir ağ isteğidir; olay döngüsünü bekletmesin.
+        await run_in_threadpool(_store_photo, name, data, file.content_type)
+    except (BotoCoreError, ClientError) as exc:
+        print(f"⚠️  Fotoğraf kovaya yazılamadı: {exc}")
+        raise HTTPException(
+            status_code=503,
+            detail="Fotoğraf şu an kaydedilemedi. Biraz sonra tekrar dene.",
+        )
 
     return {"url": f"{public_base_url(request)}{UPLOADS_PREFIX}{name}"}
+
+
+@files_router.api_route(
+    UPLOADS_PREFIX + "{name}", methods=["GET", "HEAD"], include_in_schema=False
+)
+def serve_photo(name: str):
+    """Fotoğrafı depodan servis eder. Giriş istemez (ilan fotoğrafları herkese
+    açık ilanlarda görünüyor).
+
+    Yalnızca BİZİM ürettiğimiz ad deseni servis edilir; başka her ad 404'tür.
+    nosniff ve "Content-Disposition: attachment" başlıklarını main.py'deki
+    SecurityHeadersMiddleware /uploads/ yolu için ekler (M4).
+
+    Senkron fonksiyon: kova istemcisi engelleyici; FastAPI bunu iş parçacığı
+    havuzunda çalıştırır.
+    """
+    if not _LOCAL_PHOTO_NAME.fullmatch(name):
+        raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+    media_type = CONTENT_TYPES[name.rsplit(".", 1)[1]]
+    headers = {"Cache-Control": PHOTO_CACHE_CONTROL}
+
+    settings = bucket_settings()
+    if settings is None:
+        path = Path(UPLOADS_DIR) / name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+        return FileResponse(path, media_type=media_type, headers=headers)
+
+    try:
+        body = _s3_client(settings).get_object(
+            Bucket=settings.bucket, Key=_object_key(name)
+        )["Body"]
+        try:
+            data = body.read()
+        finally:
+            body.close()
+    except ClientError as exc:
+        if _is_missing(exc):
+            raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+        print(f"⚠️  Fotoğraf kovadan okunamadı ({name}): {exc}")
+        raise HTTPException(status_code=502, detail="Fotoğraf şu an yüklenemedi.")
+    except BotoCoreError as exc:
+        print(f"⚠️  Fotoğraf kovadan okunamadı ({name}): {exc}")
+        raise HTTPException(status_code=502, detail="Fotoğraf şu an yüklenemedi.")
+    return Response(content=data, media_type=media_type, headers=headers)

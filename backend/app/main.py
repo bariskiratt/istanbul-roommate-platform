@@ -12,14 +12,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.config import (
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
-    UPLOADS_DIR,
 )
 from app.admin import router as admin_router
 from app.auth import router as auth_router
@@ -36,6 +34,7 @@ from app.listings import router as listings_router
 from app.messages import router as messages_router
 from app.reports import router as reports_router
 from app.swipes import router as swipes_router
+from app import uploads
 from app.uploads import router as uploads_router
 from app.pricing import BOUNDS, build_features
 from app.transit import TRANSIT_PATH, AccessibilityIndex, TransitNetwork
@@ -75,6 +74,7 @@ async def lifespan(_app: FastAPI):
     # init_db içinden çağrılan run_migrations ile eklenir (üretimde canlı
     # Postgres var, veri kaybı olmadan).
     init_db()
+    uploads.report_photo_storage()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 
@@ -149,7 +149,7 @@ async def lifespan(_app: FastAPI):
 # ---------------------------------------------------------------------------
 #
 # İkisi de saf ASGI ara katmanıdır (BaseHTTPMiddleware DEĞİL). Sebep: gövdeyi
-# akış halinde okumak ve StaticFiles yanıtlarını tamponlamadan geçirmek
+# akış halinde okumak ve fotoğraf dosyası yanıtlarını tamponlamadan geçirmek
 # gerekiyor; BaseHTTPMiddleware her yanıtı bir anyio kanalına kopyalar,
 # yani hem yavaşlar hem de /uploads/ akışını belleğe alır.
 
@@ -351,9 +351,8 @@ app.include_router(uploads_router)
 app.include_router(reports_router)
 app.include_router(admin_router)
 
-# Yüklenen fotoğrafların statik servisi
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+# Yüklenen fotoğrafların servisi: /uploads/<ad> (disk ya da kova, bkz. uploads.py)
+app.include_router(uploads.files_router)
 
 # --- Ara katman sırası ---------------------------------------------------
 # add_middleware TERS sırayla uygulanır: EN SON eklenen EN DIŞTAKİdir.
