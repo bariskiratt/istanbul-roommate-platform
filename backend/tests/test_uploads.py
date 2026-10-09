@@ -1,6 +1,7 @@
 """Fotoğraf yükleme, servis ve silme testleri."""
 
 import io
+from datetime import timedelta
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -9,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import content_limits
 from app import uploads as uploads_module
 from app.db import Base, get_db
 from app.main import app
@@ -291,3 +293,32 @@ def test_account_deletion_removes_photos_from_bucket(client, bucket):
     )
     assert res.status_code == 204
     assert bucket.objects == {}
+
+
+def test_daily_upload_quota(client, monkeypatch, tmp_path):
+    """Kovadaki depolama ücretli; tek hesap sınırsız yükleyemesin."""
+    monkeypatch.setitem(content_limits.LIMITS, "photo_upload", (2, timedelta(days=1)))
+    headers = _auth_headers(client)
+    _upload(client, headers)
+    _upload(client, headers)
+
+    res = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.png", PNG_BYTES, "image/png")},
+    )
+    assert res.status_code == 429
+    assert "retry-after" in res.headers
+    assert len(list(tmp_path.iterdir())) == 2
+
+
+def test_rejected_file_does_not_use_quota(client, monkeypatch):
+    monkeypatch.setitem(content_limits.LIMITS, "photo_upload", (1, timedelta(days=1)))
+    headers = _auth_headers(client)
+    res = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.txt", b"hello", "text/plain")},
+    )
+    assert res.status_code == 415
+    _upload(client, headers)

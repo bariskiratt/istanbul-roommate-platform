@@ -47,7 +47,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 
-from app import models
+from app import content_limits, models
 from app.auth import get_current_user
 from app.config import UPLOADS_DIR
 
@@ -423,7 +423,7 @@ def delete_local_photos(urls: list[str]) -> int:
 async def upload_photo(
     request: Request,
     file: UploadFile,
-    _user: models.User = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     ext = ALLOWED.get(file.content_type or "")
     if ext is None:
@@ -449,6 +449,10 @@ async def upload_photo(
             status_code=415,
             detail="Dosya içeriği görüntü formatıyla uyuşmuyor.",
         )
+
+    # Kota doğrulamadan SONRA sayılır: reddedilen dosya hak yemesin, ama
+    # depoya yazılacak her dosya sayılsın (bkz. content_limits.LIMITS).
+    content_limits.check("photo_upload", user.id)
 
     name = f"{secrets.token_hex(16)}.{ext}"
     try:

@@ -295,6 +295,21 @@ still loads.
 already gone; listings that point at them show broken images until their owners
 upload new ones.
 
+**Cost.** R2 has no spending cap: usage beyond the free tier is charged to the
+card on file. Beyond the free tier the prices are $0.015 per GB-month of
+storage, $4.50 per million uploads (Class A) and $0.36 per million photo reads
+(Class B); deletes and egress are free. For scale: 10 GB holds roughly 3,000
+photos at 3 MB each, and 20 GB would cost about $0.15 a month. Two things keep
+the bill bounded:
+
+- Each account may upload at most 100 photos a day (`photo_upload` in
+  `backend/app/content_limits.py`), so one account running a script can add at
+  most ~500 MB a day. Listings and profiles hold at most 6 photos each.
+- A **budget alert** emails you when account-wide usage-based spend crosses a
+  threshold you pick: Cloudflare dashboard → **Manage Account → Billing →
+  Billable Usage → Create budget alert**, e.g. at $1. It only notifies; it does
+  not stop anything.
+
 ### 1.6) Database — Neon
 
 **Why not Render's free Postgres.** Render locks a free database 30 days after

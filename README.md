@@ -29,7 +29,7 @@ suggestions** — all in one app, in Turkish and English.
 | **Reporting** | Users can report a listing, a user or a message with a fixed reason list. Reports land in an admin-only queue where they are resolved with a note; the same target can't be reported twice by the same user, and the reporter is never shown to the person they reported. |
 | **Admin moderation panel** | `/admin` — dashboard counters, the report queue, the flagged-content queue, the removed-content queue, user search and suspension, and an audit log of irreversible actions. Admins can also edit, publish, take down or permanently delete any listing, and delete any account. Access is decided solely by membership in `ADMIN_EMAILS`; all 15 `/api/admin/*` endpoints enforce it server-side. See below for which actions can be undone. |
 | **Message encryption** | Chat messages are stored AES-256-GCM encrypted (`MESSAGE_KEY`) and decrypted on read. This is **at-rest** encryption, not end-to-end — the server holds the key. Without the key the app still runs, but messages are stored as plain text. |
-| **Abuse limits** | Per-user quotas on the content endpoints: 20 listings/hour, 30 messages/minute, 10 reports/hour. Auth endpoints are limited per email *and* per IP, and a successful sign-in clears the counter so a stranger cannot lock someone out of their own account. |
+| **Abuse limits** | Per-user quotas on the content endpoints: 20 listings/hour, 30 messages/minute, 10 reports/hour, 100 photo uploads/day. Auth endpoints are limited per email *and* per IP, and a successful sign-in clears the counter so a stranger cannot lock someone out of their own account. |
 | **Theming** | Hinge-inspired editorial design; light & dark themes (default dark). |
 
 ## 📚 Documentation
@@ -187,7 +187,7 @@ rows). Sign in as `demo1@demo.roommatch.tr` … `demo5@…` with `Demo1234!`, us
 the password tab — those addresses receive no mail, so the code path will not
 work for them.
 
-**Tests:** `python -m pytest tests/` (backend, 413) · `npx vitest run`
+**Tests:** `python -m pytest tests/` (backend, 415) · `npx vitest run`
 (frontend, 71).
 
 ## 🚀 Deployment
@@ -240,8 +240,9 @@ dangerous kind:
   public — the URL is unguessable but needs no session.
 - Rate limits are kept in process memory, so they reset on restart and are not
   shared across instances; with more than one worker the real ceiling is the
-  configured limit times the worker count. Photo upload has no per-user quota of
-  its own — only the request-size limit. Session tokens expire after 30 days.
+  configured limit times the worker count. Photo upload is capped at 100 a day
+  per account, which bounds what one account can add to the paid bucket.
+  Session tokens expire after 30 days.
 - Moderation is rule-based, so it is bypassable by design: obfuscated spellings
   can slip through, and unusual but innocent wording can be blocked. The
   optional AI layer narrows the gap but is off unless an API key is configured,
