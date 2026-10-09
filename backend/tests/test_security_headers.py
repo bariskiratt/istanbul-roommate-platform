@@ -39,14 +39,8 @@ def _body_limit_middleware():
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    # Hem yükleme hem servis (uploads.serve_photo) dizini istek anında okur.
     monkeypatch.setattr(uploads_module, "UPLOADS_DIR", tmp_path)
-
-    # main.py, StaticFiles'ı import anında gerçek UPLOADS_DIR ile bağlıyor;
-    # testin yazdığı dosyanın servis edilebilmesi için mount'u da yönlendir.
-    for route in app.routes:
-        if getattr(route, "name", None) == "uploads":
-            monkeypatch.setattr(route.app, "directory", tmp_path)
-            monkeypatch.setattr(route.app, "all_directories", [tmp_path])
 
     engine = create_engine(
         "sqlite://",
