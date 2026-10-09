@@ -39,6 +39,8 @@ const SECTIONS: { heading: TranslationKey; body: TranslationKey[] }[] = [
     body: [
       "privacy.shareBody",
       "privacy.shareRender",
+      "privacy.shareNeon",
+      "privacy.shareCloudflare",
       "privacy.shareVercel",
       "privacy.shareBrevo",
       "privacy.shareNoAi",

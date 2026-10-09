@@ -54,11 +54,24 @@ services:
       # Vekil arkasında OLMAYAN bir kurulumda AÇMA: başlık uydurulabilir.
       - key: TRUST_PROXY_HEADERS
         value: "1"
+      # Fotoğraf deposu: Cloudflare R2 (S3 uyumlu). Boş bırakılırsa fotoğraflar
+      # konteyner diskine yazılır ve ücretsiz planda HER yeniden dağıtımda ve
+      # servis her uykuya geçtiğinde SİLİNİR. Değerler panelden girilir
+      # (gizli anahtar repoya yazılmaz). Kurulum ve doğrulama: DEPLOY.md §1.5.
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false        # https://<hesap-id>.r2.cloudflarestorage.com
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      # Veritabanı: Neon (ücretsiz, süresi DOLMAZ). Bağlantı adresi panelden
+      # elle girilir. Eskiden burada blueprint'in kurduğu ücretsiz Render
+      # Postgres'i vardı (roommatch-db). Render ücretsiz veritabanlarını
+      # oluşturulduktan 30 gün sonra kilitler, 14 gün sonra da TÜM verisiyle
+      # siler. Blok bu yüzden kaldırıldı: dosyada kalsaydı her blueprint
+      # eşitlemesi yine süresi dolacak yeni bir veritabanı kurardı.
+      # Kurulum: DEPLOY.md §1.6.
       - key: DATABASE_URL
-        fromDatabase:
-          name: roommatch-db
-          property: connectionString
-
-databases:
-  - name: roommatch-db
-    plan: free
+        sync: false

@@ -33,13 +33,12 @@ flowchart TB
     subgraph render["Render — Docker web service (1 instance, free plan)"]
         API["FastAPI / uvicorn<br/>app.main:app"]
         STATE["in-process STATE dict<br/>geojson · model · locations · transit"]
-        DISK["container filesystem<br/>data/uploads (ephemeral)"]
         API --- STATE
-        API --- DISK
     end
 
     subgraph data["Managed data"]
-        PG[("Postgres<br/>roommatch-db")]
+        PG[("Postgres<br/>Neon")]
+        R2[("Photo bucket<br/>Cloudflare R2")]
     end
 
     subgraph ext["Third-party (both optional)"]
@@ -50,6 +49,7 @@ flowchart TB
     SPA -->|"first load"| CDN
     SPA -->|"XHR, Bearer token"| API
     API -->|"SQLAlchemy + psycopg"| PG
+    API -->|"S3 API (boto3)"| R2
     API -->|"HTTPS, 6s timeout"| BREVO
     API -->|"HTTPS, 5s timeout"| ANTH
 ```
@@ -86,8 +86,13 @@ terminator, without the flag, that base URL would be `http://` and browsers
 would block the images on an `https://` page — which is exactly what the
 comment at `backend/Dockerfile:41` records.
 
-**Postgres is provisioned by the blueprint**, and its connection string is
-injected as `DATABASE_URL` (`render.yaml:38-41`). Locally the same code path
+**Postgres lives on Neon**, and its connection string is entered by hand as
+`DATABASE_URL`. The blueprint used to provision a free Render Postgres, but
+Render deletes those 44 days after creation, so it no longer declares one
+(`render.yaml`, DEPLOY.md section 1.6). **Photos live in a Cloudflare R2
+bucket** when `S3_BUCKET` is set, and the API serves them at `/uploads/<name>`
+by reading the bucket, so photo URLs do not depend on where the bytes are
+(`backend/app/uploads.py`, DEPLOY.md section 1.5). Locally the same code path
 falls back to a single SQLite file (`backend/app/db.py:36`,
 `backend/app/config.py:29`). Section 5 explains why that difference matters
 more than it looks.
@@ -690,7 +695,7 @@ change.** The second file is `backend/app/migrate.py`.
 | `app/moderation_ai.py` | 165 | optional Anthropic classification layer |
 | `app/crypto.py` | 192 | AES-256-GCM for message rows |
 | `app/emailer.py` | 77 | OTP delivery via Brevo |
-| `app/uploads.py` | 75 | photo upload + static serving |
+| `app/uploads.py` | 502 | photo upload, storage (disk or S3/R2 bucket) and serving |
 | `app/pricing.py` | 84 | feature engineering shared by training and serving |
 | `app/fairprice.py` | 131 | per-room fair share for a stored listing |
 | `app/indexing.py` | 94 | CPI factor applied to model output |
@@ -889,14 +894,13 @@ app and the tests drift apart, which is the exact failure being prevented.
 
 Stated plainly, because a document that only lists strengths is not useful.
 
-1. **Uploaded photos do not survive a redeploy.** Files are written to the
-   container filesystem (`backend/app/uploads.py:71-73`,
-   `backend/app/config.py:83`). The config comment says to point `UPLOADS_DIR`
-   at a persistent disk in production — and `render.yaml` defines neither a
-   disk nor that variable. On Render's ephemeral filesystem, every deploy or
-   restart loses previously uploaded images while the listing rows keep
-   pointing at their URLs. Listings created before a deploy will show broken
-   images.
+1. **Photos depend on one environment variable.** With `S3_BUCKET` set they
+   are stored in R2 and survive deploys. Without it, `backend/app/uploads.py`
+   falls back to the container filesystem, which Render's free plan wipes on
+   every deploy and every sleep, while listing rows keep pointing at the lost
+   files. The fallback exists for local development; in production its only
+   symptom is a warning in the startup log. Photos are also served *through*
+   the API, so they are unavailable whenever the API is.
 
 2. **The schema-drift guard warns; it does not stop anything.**
    `_warn_on_drift` prints at startup and the app proceeds

@@ -919,7 +919,7 @@ const tr = {
   // hiç olmamasından kötüdür.
   "landing.privacy": "Gizlilik",
   "privacy.title": "Gizlilik ve KVKK aydınlatma metni",
-  "privacy.updated": "Son güncelleme: 10 Ağustos 2026",
+  "privacy.updated": "Son güncelleme: 9 Ekim 2026",
   "privacy.intro":
     "Bu metin, evdes.tr'yi kullandığında hangi kişisel verilerinin işlendiğini, neden işlendiğini ve bunlar üzerinde hangi haklara sahip olduğunu anlatır. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında hazırlanmıştır.",
 
@@ -949,7 +949,11 @@ const tr = {
   "privacy.shareBody":
     "Verilerin şu hizmet sağlayıcılar üzerinden işlenir ve bu sağlayıcıların sunucuları yurt dışındadır:",
   "privacy.shareRender":
-    "Render — uygulama sunucusu ve veritabanı. Hesap, profil, ilan, mesaj ve etkinlik verilerinin burada saklanır.",
+    "Render — uygulama sunucusu. Uygulamaya gönderdiğin istekler burada işlenir.",
+  "privacy.shareNeon":
+    "Neon — veritabanı. Hesap, profil, ilan, mesaj ve etkinlik verilerin burada saklanır.",
+  "privacy.shareCloudflare":
+    "Cloudflare (R2) — fotoğraf depolama. Yüklediğin profil ve ilan fotoğrafları burada saklanır.",
   "privacy.shareVercel":
     "Vercel — arayüzün dağıtımı. Sitenin sayfalarını buradan indirirsin.",
   "privacy.shareBrevo":
@@ -967,7 +971,7 @@ const tr = {
 
   "privacy.retentionTitle": "6. Saklama ve silme",
   "privacy.retentionBody":
-    "Verilerin hesabın açık kaldığı sürece saklanır. Hesabını Ayarlar > Hesap Ayarları üzerinden kendin silebilirsin; silme kalıcıdır ve şu kayıtları geri dönüşsüz kaldırır: profilin, ilanların, kaydırmaların, eşleşmelerin, eşleşmelerindeki mesajlar (karşı tarafın yazdıkları dahil), açtığın ve hakkında açılan şikâyetler, oturum anahtarların ve sunucudaki fotoğraf dosyaların.",
+    "Verilerin hesabın açık kaldığı sürece saklanır. Hesabını Ayarlar > Hesap Ayarları üzerinden kendin silebilirsin; silme kalıcıdır ve şu kayıtları geri dönüşsüz kaldırır: profilin, ilanların, kaydırmaların, eşleşmelerin, eşleşmelerindeki mesajlar (karşı tarafın yazdıkları dahil), açtığın ve hakkında açılan şikâyetler, oturum anahtarların ve depolanan fotoğraf dosyaların.",
   "privacy.retentionAudit":
     "Tek istisna yönetici denetim kaydıdır. Bir yönetici kalıcı silme veya düzenleme yaptığında bu işlem gerekçesiyle birlikte kaydedilir ve hesabın silinse bile bu kayıt durur; yalnızca kullanıcı bağlantısı koparılır. Bir ilanın metni yönetici tarafından düzenlendiyse, düzenleme öncesindeki metin bu kayıtta kalabilir. Amaç, kimin neyi neden kaldırdığının sonradan denetlenebilmesidir.",
 
@@ -1877,7 +1881,7 @@ const en: Record<TranslationKey, string> = {
   // ---- privacy / KVKK ----
   "landing.privacy": "Privacy",
   "privacy.title": "Privacy and data protection notice",
-  "privacy.updated": "Last updated: 10 August 2026",
+  "privacy.updated": "Last updated: 9 October 2026",
   "privacy.intro":
     "This notice explains which of your personal data evdes.tr processes when you use it, why, and what rights you have over it. It is written under Turkish data protection law (KVKK, law no. 6698).",
 
@@ -1907,7 +1911,11 @@ const en: Record<TranslationKey, string> = {
   "privacy.shareBody":
     "Your data is processed through the following providers, whose servers are located outside Turkey:",
   "privacy.shareRender":
-    "Render — application server and database. Your account, profile, listing, message and activity data is stored here.",
+    "Render — application server. The requests you send to the app are processed here.",
+  "privacy.shareNeon":
+    "Neon — database. Your account, profile, listing, message and activity data is stored here.",
+  "privacy.shareCloudflare":
+    "Cloudflare (R2) — photo storage. The profile and listing photos you upload are stored here.",
   "privacy.shareVercel":
     "Vercel — interface delivery. You download the site's pages from here.",
   "privacy.shareBrevo":
@@ -1925,7 +1933,7 @@ const en: Record<TranslationKey, string> = {
 
   "privacy.retentionTitle": "6. Retention and deletion",
   "privacy.retentionBody":
-    "Your data is kept for as long as your account exists. You can delete the account yourself under Settings > Account settings; deletion is permanent and irreversibly removes your profile, your listings, your swipes, your matches, the messages in those matches (including those written by the other person), reports you filed and reports filed about you, your session tokens and your photo files on the server.",
+    "Your data is kept for as long as your account exists. You can delete the account yourself under Settings > Account settings; deletion is permanent and irreversibly removes your profile, your listings, your swipes, your matches, the messages in those matches (including those written by the other person), reports you filed and reports filed about you, your session tokens and your stored photo files.",
   "privacy.retentionAudit":
     "The one exception is the administrator audit log. When an administrator permanently deletes or edits something, that action is recorded with its reason, and the record survives even if your account is deleted; only the link to the user is severed. If an administrator edited a listing's text, the text as it stood before the edit may remain in that record. The purpose is to keep who removed what, and why, auditable afterwards.",
 
