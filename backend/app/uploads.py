@@ -273,6 +273,19 @@ def bucket_available() -> bool:
     return ok
 
 
+# Açılıştaki kova sınamasının sonucu: "unchecked" | "ok" | "error".
+# /api/health bunu okur; sınamayı her istekte yeniden yapmaz (her sınama kovaya
+# ücretli bir yazma isteğidir ve uç girişsizdir).
+_bucket_check = "unchecked"
+
+
+def photo_storage_status() -> dict[str, str]:
+    """/api/health için: hangi depo kullanılıyor, kova çalışıyor mu."""
+    if bucket_settings() is None:
+        return {"photo_storage": "disk"}
+    return {"photo_storage": "bucket", "photo_bucket": _bucket_check}
+
+
 def report_photo_storage() -> None:
     """Açılışta hangi deponun kullanıldığını, kovanın da çalışıp çalışmadığını
     loga yazar.
@@ -289,7 +302,10 @@ def report_photo_storage() -> None:
         return
 
     def check() -> None:
-        if bucket_available():
+        global _bucket_check
+        ok = bucket_available()
+        _bucket_check = "ok" if ok else "error"
+        if ok:
             print(f"✅ Fotoğraf kovası çalışıyor: {settings.bucket}")
         else:
             print(f"❌ Fotoğraf kovasına yazılamıyor ({settings.bucket}) — "

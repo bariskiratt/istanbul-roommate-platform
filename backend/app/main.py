@@ -8,11 +8,13 @@ from typing import Literal
 import joblib
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.config import (
     MARKET_VALUES_CSV,
@@ -21,7 +23,7 @@ from app.config import (
 )
 from app.admin import router as admin_router
 from app.auth import router as auth_router
-from app.db import init_db
+from app.db import get_db, init_db
 from app.heatmap import (
     STATUS_STYLES,
     annotate_features,
@@ -430,8 +432,32 @@ async def index():
             "/api/matches",
             "/api/reports",
             "/api/admin",
+            "/api/health",
         ],
     }
+
+
+@app.get("/api/health")
+def health(db: Session = Depends(get_db)):
+    """Dağıtım sonrası doğrulama: veritabanı ve fotoğraf deposu çalışıyor mu?
+
+    Render'ın ücretsiz planında Shell yok; Neon ve R2 ayarlarının tuttuğunu
+    tarayıcıdan görmenin yolu bu uç (DEPLOY.md §1.5–1.6). Biri bozuksa 503
+    döner. Hata ayrıntısı DÖNMEZ (uç girişsiz); ayrıntı Logs sekmesindedir.
+
+    Çalışma süresi izleyicisi (UptimeRobot) buraya DEĞİL "/"'e bakmalı: bu uç
+    her çağrıda veritabanına gider. 5 dakikada bir çağrılırsa Neon hiç uykuya
+    geçemez ve ücretsiz plandaki aylık işlem saatini birkaç haftada bitirir.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        database = "ok"
+    except Exception as exc:  # bağlantı, kimlik, ağ — hepsi aynı sonuç
+        print(f"⚠️  /api/health: veritabanına ulaşılamadı: {exc}")
+        database = "error"
+    status = {"database": database, **uploads.photo_storage_status()}
+    healthy = database == "ok" and status.get("photo_bucket") != "error"
+    return JSONResponse(status, status_code=200 if healthy else 503)
 
 
 @app.get("/api/geojson")

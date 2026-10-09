@@ -187,7 +187,7 @@ rows). Sign in as `demo1@demo.roommatch.tr` … `demo5@…` with `Demo1234!`, us
 the password tab — those addresses receive no mail, so the code path will not
 work for them.
 
-**Tests:** `python -m pytest tests/` (backend, 415) · `npx vitest run`
+**Tests:** `python -m pytest tests/` (backend, 419) · `npx vitest run`
 (frontend, 71).
 
 ## 🚀 Deployment
