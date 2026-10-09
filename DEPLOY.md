@@ -1,16 +1,17 @@
 # Deployment
 
-Architecture: **backend → Render** (Docker + free Postgres), **frontend → Vercel**.
-The code is ready; the steps below are mostly about creating accounts and wiring
-them together.
+Architecture: **backend → Render** (Docker), **database → Neon** (free
+Postgres), **photos → Cloudflare R2**, **frontend → Vercel**. The code is ready;
+the steps below are mostly about creating accounts and wiring them together.
 
 ## 1) Backend — Render
 
 1. https://render.com → sign in with GitHub.
 2. **New → Blueprint** → pick the `istanbul-roommate-platform` repo.
    The root `render.yaml` is read automatically: it creates the `roommatch-api`
-   service and the `roommatch-db` Postgres instance. The fair-rent model is
-   trained while the Docker image builds (~5–10 min).
+   service. The fair-rent model is trained while the Docker image builds
+   (~5–10 min). The blueprint no longer creates a database — see section 1.6
+   for why.
 3. When the setup finishes, note the API address, e.g.
    `https://roommatch-api.onrender.com`.
 4. Service → Environment → set `CORS_ORIGINS` to your Vercel address
@@ -21,13 +22,22 @@ them together.
 6. Verify that `DEV_OTP` is `0` and that `ADMIN_EMAILS` holds *your* addresses —
    see section 1.3. **Do this before the frontend goes public.** Getting it
    wrong hands the moderation panel to anyone who knows an admin address.
+7. Set `DATABASE_URL` to a Neon database (section 1.6) and the four `S3_*`
+   photo storage variables (section 1.5). Without the first the API falls back
+   to a SQLite file inside the container, which is wiped like the photos are;
+   without the second every photo is lost on the next redeploy or sleep.
 
 Notes:
-- **Photos:** the free plan has no persistent disk — uploaded photos are
-  deleted on redeploy. For persistence: add a paid disk on Render and point
-  `UPLOADS_DIR` at it, or (better) integrate S3/Cloudflare R2 (next task).
+- **Photos:** the free plan has no persistent disk, and its local filesystem
+  is wiped on every redeploy *and* every time the service sleeps. Photos go to
+  a Cloudflare R2 bucket instead once the `S3_*` variables are set — section
+  1.5.
 - **Sleep mode:** a free web service sleeps after 15 min of inactivity; the
-  first request can take ~1 min.
+  first request can take ~1 min. Section 5 keeps it awake.
+- **No Shell on the free plan.** Render offers its Shell tab and one-off jobs
+  only on paid instances, so checks in this guide that say "Render Shell" need
+  a paid instance. The photo bucket and the database are verified from the
+  **Logs** tab instead (sections 1.5 and 1.6).
 - **Demo content:** you can run `python -m scripts.seed_demo` from the Render
   Shell to insert 100 demo listings.
 
@@ -226,6 +236,107 @@ Four limits worth knowing before you rely on this:
   returns 400, which puts it out of reach of the panel — leave those rows in
   the removed queue unless you have a reason not to.
 
+### 1.5) Photo storage — Cloudflare R2
+
+**Why.** Render's free plan has no persistent disk, and the container's
+filesystem is wiped on every redeploy and every time the service goes to sleep.
+Photos written there disappear and the listings that show them are left with
+broken images. With `S3_BUCKET` set, `app/uploads.py` writes photos to an
+S3-compatible bucket instead. R2's free tier (10 GB of storage, 1 million
+writes and 10 million reads a month, no egress fees) is far more than a launch
+needs.
+
+**What does not change.** Photo URLs keep their shape —
+`https://api.evdes.tr/uploads/<name>` — and the API reads the bytes from the
+bucket when a browser asks for one. So the bucket stays **private** (no public
+access, no custom domain), the frontend's Content-Security-Policy does not
+change, and the M4 hardening headers still apply.
+
+**Setup (once):**
+
+1. Cloudflare dashboard → **R2 Object Storage**. R2 needs a one-time
+   subscription checkout before the first bucket, even though usage within the
+   free tier is not charged.
+2. **Create bucket** → name `roommatch-photos`, location **Automatic**. Leave
+   **Public access** off.
+3. R2 overview → **API Tokens → Manage** → create an **Account API token** with
+   the **Object Read & Write** permission, limited to the `roommatch-photos`
+   bucket.
+4. The next screen shows three values, and the secret is shown only once:
+   - **Access Key ID**
+   - **Secret Access Key**
+   - the S3 endpoint, `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+5. Render → `roommatch-api` → **Environment** → add:
+
+   | Variable | Value |
+   |---|---|
+   | `S3_BUCKET` | `roommatch-photos` |
+   | `S3_ENDPOINT_URL` | the endpoint from step 4 |
+   | `S3_ACCESS_KEY_ID` | the Access Key ID |
+   | `S3_SECRET_ACCESS_KEY` | the Secret Access Key |
+
+   Leave `S3_REGION` unset; it defaults to `auto`, which is what R2 expects.
+   Save — Render redeploys.
+
+**Verification.** Render → `roommatch-api` → **Logs**. A few seconds after
+startup the API writes, reads back and deletes a test object, then prints one
+of:
+
+- `✅ Fotoğraf kovası çalışıyor: roommatch-photos` — done.
+- `❌ Fotoğraf kovasına yazılamıyor (...)` — the line above it carries the
+  error from R2. Usually a typo in the endpoint, a token without write access
+  or a token limited to another bucket. Uploads answer 503 until it is fixed.
+- `⚠️ Fotoğraflar konteyner diskinde` — `S3_BUCKET` is not set.
+
+Then upload a photo on the site, trigger **Manual Deploy**, and check the photo
+still loads.
+
+**Photos uploaded before the switch** lived on the container disk and are
+already gone; listings that point at them show broken images until their owners
+upload new ones.
+
+### 1.6) Database — Neon
+
+**Why not Render's free Postgres.** Render locks a free database 30 days after
+it is created and deletes it, with all its data, 14 days after that. The
+original `roommatch-db` came from the blueprint when the service went live at
+the end of July 2026; by October every endpoint that reads the database was
+failing while the ones that don't kept answering. Leaving it in `render.yaml`
+would only make every blueprint sync create another database that expires the
+same way, so the blueprint no longer declares one.
+
+**Neon's free plan** does not expire: 1 GB of storage, 100 compute-hours a
+month, and the database suspends after 5 idle minutes. The first query after
+that wakes it in well under a second, and the engine's `pool_pre_ping`
+(`backend/app/db.py`) quietly replaces connections the suspension closed.
+
+**Setup (once):**
+
+1. Sign up at <https://neon.tech> and create a project. Pick the AWS region
+   nearest the Render service (the service page in Render shows its region; a
+   blueprint without a `region` lands in Oregon, which is AWS **US West 2**).
+   A database on another continent from the API adds that round trip to every
+   query.
+2. Project dashboard → **Connect** → copy the connection string with
+   **connection pooling turned off** (the direct one, without `-pooler` in the
+   host name). It looks like
+   `postgresql://<user>:<password>@ep-....aws.neon.tech/neondb?sslmode=require`.
+3. Render → `roommatch-api` → **Environment** → set `DATABASE_URL` to that
+   string. If the variable is still linked to `roommatch-db`, delete it and add
+   it again as a plain value. Save — Render redeploys.
+
+**Verification.** The tables are created on startup (`init_db` in
+`backend/app/db.py`), so a fresh database needs no manual step. In **Logs**,
+`Application startup complete.` means the API reached the database; then
+`https://api.evdes.tr/api/listings` should answer `[]` instead of an error.
+Sign up once to confirm writes work. Demo listings are optional
+(`python -m scripts.seed_demo` needs Shell, see the notes in section 1).
+
+**The old database.** If `roommatch-db` still appears in Render, delete it once
+the API runs on Neon. Its data can only be read again by upgrading it to a paid
+plan first; before launch that is test data, so a fresh start is the simpler
+choice.
+
 ## 2) Frontend — Vercel
 
 1. https://vercel.com → sign in with GitHub → **Add New → Project** → pick the repo.
@@ -246,6 +357,10 @@ Four limits worth knowing before you rely on this:
 - [ ] **`DEV_OTP=0` verified** — `/auth/request-otp` returns no `dev_code`
       field on the deployed API (section 1.3)
 - [ ] `ADMIN_EMAILS` is set to your own addresses, not the repo defaults
+- [ ] `DATABASE_URL` points at Neon and `/api/listings` answers `[]` or a list,
+      not an error (section 1.6)
+- [ ] Logs show `✅ Fotoğraf kovası çalışıyor` after a deploy (section 1.5)
+- [ ] A photo uploaded before a redeploy still loads after it
 - [ ] `/admin` returns 403 for a normal account and loads for an admin one
 
 ## 4) Known gaps before launch
@@ -253,7 +368,8 @@ Four limits worth knowing before you rely on this:
 | Topic | Status |
 |---|---|
 | OTP email | Brevo integration is ready (`app/emailer.py`). To activate: create a Brevo account → verify your sender address → get an API key → set on Render: `BREVO_API_KEY`, `EMAIL_FROM`. Until those are set, OTP sign-in returns 502 on a correctly configured deployment (`DEV_OTP=0`) — do **not** "fix" that by setting `DEV_OTP=1` on a public deployment, see section 1.3. |
-| Photo storage | Local disk; persistent storage (R2/S3) is needed. |
+| Photo storage | Cloudflare R2 once the `S3_*` variables are set (section 1.5). Without them, the container disk, which loses every photo on redeploy and on sleep. Photos are served through the API, so they load only while it is awake. |
+| Database | Neon free (section 1.6): 1 GB, 100 compute-hours a month, 6 hours of restore history. Usage is on the Neon dashboard; an app with people chatting all day will outgrow the compute hours before the storage. |
 | Rate limiting | Auth endpoints are limited to 5 requests per 15 min per email, but the counter lives **in process memory**: it resets on restart and is not shared between instances. Other endpoints are unlimited. |
 | Message encryption | At rest only, and only while `MESSAGE_KEY` is set correctly (section 1.1). Not end-to-end. |
 | Moderation | Rule-based and therefore bypassable; the AI layer is optional and off by default. Reports and flagged content are reviewed by hand in the admin panel (section 1.4) by accounts listed in `ADMIN_EMAILS` — no automatic enforcement, and no appeal flow for the person acted on. Every removal has an undo, within the limits in section 1.4. Undoing keeps no history: reopening a report or lifting a suspension clears the reverted decision rather than recording it. |
@@ -303,7 +419,7 @@ already delivering 10% of the requested schedule.
 
 | Variable | Default | What it does / what happens if unset |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection (Render supplies it automatically). Unset → local SQLite file. |
+| `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection — the Neon connection string (section 1.6), entered by hand. Unset → a SQLite file inside the container, which is wiped on redeploy and sleep. |
 | `CORS_ORIGINS` | localhost list | Comma-separated allowed origins. Unset → only localhost may call the API, so the deployed frontend gets CORS errors. |
 | `DEV_OTP` | `1` in code, **`0` from `render.yaml`** | `1`: the sign-in code is returned in the API response (`dev_code`) — development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. The unsafe value is the code-level default, so never leave this variable unset on a public deployment. See section 1.3. |
 | `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → **messages are stored in plain text** and only a log warning is printed. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
@@ -312,6 +428,10 @@ already delivering 10% of the requested schedule.
 | `EMAIL_FROM` | — | Sender address verified in Brevo. Email sending requires both this and `BREVO_API_KEY`. |
 | `EMAIL_FROM_NAME` | `evdes.tr` | Display name on outgoing OTP emails. Unset → the default name is used; nothing breaks. |
 | `ADMIN_EMAILS` | two project addresses | Comma-separated admin accounts. Membership in this list *is* the authorization check for the whole moderation panel — report queue, flagged private message text, user suspension, listing takedown (section 1.4). Unset → the defaults written in `config.py` stay in effect, so always set it explicitly for your own deployment. |
-| `UPLOADS_DIR` | `data/uploads` | Directory photos are written to. Unset → a path inside the container, i.e. photos are lost on redeploy. |
+| `S3_BUCKET` | — | Photo bucket name (section 1.5). Set → photos are stored in the bucket. Unset → photos are written to `UPLOADS_DIR` and lost on redeploy and sleep. |
+| `S3_ENDPOINT_URL` | — | S3 API endpoint. For R2: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Unset → AWS S3. |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | — | The bucket's API token. Wrong or missing → uploads answer 503 and the startup log says so. |
+| `S3_REGION` | `auto` | Leave unset for R2. Set it only for AWS S3. |
+| `UPLOADS_DIR` | `data/uploads` | Directory photos are written to while `S3_BUCKET` is unset — local development. On Render's free plan this is inside the container, i.e. photos are lost on redeploy and sleep. |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |

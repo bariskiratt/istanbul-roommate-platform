@@ -25,10 +25,10 @@ section 11.
 |---|---|---|
 | Student identity (name, university, department, year) | `users` table, `backend/app/models.py:24` | Social engineering, targeting a specific person |
 | Private chat messages | `messages.content`, encrypted at rest (`backend/app/models.py:234`) | Rental-deposit scams, harassment, doxxing |
-| Uploaded photos (faces, apartments) | `data/uploads/`, served publicly at `/uploads` (`backend/app/main.py:158`) | Re-identification, harassment, reuse in fake listings |
+| Uploaded photos (faces, apartments) | Cloudflare R2 bucket (private), served publicly by the API at `/uploads/<name>` (`serve_photo`, `backend/app/uploads.py`) | Re-identification, harassment, reuse in fake listings |
 | Session tokens | `auth_tokens.token_hash` (`backend/app/models.py:89`) | Account takeover |
 | Admin capability | Derived purely from email membership (`backend/app/models.py:83`) | Full moderation control: read flagged private messages, permanently delete accounts |
-| Service availability | Render free tier, single container, free Postgres | Extortion, sabotage, or simple vandalism |
+| Service availability | Render free tier, single container, Neon free Postgres | Extortion, sabotage, or simple vandalism |
 
 ---
 
@@ -128,7 +128,7 @@ flowchart LR
 
     subgraph data["Data at rest"]
         PG[("Postgres<br/>messages encrypted<br/>AES-256-GCM")]
-        DISK[["Ephemeral disk<br/>photo files"]]
+        DISK[["Cloudflare R2 bucket<br/>photo files"]]
     end
 
     subgraph third["Third parties"]
@@ -575,7 +575,15 @@ This is disclosed to users. The Safety page states that while the layer is on,
 for classification" (`frontend/src/i18n/translations.ts:1534`, TR at `:662`).
 That is an unusually honest piece of product copy and it matches the code.
 
-### 8.3 What is not disclosed
+### 8.3 Storage providers
+
+Since October 2026 the database runs on Neon and uploaded photos are stored in
+a private Cloudflare R2 bucket (DEPLOY.md sections 1.5 and 1.6). Both hold user
+data at rest outside Turkey and are named in the privacy notice (`/privacy`,
+section 4). The R2 token in `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` is
+scoped to the one bucket; anyone holding it can read and delete every photo.
+
+### 8.4 What is not disclosed
 
 There is no privacy notice and no `/privacy` route. Brevo (email processing) and
 Render (database hosting, outside Turkey) appear in no user-facing text. Under
@@ -1137,9 +1145,11 @@ are findings; they are the boundaries of the current design.
    messages. The only recovery is an operator's manual backup of the value.
 5. **Rate limiting is per-process and in-memory.** It resets on restart and does
    not work correctly under more than one worker.
-6. **Uploads are ephemeral and public.** The Render free plan has no persistent
-   disk, so photos vanish on redeploy (`DEPLOY.md`) — and, per H6, do *not*
-   vanish on account deletion. Files are served with no authorization
+6. **Uploads are public, and durable only with a bucket.** With `S3_BUCKET`
+   set, photos live in R2 and survive redeploys; without it they fall back to
+   the container disk, which the Render free plan wipes (`DEPLOY.md` §1.5). Per
+   H6 they used *not* to vanish on account deletion; account and listing
+   deletion now remove them from whichever store is in use. Files are served with no authorization
    (`backend/app/main.py:158`).
 7. **Listing deletion is deactivation, not deletion.** `DELETE
    /api/listings/{id}` sets `is_active=False` and the row stays

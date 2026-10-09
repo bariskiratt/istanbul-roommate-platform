@@ -187,23 +187,24 @@ rows). Sign in as `demo1@demo.roommatch.tr` … `demo5@…` with `Demo1234!`, us
 the password tab — those addresses receive no mail, so the code path will not
 work for them.
 
-**Tests:** `python -m pytest tests/` (backend, 402) · `npx vitest run`
+**Tests:** `python -m pytest tests/` (backend, 413) · `npx vitest run`
 (frontend, 71).
 
 ## 🚀 Deployment
 
 See [DEPLOY.md](DEPLOY.md). Short version: Render builds `backend/Dockerfile`
-(the model is trained during the image build) with a free Postgres via the
-root `render.yaml` blueprint; Vercel serves `frontend/` with `VITE_API_URL`
-pointing at the API. An external uptime monitor pings `https://api.evdes.tr/`
+(the model is trained during the image build) from the root `render.yaml`
+blueprint, against a free Neon Postgres, with uploaded photos in a Cloudflare
+R2 bucket; Vercel serves `frontend/` with `VITE_API_URL` pointing at the API. An external uptime monitor pings `https://api.evdes.tr/`
 every 5 minutes to keep the free instance awake — see DEPLOY.md for why this is
 not a GitHub Actions cron.
 
 Backend environment variables: `DATABASE_URL`, `CORS_ORIGINS`, `DEV_OTP`,
 `MESSAGE_KEY`, `OTP_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY_HEADERS`,
 `ANTHROPIC_API_KEY`, `BREVO_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`,
-`ADMIN_EMAILS`, `UPLOADS_DIR`, `RENT_INDEX_FACTOR`, `MAX_REQUEST_BYTES`,
-`EXTRA_PHOTO_HOSTS`. DEPLOY.md explains what each one does and what happens
+`ADMIN_EMAILS`, `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, `S3_REGION`, `UPLOADS_DIR`, `RENT_INDEX_FACTOR`,
+`MAX_REQUEST_BYTES`, `EXTRA_PHOTO_HOSTS`. DEPLOY.md explains what each one does and what happens
 when it is missing. Several fail *quietly* rather than loudly, which is the
 dangerous kind:
 
@@ -223,6 +224,9 @@ dangerous kind:
   front, the header is client-controlled and the limits are just as useless.
 - `PUBLIC_BASE_URL` — the base for uploaded-photo URLs. Unset, it falls back to
   the request's `Host` header, which the client chooses.
+- `S3_BUCKET` — unset, photos are written to the container disk, which Render's
+  free plan wipes on every redeploy and every sleep. The app keeps running and
+  only the startup log says so (DEPLOY.md section 1.5).
 
 ## ⚠️ Limitations
 
@@ -231,10 +235,9 @@ dangerous kind:
   the data. Indexing forward tracks inflation, not micro-market shifts, and the
   multiplier itself is an estimate within published bounds (see `app/indexing.py`).
 - Transit graph covers rail only (no metrobus/bus/ferry).
-- Uploaded photos live on the container's local disk, which Render's free plan
-  does not persist: **every redeploy deletes them**, and listings that referenced
-  them are left with broken images. Moving to S3/R2 is the next infrastructure
-  task. Photos are also public — the URL is unguessable but needs no session.
+- Uploaded photos live in a Cloudflare R2 bucket and are served through the API
+  at `/uploads/<name>`, so they load only while the API is up. Photos are
+  public — the URL is unguessable but needs no session.
 - Rate limits are kept in process memory, so they reset on restart and are not
   shared across instances; with more than one worker the real ceiling is the
   configured limit times the worker count. Photo upload has no per-user quota of
