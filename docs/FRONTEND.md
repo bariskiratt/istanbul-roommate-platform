@@ -49,7 +49,7 @@ Versions are from `frontend/package.json`.
 | Tailwind CSS | 3.4.17 | Utility-first styling driven by CSS variables. See §4. |
 | shadcn/ui | (vendored) | Not an npm dependency — the components are copied into `src/components/ui/`. See §4.3. |
 | TanStack Query | 5.83.0 | Server-state cache: fetching, caching, invalidation. See §5. |
-| React Router | 6.30.1 | Client-side routing. See §6. |
+| React Router | 6.30.6 | Client-side routing. See §6. |
 | framer-motion | 12.34.3 | Gesture handling and transitions — the swipe deck is a real drag gesture, not a CSS animation (`src/pages/SwipeScreen.tsx:453-476`). |
 | Leaflet | 1.9.4 | Map rendering for the budget heatmap (`src/pages/Explore.tsx`). |
 | next-themes | 0.3.0 | Light/dark/system theme, persisted, applied as a class on `<html>` (`src/App.tsx:31`). |

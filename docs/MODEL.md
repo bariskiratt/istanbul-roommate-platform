@@ -363,11 +363,13 @@ production.** Four independent facts establish this:
 
 3. **It is a dev-only dependency.** `backend/requirements-dev.txt:5-6` lists
    `xgboost>=2.0` under the comment "Model eğitimi (scripts/train_model.py — CV
-   karşılaştırması)". `backend/requirements.txt` does **not** contain it — it
-   only notes at lines 17-19 that xgboost lives in the dev file. Runtime pulls in
-   `lightgbm`, `joblib` and `scikit-learn` (`requirements.txt:15-20`); scikit-learn
-   is required not for prediction but because `LGBMRegressor` subclasses
-   sklearn's `BaseEstimator` and joblib needs the class available to unpickle.
+   karşılaştırması)". `backend/requirements.in`, the runtime list that
+   `requirements.txt` is locked from, does **not** contain it — it only notes
+   at lines 29-31 that xgboost lives in the dev file, and the lock has no
+   xgboost either. Runtime pulls in `lightgbm`, `joblib` and `scikit-learn`
+   (`requirements.in:26-32`); scikit-learn is required not for prediction but
+   because `LGBMRegressor` subclasses sklearn's `BaseEstimator` and joblib
+   needs the class available to unpickle.
 
 4. **The production build never runs that code path.**
    `backend/Dockerfile:36` runs `python -m scripts.train_model --fast`, and

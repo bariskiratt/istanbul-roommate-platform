@@ -132,12 +132,12 @@ to keep all moderation local.
 > suspending users and taking listings down. If the address is not registered
 > yet, the attacker simply registers it first and then verifies it the same way.
 
-Why this is called out separately: the application default in
-`backend/app/auth.py` is `DEV_OTP=1` (development convenience), so **forgetting
-the variable is the unsafe outcome, not the safe one**. `render.yaml` therefore
+Why this is called out separately: one wrong value opens the admin panel to
+anyone. The code default in `backend/app/auth.py` is off (`"0"`); it used to be
+`"1"`, when forgetting the variable was the unsafe outcome. `render.yaml` still
 pins `DEV_OTP` to `"0"` explicitly instead of leaving it to be filled in from
-the dashboard, so a clean blueprint deploy starts closed. Do not weaken that
-back to a dashboard-managed value.
+the dashboard, so a clean blueprint deploy starts closed whatever the code
+default is. Do not weaken that back to a dashboard-managed value.
 
 Two consequences of `DEV_OTP=0` to expect:
 
@@ -419,7 +419,7 @@ database on every call, so a 5-minute check would keep Neon from ever
 suspending and use up its monthly compute hours.
 
 `GET /` is the right target: it returns a static dict with no database access
-and answers `HEAD` as well (`backend/app/main.py:415-435`), so a 5-minute check
+and answers `HEAD` as well (`backend/app/main.py:437-462`), so a 5-minute check
 costs nothing.
 
 ### Why not GitHub Actions
@@ -449,7 +449,7 @@ already delivering 10% of the requested schedule.
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection — the Neon connection string (section 1.6), entered by hand. Unset → a SQLite file inside the container, which is wiped on redeploy and sleep. |
 | `CORS_ORIGINS` | localhost list | Comma-separated allowed origins. Unset → only localhost may call the API, so the deployed frontend gets CORS errors. |
-| `DEV_OTP` | `1` in code, **`0` from `render.yaml`** | `1`: the sign-in code is returned in the API response (`dev_code`) — development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. The unsafe value is the code-level default, so never leave this variable unset on a public deployment. See section 1.3. |
+| `DEV_OTP` | `0` (also pinned by `render.yaml`) | `1`: the sign-in code is returned in the API response (`dev_code`) — local development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. Unset is safe. See section 1.3. |
 | `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → **messages are stored in plain text** and only a log warning is printed. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
 | `ANTHROPIC_API_KEY` | — | Enables the optional AI moderation layer. Unset → rule-based moderation only (still fully functional). Set → the full text of every listing and message is sent to `api.anthropic.com`, which must be disclosed to users. |
 | `BREVO_API_KEY` | — | Brevo API key (real OTP emails). Unset → no email is sent; only dev-mode OTP works. |
@@ -464,4 +464,4 @@ already delivering 10% of the requested schedule.
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
-| `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
+| `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
