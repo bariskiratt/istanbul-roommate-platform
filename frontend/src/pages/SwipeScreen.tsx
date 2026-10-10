@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   fetchListings,
@@ -140,6 +141,7 @@ const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
 
 const SwipeScreen = () => {
   const { isLoggedIn, user: me } = useAuth();
+  const navigate = useNavigate();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [cards, setCards] = useState<DeckListing[]>([]);
@@ -312,10 +314,21 @@ const SwipeScreen = () => {
             <p className="text-muted-foreground text-sm max-w-[260px] mx-auto">
               {t(activeFilters ? "swipe.emptyFiltered" : "swipe.emptyAll")}
             </p>
-            {activeFilters && (
+            {activeFilters ? (
               <Button variant="outline" onClick={() => setActiveFilters(null)}>
                 {t("swipe.clearFilters")}
               </Button>
+            ) : (
+              // Yayının ilk günlerinde deste çoğu zaman boş olacak; öğrenci
+              // burada takılı kalmasın, ilan vermeye ya da haritaya geçsin.
+              <div className="flex flex-col items-center gap-2 pt-2">
+                <Button onClick={() => navigate(isLoggedIn ? "/create-listing" : "/onboarding")}>
+                  {t("swipe.emptyCreate")}
+                </Button>
+                <Button variant="ghost" onClick={() => navigate("/explore")}>
+                  {t("swipe.emptyMap")}
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -349,10 +362,10 @@ const SwipeScreen = () => {
 
       {cards.length > 0 && (
         <div className="flex items-center justify-center gap-8 py-4">
-          <button onClick={() => handleSwipe("left")} className="btn-swipe-pass w-[60px] h-[60px] flex items-center justify-center">
+          <button onClick={() => handleSwipe("left")} aria-label={t("likes.pass")} className="btn-swipe-pass w-[60px] h-[60px] flex items-center justify-center">
             <X className="w-7 h-7" />
           </button>
-          <button onClick={() => handleSwipe("right")} className="btn-swipe-like w-[60px] h-[60px] flex items-center justify-center">
+          <button onClick={() => handleSwipe("right")} aria-label={t("swipe.likeLabel")} className="btn-swipe-like w-[60px] h-[60px] flex items-center justify-center">
             <Heart className="w-7 h-7" />
           </button>
         </div>

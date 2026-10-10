@@ -218,7 +218,9 @@ const CreateListing = () => {
         title: t("create.successTitle"),
         description: t("create.successDesc", { title }),
       });
-      navigate("/listings");
+      // /listings yalnızca yöneticiye açık; öğrenci orada "Bu sayfa şu an
+      // kapalı" görüyordu. Yeni ilanı "İlanlarım" sekmesinde gösteriyoruz.
+      navigate("/profile", { state: { tab: "listings" } });
     } catch (err) {
       const apiError = err instanceof ApiError ? err : null;
       // Denetim reddi alan bazlı gelir ve gerekçe kodları taşır; Pydantic

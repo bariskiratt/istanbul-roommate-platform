@@ -10,6 +10,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // Alttaki tam genişlik "Devam" / "Gönder" düğmelerinin üstüne binmesin
+      // (mobilde 30 sn kalan doğrulama kodu bildirimi düğmeyi kapatıyordu).
+      position="top-center"
       toastOptions={{
         classNames: {
           toast:

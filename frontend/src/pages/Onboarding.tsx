@@ -326,7 +326,7 @@ const Onboarding = () => {
           {/* Step 1: OTP */}
           {currentStep === 1 && (
             <div className="space-y-6">
-              <div className="flex gap-3 justify-center">
+              <div className="flex gap-2 sm:gap-3 justify-center">
                 {otp.map((digit, i) => (
                   <Input
                     key={i}
@@ -336,7 +336,7 @@ const Onboarding = () => {
                     value={digit}
                     onChange={e => handleOtpChange(i, e.target.value)}
                     onKeyDown={e => handleOtpKeyDown(i, e)}
-                    className="w-14 h-14 text-center text-2xl font-bold rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
+                    className="w-11 sm:w-14 h-14 px-0 text-center text-2xl font-bold rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
                   />
                 ))}
               </div>
