@@ -19,9 +19,8 @@ from app.auth import get_current_user, get_optional_user
 from app.db import get_db
 from app.uploads import (
     MAX_PHOTO_URL_LENGTH,
-    delete_local_photos,
+    delete_unused_photos,
     is_allowed_photo_url,
-    local_photo_name,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
@@ -169,35 +168,6 @@ def flag_state(result: moderation.ModerationResult) -> tuple[bool, str | None]:
     return True, ",".join(result.reasons)
 
 
-def _photos_in_use_elsewhere(db: Session, listing_id: int) -> set[str]:
-    """Başka kayıtların kullandığı yerel fotoğraf DOSYA ADLARI.
-
-    Aynı dosya birden fazla yerde geçebilir: kullanıcı fotoğrafını hem
-    profiline hem ilanına koyabilir ya da iki ilanında aynı görseli
-    kullanabilir. Silinen ilan yüzünden hâlâ kullanılan bir dosyayı silmek
-    başka bir ilanı kırık görselle bırakırdı.
-
-    Karşılaştırma DOSYA ADI üzerinden yapılır, URL metni üzerinden değil:
-    aynı dosya bir kayıtta göreli ("/uploads/ab..jpg"), diğerinde mutlak
-    adresle durabilir.
-    """
-    used: set[str] = set()
-    others = db.scalars(
-        select(models.Listing.photos).where(models.Listing.id != listing_id)
-    ).all()
-    for photos in others:
-        for url in photos or []:
-            name = local_photo_name(url) if isinstance(url, str) else None
-            if name:
-                used.add(name)
-    for photos in db.scalars(select(models.User.photos)).all():
-        for url in photos or []:
-            name = local_photo_name(url) if isinstance(url, str) else None
-            if name:
-                used.add(name)
-    return used
-
-
 def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
     """İlanı KALICI siler ve ona bağlı kayıtları temizler. COMMIT ETMEZ.
 
@@ -221,9 +191,9 @@ def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
     FOTOĞRAF DOSYALARI da silinir (bulgu H6): satır gidip dosya kalırsa
     /uploads/<ad> adresi girişsiz ve süresiz erişilebilir olmaya devam eder.
     Yalnızca BİZİM ürettiğimiz ve BAŞKA HİÇBİR kayıtta kullanılmayan dosyalar
-    silinir. Dosya silme geri alınamaz; çağıran taraf işlemi geri sararsa
-    (rollback) satır geri gelir ama görseller gelmez — bu uç zaten "kalıcı
-    silme" ucudur, çağrıldığı yerde commit ediliyor.
+    silinir (uploads.delete_unused_photos). Silme geri alınamaz: işlem geri
+    sarılırsa (rollback) satır döner ama görseller dönmez — bu uç zaten
+    "kalıcı silme" ucudur, çağrıldığı yerde commit ediliyor.
     """
     lid = row.id
     swipes = db.query(models.Swipe).filter(
@@ -241,13 +211,7 @@ def purge_listing(db: Session, row: models.Listing) -> dict[str, int]:
     db.delete(row)
     db.flush()
 
-    in_use = _photos_in_use_elsewhere(db, lid)
-    orphans = [
-        url
-        for url in photos
-        if isinstance(url, str) and (local_photo_name(url) or "") not in in_use
-    ]
-    deleted_photos = delete_local_photos(orphans)
+    deleted_photos = delete_unused_photos(db, photos)
 
     return {
         "swipes": swipes,

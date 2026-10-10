@@ -17,10 +17,13 @@ URL iki depoda da AYNIDIR (api.evdes.tr/uploads/<ad>); fotoğraf baytları
 kovadan bu sunucu üzerinden geçer. Böylece depo değişince ne veritabanındaki
 adresler ne de arayüzün CSP'si (img-src) değişmek zorunda kalır.
 
-Bu modül ayrıca iki ORTAK yardımcıyı barındırır (diğer uçlar buradan çağırır):
+Bu modül ayrıca ORTAK yardımcıları barındırır (diğer uçlar buradan çağırır):
 
-  is_allowed_photo_url(url) -> bool   hangi fotoğraf adresleri kabul edilir
-  delete_local_photos(urls) -> int    bizim ürettiğimiz dosyaları depodan siler
+  is_allowed_photo_url(url) -> bool       hangi fotoğraf adresleri kabul edilir
+  delete_local_photos(urls) -> int        bizim ürettiğimiz dosyaları depodan siler
+  delete_unused_photos(db, urls) -> int   aynısı, ama hâlâ bir satırda geçen
+                                          dosyaya dokunmadan (silme uçları bunu
+                                          kullanır)
 
 ("local" burada "diskte" değil "BİZİM ürettiğimiz" demektir; kova kullanılırken
 de aynı isimler geçerlidir.)
@@ -46,6 +49,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app import content_limits, models
 from app.auth import get_current_user
@@ -383,8 +388,8 @@ def delete_local_photos(urls: list[str]) -> int:
     "hesabın tamamen silinir" sözü tutulmuyordu (bulgu H6).
 
     Bu fonksiyon VERİTABANINA BAKMAZ: bir dosyanın başka bir kayıtta hâlâ
-    kullanılıp kullanılmadığını ÇAĞIRAN taraf kontrol etmelidir
-    (bkz. listings.purge_listing).
+    kullanılıp kullanılmadığını kontrol eden sarmalayıcı
+    delete_unused_photos'tur; silme uçları onu çağırır.
 
     Hata FIRLATMAZ: çağıranlar hesap ve ilan silme uçlarıdır; kovaya o an
     ulaşılamıyor diye silme işleminin kendisi 500 vermemeli. Silinemeyen
@@ -425,6 +430,46 @@ def delete_local_photos(urls: list[str]) -> int:
             continue
         deleted += 1
     return deleted
+
+
+def photo_names_in_use(db: Session) -> set[str]:
+    """Bir ilanda ya da bir profilde HÂLÂ geçen yerel fotoğraf DOSYA ADLARI.
+
+    Aynı dosya birden fazla yerde geçebilir: kullanıcı fotoğrafını hem
+    profiline hem ilanına koyabilir, iki ilanında aynı görseli kullanabilir
+    ya da başka bir hesap bir fotoğrafın adresini kopyalayıp kendi profiline
+    yazabilir (/uploads/ adresi izin listesinden geçer).
+
+    Karşılaştırma DOSYA ADI üzerinden yapılır, URL metni üzerinden değil:
+    aynı dosya bir kayıtta göreli ("/uploads/ab..jpg"), diğerinde mutlak
+    adresle durabilir.
+    """
+    used: set[str] = set()
+    for column in (models.Listing.photos, models.User.photos):
+        for photos in db.scalars(select(column)).all():
+            for url in photos or []:
+                name = local_photo_name(url)
+                if name:
+                    used.add(name)
+    return used
+
+
+def delete_unused_photos(db: Session, urls: list[str]) -> int:
+    """urls içinden artık HİÇBİR satırın kullanmadığı dosyaları siler.
+
+    Silinen satırları gösteren fotoğraflar için tek giriş noktası: ilan
+    silme (listings.purge_listing) ve hesap silme (auth.purge_user) buradan
+    geçer. Çağıran, satırları ÖNCE silip flush etmiş olmalı; kalan
+    satırlarda geçen dosyaya dokunulmaz.
+
+    Eskiden bu kontrol yalnızca ilan silmede vardı. Hesap silme, profilde ve
+    ilanlarda geçen HER dosyayı siliyordu: B hesabı A'nın fotoğraf adresini
+    kendi profiline yazıp hesabını silince A'nın fotoğrafı 404 veriyordu.
+    Yani herkes başkasının fotoğrafını silebiliyordu (SECURITY.md H6).
+    """
+    in_use = photo_names_in_use(db)
+    orphans = [url for url in urls if (local_photo_name(url) or "") not in in_use]
+    return delete_local_photos(orphans)
 
 
 @router.post("", status_code=201)

@@ -37,6 +37,19 @@ def _allow_fixture_photo_host(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _dev_otp(monkeypatch):
+    """Testler doğrulama kodunu yanıttaki dev_code alanından okur.
+
+    Kodun varsayılanı kapalı (DEV_OTP="0"), bu yüzden testler modu açıkça
+    açar; varsayılanı sınayan test değişkeni kendisi siler. E-posta
+    anahtarı da silinir: geliştiricinin kabuğunda tanımlıysa testler
+    gerçek e-posta göndermesin.
+    """
+    monkeypatch.setenv("DEV_OTP", "1")
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _disable_moderation_ai(monkeypatch):
     """İçerik denetiminin yapay zeka katmanı testlerde kapalı kalsın.
 

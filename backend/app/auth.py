@@ -1,8 +1,8 @@
 """Kimlik doğrulama: e-posta + şifre ile kayıt, OTP ile doğrulama/giriş.
 
-E-posta servisi henüz bağlı değil; OTP kodu geliştirme kolaylığı için API
-yanıtında `dev_code` alanında döner. Yayına çıkarken SMTP bağlanmalı ve
-DEV_OTP=0 yapılmalı.
+OTP kodu e-postayla (Brevo, app/emailer.py) gider. Yerel geliştirmede
+DEV_OTP=1 verilirse kod API yanıtında `dev_code` alanında da döner; bu mod
+varsayılan olarak KAPALIDIR ve yayında kapalı kalmalıdır.
 
 Token: opak rastgele dize; veritabanında yalnızca SHA-256 hash'i durur.
 İstemci `Authorization: Bearer <token>` başlığıyla gönderir.
@@ -342,7 +342,14 @@ def _issue_otp(user: models.User) -> str:
 
 
 def _dev_otp_enabled() -> bool:
-    return os.getenv("DEV_OTP", "1") == "1"
+    """DEV_OTP=1 iken doğrulama kodu API yanıtında (`dev_code`) da döner.
+
+    Varsayılan KAPALI. Eskiden "1"di: değişkeni tanımlamadan kurulan bir
+    dağıtımda herkes ADMIN_EMAILS'teki bir adresle kod isteyip şifresiz
+    yönetici olabiliyordu (SECURITY.md L6). Yerel geliştirmede açıkça
+    DEV_OTP=1 verilir (backend/README.md).
+    """
+    return os.getenv("DEV_OTP", "0") == "1"
 
 
 def _deliver_otp(email: str, code: str) -> dict:
@@ -510,6 +517,9 @@ MAX_PHOTO_URL_LENGTH = 500
 DistrictName = Annotated[
     str, StringConstraints(strip_whitespace=True, max_length=MAX_DISTRICT_LENGTH)
 ]
+# Adresin kendisi (izin listesi) şemada değil update_me'de denetlenir
+# (_check_profile_photos): profilde zaten duran adresleri ayırmak için
+# kullanıcının mevcut satırına bakmak gerekiyor.
 PhotoUrl = Annotated[
     str, StringConstraints(strip_whitespace=True, max_length=MAX_PHOTO_URL_LENGTH)
 ]
@@ -822,6 +832,35 @@ def me(user: models.User = Depends(get_current_user)):
     return user
 
 
+def _check_profile_photos(photos: list[str], current: list[str] | None) -> None:
+    """Profil fotoğrafı da ilan fotoğrafıyla aynı izin listesinden geçer (M4).
+
+    Eskiden yalnızca UZUNLUĞU denetleniyordu: profile herhangi bir https
+    adresi yazılabiliyordu ve profili açan herkesin tarayıcısı o sunucuya
+    istek atardı (izleme pikseli). Sitenin CSP'si (img-src) bunu tarayıcıda
+    engelliyor; bu kontrol aynı kuralı sunucuda da uygular.
+
+    Profilde ZATEN duran adresler geçer: arayüz her kayıtta fotoğraf
+    listesinin tamamını yolluyor ve kuraldan önce kaydedilmiş tek bir adres
+    yüzünden kullanıcı profilini hiç düzenleyemez hâle gelmemeli. Böyle bir
+    adres kaldırılabilir, yenisi eklenemez.
+
+    İMPORT NEDEN FONKSİYON İÇİNDE: app.uploads, app.auth'u import ediyor.
+    """
+    from app.uploads import is_allowed_photo_url
+
+    existing = set(current or [])
+    for url in photos:
+        if url not in existing and not is_allowed_photo_url(url):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Fotoğraf adresi kabul edilmiyor: yalnızca uygulamaya "
+                    "yüklenen fotoğraflar ve izin verilen barındırıcılar geçerli."
+                ),
+            )
+
+
 @router.patch("/me", response_model=UserOut)
 def update_me(
     payload: UserUpdate,
@@ -829,6 +868,8 @@ def update_me(
     db: Session = Depends(get_db),
 ):
     updates = payload.model_dump(exclude_unset=True)
+    if updates.get("photos"):
+        _check_profile_photos(updates["photos"], user.photos)
     # Tek alan güncellense bile tutarlılık mevcut değerle birlikte denetlenir
     eff_min = updates.get("budget_min", user.budget_min)
     eff_max = updates.get("budget_max", user.budget_max)
@@ -897,27 +938,30 @@ def _nullable_user_fk_columns() -> list:
     ]
 
 
-def _delete_photo_files(urls: list[str]) -> int:
-    """Kullanıcının yüklediği fotoğraf DOSYALARINI diskten siler.
+def _delete_photo_files(db: Session, urls: list[str]) -> int:
+    """Kullanıcının fotoğraf DOSYALARINI depodan siler.
 
-    İşi app.uploads.delete_local_photos yapar; burada yalnızca çağrılır (o
-    modül yalnızca UPLOADS_DIR içinde kalan ve BİZİM ürettiğimiz ad desenine
-    uyan yolları siler, dış URL'leri atlar, yol geçişine kapalıdır).
+    İşi app.uploads.delete_unused_photos yapar; burada yalnızca çağrılır.
+    O fonksiyon yalnızca BİZİM ürettiğimiz ad desenine uyan dosyaları siler,
+    dış URL'leri atlar, yol geçişine kapalıdır ve kalan satırlardan birinde
+    HÂLÂ geçen dosyaya dokunmaz. Sonuncusu önemli: eskiden burada o kontrol
+    yoktu ve bir hesap, başka bir hesabın fotoğraf adresini kendi profiline
+    yazıp kendini silerek o fotoğrafı silebiliyordu (SECURITY.md H6).
 
     İMPORT NEDEN FONKSİYON İÇİNDE: app.uploads, app.auth'tan get_current_user
     alıyor. Modül seviyesinde import etmek döngü kurar.
 
-    delete_local_photos yoksa sessizce 0 döner. Bu, hesap silmenin bir
+    delete_unused_photos yoksa sessizce 0 döner. Bu, hesap silmenin bir
     yardımcı fonksiyon eksikliği yüzünden 500 vermemesi içindir — dosya
     temizliği önemli ama hesabın silinmesi DAHA önemli.
     """
     if not urls:
         return 0
     try:
-        from app.uploads import delete_local_photos
+        from app.uploads import delete_unused_photos
     except ImportError:  # pragma: no cover — uploads her zaman var
         return 0
-    return delete_local_photos(urls)
+    return delete_unused_photos(db, urls)
 
 
 def purge_user(db: Session, user: models.User) -> dict[str, int]:
@@ -1044,6 +1088,9 @@ def purge_user(db: Session, user: models.User) -> dict[str, int]:
     # silindikten SONRA da URL'i bilen herkese 200 dönmeye devam ediyordu.
     # KVKK açısından bu bir silme talebinin yerine getirilmemesidir.
     #
+    # Satırlar yukarıda flush edildi; başka bir ilanda ya da profilde hâlâ
+    # geçen dosya bu yüzden "kullanımda" görünür ve silinmez.
+    #
     # İşlem sınırının DIŞINDA: dosya silme geri alınamaz, veritabanı ise bu
     # noktada henüz commit edilmedi. Çağıran rollback ederse dosyalar gitmiş,
     # satırlar durmuş olur (yetim URL). Bilinçli tercih: iki çağıran da
@@ -1051,7 +1098,7 @@ def purge_user(db: Session, user: models.User) -> dict[str, int]:
     # commit ediyor ve buradan sonra hata verebilecek bir adım kalmıyor;
     # ters yönde hata yapmak — yani veri silinmiş görünürken fotoğrafın
     # yayında kalması — kullanıcı için çok daha ağır.
-    deleted_photos = _delete_photo_files(photo_urls)
+    deleted_photos = _delete_photo_files(db, photo_urls)
 
     return {
         "listings": deleted_listings,

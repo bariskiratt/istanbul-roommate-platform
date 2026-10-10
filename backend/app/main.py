@@ -189,7 +189,7 @@ _HSTS = (b"strict-transport-security", b"max-age=63072000; includeSubDomains")
 # yok sayar. VARSAYIM DEĞİL, ölçüldü: Chrome 150 ile hem aynı origin'de hem
 # de çapraz origin'de (üretim topolojisi: Vercel sayfası -> api.evdes.tr
 # resmi) attachment başlıklı resim sorunsuz çizildi, naturalWidth doğru
-# geldi. Ayrıntı: DEPLOY.md §5.
+# geldi. Ayrıntı: docs/SECURITY.md, M4.
 _UPLOAD_HEADERS: list[tuple[bytes, bytes]] = [
     (b"content-disposition", b"attachment"),
     # Fotoğraflar başka bir origin'deki (Vercel) arayüzden yükleniyor;
@@ -267,47 +267,62 @@ async def _send_413(send) -> None:
 class BodySizeLimitMiddleware:
     """Uygulama katmanında istek gövdesi üst sınırı (H1).
 
-    İki ayrı durum var:
+    Gövdenin olup olmadığına ve boyutuna YÖNTEM değil, gövdeyi çerçeveleyen
+    başlık karar verir. Üç durum var:
 
     1. `Content-Length` bildirilmiş: değeri okumak yeter, gövdeye hiç
        dokunmadan 413 döneriz. Sınırın altındaysa ara katman TAMAMEN devre
        dışı kalır — `receive` sarmalanmaz, normal isteklere ölçülebilir bir
        maliyet binmez. Bildirilen uzunluğu sunucu (h11) zaten zorlar.
 
-    2. `Content-Length` YOK (`Transfer-Encoding: chunked`): boyut önceden
-       bilinemez. Bu durumda `receive` sarmalanır, okunan bayt sayılır ve
-       sınır aşılır aşılmaz istek kesilir. Eskiden chunked gövde tüm boyut
-       kontrollerini atlıyordu; uploads.py'deki 5 MB kontrolü ancak dosya
-       diske yazıldıktan SONRA çalışıyordu.
+    2. `Transfer-Encoding` var (chunked): boyut önceden bilinemez. Bu durumda
+       `receive` sarmalanır, okunan bayt sayılır ve sınır aşılır aşılmaz
+       istek kesilir. Eskiden chunked gövde tüm boyut kontrollerini
+       atlıyordu; uploads.py'deki 5 MB kontrolü ancak dosya diske
+       yazıldıktan SONRA çalışıyordu.
+
+    3. İkisi de yok: HTTP/1.1'de bu isteğin gövdesi yoktur, ara katman
+       devre dışı kalır. GET/HEAD istekleri neredeyse hep buraya düşer.
+
+    Eskiden GET/HEAD/OPTIONS/DELETE/TRACE yönteme bakılarak hiç
+    denetlenmiyordu. Oysa DELETE /api/auth/me ve yöneticinin silme uçları
+    JSON gövdesi okuyor ve FastAPI gövdeyi token'ı denetlemeden ÖNCE
+    okuyor: girişsiz biri 20 MB'lık chunked bir DELETE'i sunucuya baştan
+    sona okutabiliyordu (SECURITY.md H1).
 
     Bu, tam çözümün yerine geçmez: sunucuya kadar gelen baytlar yine de ağ
-    ve bellek tüketir. Gerçek savunma ters vekilde (`client_max_body_size`)
-    olmalı — bkz. DEPLOY.md §5.
+    ve bellek tüketir. Gerçek savunma ters vekilde olurdu (ör. nginx'in
+    `client_max_body_size` ayarı).
     """
-
-    # Gövdesi olmayan yöntemler: sarmalamaya hiç girmeyiz.
-    _BODYLESS = frozenset({"GET", "HEAD", "OPTIONS", "DELETE", "TRACE"})
 
     def __init__(self, app, max_bytes: int):
         self.app = app
         self.max_bytes = max_bytes
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope.get("method") in self._BODYLESS:
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
         declared = None
+        chunked = False
         for name, value in scope.get("headers", []):
             if name == b"content-length":
                 declared = value
-                break
+            elif name == b"transfer-encoding":
+                chunked = True
 
-        if declared is not None:
-            if declared.isdigit() and int(declared) > self.max_bytes:
+        # İki başlık birlikte gelirse (sunucu bunu zaten reddeder) bildirilen
+        # uzunluğa güvenilmez; gövde sayılarak okunur.
+        if not chunked:
+            if (
+                declared is not None
+                and declared.isdigit()
+                and int(declared) > self.max_bytes
+            ):
                 await _send_413(send)
                 return
-            # Hızlı yol: uzunluk bildirilmiş ve sınırın altında.
+            # Hızlı yol: gövde yok ya da bildirilen uzunluk sınırın altında.
             await self.app(scope, receive, send)
             return
 

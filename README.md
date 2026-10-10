@@ -166,14 +166,20 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 python -m scripts.train_model   # trains the fair-rent model (~1 min, first time)
-python -m app.main
+DEV_OTP=1 python -m app.main
 ```
+
+`DEV_OTP=1` returns the sign-in code in the API response and the app shows it
+in a toast, so you can register without an email provider. It is off unless
+set, and must stay off on any public deployment (DEPLOY.md section 1.3).
 
 On macOS, LightGBM needs: `brew install libomp`. Transit data ships with the
 repo; re-download with `python -m scripts.fetch_transit` if needed. The
 interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off by default,
-production included; start the API with `API_DOCS=1 python -m app.main` to see
-them.
+production included; start the API with `API_DOCS=1` as well to see them.
+`requirements.txt` pins every package to an exact version; to add or upgrade
+one, edit `requirements.in` and regenerate the lock with the command at the
+top of that file.
 
 **2) Frontend** (http://localhost:8080)
 
@@ -184,7 +190,7 @@ cp .env.example .env            # VITE_API_URL defaults to 127.0.0.1:8000
 npm run dev
 ```
 
-**Tests:** `python -m pytest tests/` (backend, 428) · `npm test` (frontend,
+**Tests:** `python -m pytest tests/` (backend, 436) · `npm test` (frontend,
 88) · `npm run typecheck` · `npm run lint`. GitHub Actions runs all of them,
 plus `npm run build`, on every pull request and every push to `main`
 (`.github/workflows/ci.yml`); Render deploys a `main` commit only after they
@@ -211,10 +217,10 @@ dangerous kind:
 - `MESSAGE_KEY` — message encryption silently falls back to plain text when it
   is unset, and messages already encrypted with a key become unreadable if that
   key is lost.
-- `DEV_OTP` — its code-level default is `1`, which returns the sign-in code in
-  the API response. On a public deployment that means anyone can sign in as any
-  address without a password, admin addresses included, so `render.yaml` pins
-  it to `0` and DEPLOY.md section 1.3 has a check to confirm it.
+- `DEV_OTP` — off unless set. Set to `1`, it returns the sign-in code in the
+  API response; on a public deployment that means anyone can sign in as any
+  address without a password, admin addresses included. `render.yaml` pins it
+  to `0`, and DEPLOY.md section 1.3 has a check to confirm it.
 - `OTP_KEY` — without it, OTP codes are stored as unsalted SHA-256. Six digits
   is a search space of a million, so anyone who reads the database recovers a
   live code in seconds.
