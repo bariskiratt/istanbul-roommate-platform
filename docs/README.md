@@ -25,7 +25,7 @@ does.
 | [MODEL.md](MODEL.md) | *How does it decide a rent is fair?* The raw dataset, feature engineering, why the answer is a band and not a number, quantile LightGBM, honest evaluation against a neighbourhood-median baseline, CPI indexing, and the flat-rent → room-share split. | ~800 lines |
 | [ALGORITHMS.md](ALGORITHMS.md) | *What about everything that isn't the model?* The budget heatmap over 968 neighbourhood polygons, transfer-weighted alternative-neighbourhood search over the rail network, the Turkish-aware moderation rule engine, and the match/likes logic. | ~990 lines |
 | [FRONTEND.md](FRONTEND.md) | *How is the client built?* The stack piece by piece (Vite, Tailwind + design tokens, shadcn/ui, TanStack Query, react-router, i18n), the API layer, a page-by-page tour, and what the tests cover. | ~1050 lines |
-| [SECURITY.md](SECURITY.md) | *Who can do what, and what breaks under attack?* Threat model, trust boundaries, identity, authorization, content safety, cryptography — plus the results of an adversarial audit against a local instance: 17 findings (6 high, 5 medium, 6 low), what held under attack, what is accepted risk, and an incident runbook. | ~1280 lines |
+| [SECURITY.md](SECURITY.md) | *Who can do what, and what breaks under attack?* Threat model, trust boundaries, identity, authorization, content safety, cryptography — plus the results of an adversarial audit against a local instance: 17 findings (6 high, 5 medium, 6 low) and where each stands now, what held under attack, what is accepted risk, and an incident runbook. | ~1540 lines |
 
 The scope split is deliberate and consistent: **security lives in one document
 only.** ARCHITECTURE, MODEL, ALGORITHMS and FRONTEND each say so explicitly in
@@ -223,9 +223,10 @@ unrecoverable. SECURITY.md §7.1–7.3.
   GitHub Actions cron; it was removed once measurement showed GitHub honoured
   10% of its schedule, see DEPLOY.md §5. CI is triggered by pushes, not by a
   schedule, so that problem does not apply to it.)
-- **The five documents are not uniformly current.** Only SECURITY.md pins itself
-  to a commit (`51e5bb4`, §15); the others carry no staleness marker, so a
-  claim's `file:line` reference is the only reliable freshness check.
+- **The five documents are not uniformly current.** Only SECURITY.md dates
+  itself: its audit write-ups are pinned to commit `51e5bb4`, and its status
+  table to 10 October 2026 (§10, §15). The others carry no staleness marker, so
+  a claim's `file:line` reference is the only reliable freshness check.
 - **Coverage is uneven.** The offline pipeline is only covered where a
   runtime feature depends on it — `build_market_values.py` and
   `fetch_transit.py` appear inside ALGORITHMS.md §1–2 and MODEL.md §2. The

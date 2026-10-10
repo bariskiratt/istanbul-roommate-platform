@@ -8,12 +8,22 @@ codebase. Each section starts with the *problem* the mechanism exists to solve,
 then explains *how* the mechanism works, and only then points at the code. Every
 claim carries a `file:line` reference so you can check it yourself — this
 project has repeatedly shipped documentation and UI copy that promised things
-the code did not do, and section 10 below documents two places where that is
-still true today.
+the code did not do. The audit in section 10 found two such places (**H5** and
+**H6**); both have since been fixed in code.
+
+**Status as of 10 October 2026.** The audit ran against commit `51e5bb4`. Most
+findings were fixed in `dfd79b8`, the commit that added this document, and in
+later commits. Section 10 opens with a table of where each finding stands now,
+and the rest of the document describes the current code. The finding write-ups
+in section 10 are kept as they were found, so their line numbers point at
+`51e5bb4` (read them with `git show 51e5bb4:<path>`); every other reference
+points at the code as of this update. Line numbers drift with every change: if
+one is off, search for the function it names.
 
 **Nothing here was tested against production (`api.evdes.tr`).** All exploitation
 was reproduced against a throwaway local instance on `127.0.0.1:8377` with an
-isolated SQLite database. Where a finding depends on production configuration
+isolated SQLite database, and the status review was done by reading the code
+and running its tests. Where a finding depends on production configuration
 that could not be read without touching production, it is labelled as such in
 section 11.
 
@@ -47,13 +57,15 @@ advisor and the `dolandiricilik` (fraud) moderation category exist for.
 **Defences:** rule-based moderation flags fraud patterns
 (`backend/app/moderation.py:677`), optional AI layer
 (`backend/app/moderation_ai.py:80`), user reporting
-(`backend/app/reports.py:106`), admin suspension
+(`backend/app/reports.py:143`), admin suspension
 (`backend/app/admin.py:1311`), and the fair-price estimate that makes a
 suspiciously cheap listing visibly suspicious.
 
 **Not defended:** identity is an email address, not a person. Nothing ties an
-account to a real human. A banned scammer re-registers in thirty seconds — and
-per finding **H5**, not even with a university address.
+account to a real human. A banned scammer re-registers in thirty seconds with
+any other university address they control. Since the **H5** fix the server at
+least insists on a university address (`StudentEmailIn`,
+`backend/app/auth.py:424-453`); before it, any address worked.
 
 ### 2.2 The harasser
 
@@ -61,7 +73,7 @@ Uses matching as a channel to reach a specific student. The product design
 limits this structurally: messaging only opens after a *mutual* like
 (`backend/app/messages.py:50`, `_require_participant`), so there is no
 unsolicited-message surface at all. Reporting a message is available
-(`backend/app/reports.py:106`) and the admin can overwrite the text with a
+(`backend/app/reports.py:143`) and the admin can overwrite the text with a
 sentinel while keeping the row (`backend/app/admin.py:759`).
 
 **Not defended:** there is no user-level block/mute. The only remedies are
@@ -72,16 +84,22 @@ report → admin suspension, or account deletion.
 Wants to publish many listings or messages cheaply. This is the threat the audit
 found the platform least prepared for: findings **H2** and **H3** together let a
 single account write unbounded amounts of data through an endpoint that is then
-served to every anonymous visitor.
+served to every anonymous visitor. Both are fixed: every stored list element
+has a length cap, and listings, messages, reports and photo uploads are
+rate-limited per account (`backend/app/content_limits.py:25-40`). The counters
+live in process memory (section 4.5).
 
 ### 2.4 The scraper
 
 Wants the student roster: who is on the platform, from which university, in
-which district. Two separate leaks feed this — `GET /api/listings` returns owner
-name and university without authentication (**L3**), and the auth endpoints
-answer "is this address registered?" to strangers (**M3**). Combined with the
-predictable `ad.soyad@ogr.university.edu.tr` pattern used by Turkish
-universities, this is a real enumeration path.
+which district. Two separate leaks fed this. Anonymous `GET /api/listings` no
+longer returns the owner's name and university (**L3**, fixed). The auth
+endpoints still partly answer "is this address registered?" (**M3**):
+`request-otp` now gives the same answer either way, but `register` still returns
+409 for a taken address. Combined with the predictable
+`ad.soyad@ogr.university.edu.tr` pattern used by Turkish universities, this was
+a real enumeration path; at 10 registration attempts per IP per hour
+(`backend/app/auth.py:72-73`) it is now a slow one.
 
 ### 2.5 The account-takeover attacker
 
@@ -93,10 +111,11 @@ controls moderation, including permanent deletion.
 
 ### 2.6 The vandal (denial of service)
 
-Wants the site down. On a free-tier Render container with 512 MB of RAM, this is
-cheap: see **H1** (unbounded request bodies), **H2** (unbounded stored payloads)
+Wants the site down. On a free-tier Render container with 512 MB of RAM, this
+was cheap: **H1** (unbounded request bodies), **H2** (unbounded stored payloads)
 and **M1** (locking a specific user out of their own account with five
-requests).
+requests). H2 is fixed; H1 and M1 are partly fixed, and section 10 says what
+is left of each.
 
 ### Explicitly out of scope
 
@@ -117,12 +136,12 @@ flowchart LR
     end
 
     subgraph vercel["Vercel (static hosting)"]
-        SPA["evdes.tr<br/>vercel.json = SPA rewrite only"]
+        SPA["evdes.tr<br/>vercel.json = SPA rewrite + security headers"]
     end
 
     subgraph render["Render container (trust anchor)"]
-        API["FastAPI<br/>backend/app/main.py:147"]
-        STATIC["/uploads static files<br/>main.py:158 — NO auth"]
+        API["FastAPI<br/>backend/app/main.py:350"]
+        STATIC["/uploads/* photos<br/>uploads.py:482 serve_photo — NO auth"]
         KEY["MESSAGE_KEY in env<br/>render.yaml"]
     end
 
@@ -148,8 +167,11 @@ flowchart LR
 
 The single trust anchor is the Render container. It holds the message
 decryption key, so "encrypted messages" means *encrypted against a database
-leak*, not against the server itself. The `/uploads` mount is outside every
-authorization check by design — it is a plain static file server.
+leak*, not against the server itself. Photos at `/uploads/<name>` are outside
+every authorization check by design: `serve_photo`
+(`backend/app/uploads.py:479-482`) hands the file to anyone who has its URL.
+The name is 16 random bytes, so the URL cannot be guessed, but it never
+expires.
 
 ---
 
@@ -158,60 +180,75 @@ authorization check by design — it is a plain static file server.
 ### 4.1 The `.edu.tr` restriction — the product's central promise
 
 The whole trust proposition is "verified Istanbul university students". The
-mechanism that is supposed to enforce it is a domain restriction on sign-up.
+mechanism that enforces it is a domain restriction on sign-up.
 
-**What actually exists:** exactly one check, in the browser, in the onboarding
-form's "can I advance to the next step" predicate:
-
-```
-frontend/src/pages/Onboarding.tsx:124
-  case 0: return email.includes("@") && email.includes(".edu.tr") && ...
-```
-
-The server-side validator only requires an `@` and a dot in the domain part:
+**What exists:** a rule on the server's registration schema. `RegisterIn`
+inherits from `StudentEmailIn`, whose validator rejects any address that is not
+a student address:
 
 ```
-backend/app/auth.py:159-168   class EmailIn._normalize
-  if "@" not in v or "." not in v.split("@")[-1]:
-      raise ValueError("Geçerli bir e-posta adresi girin.")
+backend/app/auth.py:368-393   is_student_email
+  domain == "edu.tr" or domain.endswith(".edu.tr"), or a domain in
+  app/universities.py DOMAINS (sabanciuniv.edu is a university but not .edu.tr)
+backend/app/auth.py:424-453   class StudentEmailIn._normalize
+  if v in config.ADMIN_EMAILS: return v
+  if not is_student_email(v): raise ValueError(STUDENT_EMAIL_ERROR)
 ```
 
-A client-side check is not a security control; it is a form hint. `curl` skips
-it. This is finding **H5** and it was reproduced: `attacker@gmail.com`
-registered, verified, and then carried out the rest of the audit session.
+The onboarding form keeps its own check as a form hint
+(`frontend/src/pages/Onboarding.tsx:124`). Until the **H5** fix that hint was
+the only check, and `curl` skipped it: `attacker@gmail.com` registered,
+verified, and then carried out the rest of the audit session.
+
+Two edges are deliberate:
+
+- **Only sign-up is restricted.** Login, `request-otp` and `verify-otp` use the
+  plain `EmailIn` (`backend/app/auth.py:402-421`). Its docstring records why:
+  when the rule also guarded login, accounts opened earlier with other
+  addresses were locked out of themselves in production.
+- **`ADMIN_EMAILS` is exempt** (`backend/app/auth.py:448-449`). One admin
+  address is not a university address, and admin rights hang on the address.
+  The list comes from an environment variable only the operator sets.
 
 The university name shown on a profile is derived from the email domain
 (`backend/app/universities.py:10` `DOMAINS`, applied at
-`backend/app/auth.py:325`) and cannot be edited by the user — `UserUpdate`
-deliberately omits the field (`backend/app/auth.py:208`). That part works: an
-account with a non-university address simply has no university, rather than a
-forged one. But the account exists and is fully functional.
+`backend/app/auth.py:660`) and cannot be edited by the user — `UserUpdate`
+deliberately omits the field (`backend/app/auth.py:518`).
 
-**Stops:** a casual user from typo-ing a personal address into the sign-up form.
-**Does not stop:** anyone who has ever seen a browser devtools Network tab.
+**Stops:** anyone without a university address from opening an account,
+including someone who skips the form and calls the API directly.
+**Does not stop:** a student lending their address, or one person holding
+several; the domain is checked, not the person (section 13, item 1).
 
 ### 4.2 OTP (one-time code)
 
 Registration issues a 6-digit code; the account is not `verified` until the code
 comes back.
 
-- Generated with a CSPRNG: `secrets.randbelow(1_000_000)`, `backend/app/auth.py:129`.
-- Stored as an unsalted SHA-256 of the code (`_issue_otp` → `_sha256`,
-  `backend/app/auth.py:105`), with a 10-minute TTL (`OTP_TTL`,
-  `backend/app/auth.py:34`).
-- Compared with `hmac.compare_digest` (`backend/app/auth.py:400`) — constant
-  time, so no timing oracle on the code itself.
-- Single use: cleared on success (`backend/app/auth.py:403-405`).
+- Generated with a CSPRNG: `secrets.randbelow(1_000_000)`, `backend/app/auth.py:338`.
+- Stored as `HMAC-SHA256(OTP_KEY, code)` (`_issue_otp` → `_otp_digest`,
+  `backend/app/auth.py:314-319`), with a 10-minute TTL (`OTP_TTL`,
+  `backend/app/auth.py:41`). `OTP_KEY` is a server environment variable that
+  `render.yaml` generates, so the stored value is useless without it. Without
+  `OTP_KEY`, or with one shorter than 32 characters, storage falls back to an
+  unsalted SHA-256 and the process prints a warning once
+  (`backend/app/auth.py:289-311`).
+- Compared with `hmac.compare_digest` (`_otp_matches`,
+  `backend/app/auth.py:322-334`) — constant time, so no timing oracle on the
+  code itself.
+- Single use: cleared on success (`backend/app/auth.py:796-798`).
 - Brute force is bounded by the rate limiter: 5 attempts per 15 minutes
-  (`backend/app/auth.py:44-45`), against a 10⁶ space.
+  (`backend/app/auth.py:55-56`), against a 10⁶ space.
 
 **Stops:** using an email address you do not control; online brute force of the
 code.
-**Does not stop:** anything once the code is in a log line — see **M2**. The
-hash is unsalted over a 10⁶ space, so it inverts in under a second.
+**Does not stop:** someone who holds both the database and the server
+environment. With `OTP_KEY` set, a leaked dump or log line no longer reveals a
+live code (**M2**, fixed); without it, the unsalted hash over a 10⁶ space
+inverts in under a second.
 
 There is a development escape hatch: when `DEV_OTP=1`, the code is returned *in
-the API response* (`backend/app/auth.py:135-136`, `:152-153`). The code default
+the API response* (`backend/app/auth.py:344-345`, `:361-362`). The code default
 is `"1"` — the unsafe value. Production is only safe because `render.yaml` pins
 `DEV_OTP: "0"` explicitly, and that file carries a long comment explaining why
 the value is written in the blueprint rather than left to the dashboard. Any
@@ -220,12 +257,12 @@ deployment that does *not* use this blueprint is insecure by default (**L6**).
 ### 4.3 Passwords
 
 - Hashed with `scrypt`, N=2¹⁴, r=8, p=1, 16-byte random salt per password:
-  `backend/app/auth.py:40`, `:109-115`.
-- Verified in constant time via `hmac.compare_digest`, `backend/app/auth.py:123`.
+  `backend/app/auth.py:47`, `:224-230`.
+- Verified in constant time via `hmac.compare_digest`, `backend/app/auth.py:238`.
 - Policy is length only: minimum 8 characters, maximum 128
-  (`backend/app/auth.py:172`). No complexity rule, no breached-password check.
+  (`backend/app/auth.py:456`). No complexity rule, no breached-password check.
 - Changing the password invalidates every session
-  (`backend/app/auth.py:468-470`) — a real logout-everywhere, not just the
+  (`backend/app/auth.py:865-867`) — a real logout-everywhere, not just the
   current device.
 
 **Stops:** offline cracking of a leaked hash at any meaningful rate for a decent
@@ -237,49 +274,69 @@ reused elsewhere. N=2¹⁴ is also below the current OWASP recommendation of 2¹
 ### 4.4 Session tokens
 
 - Opaque 256-bit random string, `secrets.token_urlsafe(32)`,
-  `backend/app/auth.py:353`.
+  `backend/app/auth.py:711`.
 - Only the SHA-256 hash is stored (`backend/app/models.py:89`,
-  `backend/app/auth.py:354`) — a database leak does not yield usable sessions.
+  `backend/app/auth.py:712`) — a database leak does not yield usable sessions.
   Plain SHA-256 is correct here and not a weakness, because the input is already
   256 bits of entropy; there is nothing to brute-force.
 - 30-day TTL, enforced on read and the expired row deleted
-  (`TOKEN_TTL`, `backend/app/auth.py:35`, `:283-289`).
+  (`TOKEN_TTL`, `backend/app/auth.py:42`, `:595-601`).
 - Suspension deletes all of a user's tokens (`backend/app/admin.py:1336-1338`),
   and `get_optional_user` re-checks `is_suspended` on every request as a second
-  gate (`backend/app/auth.py:294-295`) in case a row survives.
-- Logout deletes the single token (`backend/app/auth.py:643-655`).
+  gate (`backend/app/auth.py:606-607`) in case a row survives.
+- Logout deletes the single token (`backend/app/auth.py:1089-1101`).
 
 **Stops:** stale sessions surviving a suspension or a password change; session
 recovery from a database dump.
 **Does not stop:** theft from the browser. The token lives in `localStorage`
 (`frontend/src/lib/api.ts:16-20`), which is readable by any script that achieves
-XSS. There is no HttpOnly cookie, no CSP, and no `Referrer-Policy` — see **M5**.
+XSS. There is no HttpOnly cookie. What stands in the way is the site's
+Content-Security-Policy, which runs scripts only from the site's own origin
+(`script-src 'self'`, `frontend/vercel.json:78`); it was added for **M5**.
 
 ### 4.5 Rate limiting
 
-One in-memory token bucket, keyed by `(action, email)`, 5 requests per 15
-minutes:
+Two in-memory counters, both sliding windows.
 
-```
-backend/app/auth.py:44-58
-  _RATE_BUCKETS: dict[tuple[str, str], list[datetime]] = {}
-  def _rate_limit(action: str, email: str) -> None: ...
-```
+**Auth endpoints** use `_rate_limit` (`backend/app/auth.py:125-142`), with the
+key chosen per endpoint:
 
-It is applied to exactly four endpoints: `register` (`:312`), `request-otp`
-(`:336`), `login` (`:361`), `verify-otp` (`:385`).
+| Endpoint | Key | Limit | Where |
+|---|---|---|---|
+| `register` | email | 5 per 15 min | `backend/app/auth.py:629` |
+| `register` | IP | 10 per hour | `:630-635` |
+| `request-otp` | email | 5 per 15 min | `:692` |
+| `request-otp` | IP | 15 per hour | `:695` |
+| `login` | email + IP, cleared on success | 5 per 15 min | `:742`, `:760` |
+| `verify-otp` | email, cleared on success | 5 per 15 min | `:778`, `:802` |
 
-**Stops:** online brute force of one specific account's password or OTP.
+Stale buckets are pruned and the table is capped at 10,000 keys
+(`backend/app/auth.py:87-113`).
+
+**Content endpoints** use `content_limits.check`, keyed by user id
+(`backend/app/content_limits.py:25-40`): 20 listings an hour, 30 messages a
+minute, 10 reports an hour, 100 photo uploads a day.
+
+**Stops:** online brute force of one account's password or OTP; bulk
+registration and address scanning from one IP; one account flooding listings,
+messages, reports or the photo bucket (**H3**, fixed).
 **Does not stop:**
-- Bulk registration — the key includes the email, so a fresh address gets a
-  fresh bucket (**H3**).
-- Any content-producing endpoint. Listings, messages, uploads and reports have
-  no limit at all (**H3**).
-- Being weaponised against the victim: five wrong passwords lock the *real
-  owner* out for 15 minutes, and a successful login does not reset the bucket
-  (**M1**).
-- Multi-process deployments. The bucket is per-process memory and resets on
-  restart; the module comment at `backend/app/auth.py:42-43` says so honestly.
+- An attacker with many IP addresses: each gets its own registration and login
+  allowance.
+- The code path being turned against its owner: five `request-otp` or bad
+  `verify-otp` calls from anyone block that address's code sign-in for 15
+  minutes. The email-only key on `verify-otp` is a choice — with an IP in it, a
+  botnet could search the 10⁶ code space in parallel
+  (`backend/app/auth.py:769-777`). Password login stays open (**M1**, partly
+  fixed).
+- Wrong client IPs. Behind Render's proxy every request arrives from the proxy,
+  so `_client_ip` reads the right-most `X-Forwarded-For` entry, and only when
+  `TRUST_PROXY_HEADERS=1` (`backend/app/auth.py:150-173`; `render.yaml` sets
+  it). That assumes Render is the only proxy: put a CDN proxy in front and the
+  right-most entry becomes the CDN's address, shared by many users.
+- Multi-process deployments. Both counters are per-process memory and reset on
+  restart; the module comments say so (`backend/app/auth.py:49-54`,
+  `backend/app/content_limits.py:12-15`).
 
 ---
 
@@ -292,14 +349,14 @@ server-side. The pattern is consistent:
 
 | Action | Check | Code |
 |---|---|---|
-| Edit listing | `user.id != row.owner_id` → 403 | `backend/app/listings.py:438` |
-| Deactivate listing | same | `backend/app/listings.py:499` |
-| Read chat | not a participant → 403 | `backend/app/messages.py:50-57` |
-| Send message | same helper | `backend/app/messages.py:107` |
-| Respond to a like | like must be on *your* listing → 403 | `backend/app/swipes.py:261` |
+| Edit listing | `user.id != row.owner_id` → 403 | `backend/app/listings.py:566` |
+| Deactivate listing | same | `backend/app/listings.py:627` |
+| Read chat | not a participant → 404, same as a missing match (**L4**) | `backend/app/messages.py:50-63` |
+| Send message | same helper | `backend/app/messages.py:112` |
+| Respond to a like | like must be on *your* listing → 404 | `backend/app/swipes.py:260-264` |
 
 Mass assignment is closed by schema design rather than by a blocklist:
-`UserUpdate` (`backend/app/auth.py:208`) simply does not declare `email`,
+`UserUpdate` (`backend/app/auth.py:518`) simply does not declare `email`,
 `university`, `verified`, `is_suspended` or `id`, and Pydantic drops unknown
 keys. `is_admin` cannot be assigned at all because it is a computed property,
 not a column (`backend/app/models.py:83`). This was probed during the audit and
@@ -348,7 +405,7 @@ compromised mailbox would be enough to wipe the moderation team.
 
 Crucially, this does not remove anyone's right to delete their own account.
 `DELETE /api/auth/me` remains open to admins and requires the password
-(`backend/app/auth.py:621-640`). What is blocked is the accidental,
+(`backend/app/auth.py:1067-1086`). What is blocked is the accidental,
 one-click-plus-reason-box path — not the deliberate, authenticated one.
 
 There is also a deliberate *absence*: no impersonation endpoint. The reasoning
@@ -391,8 +448,8 @@ category is capped at `_SCAM_MAX = 0.9` so that it can *never* block on its own
 (`backend/app/moderation.py:66-73`).
 
 Enforcement points: listings check title and description separately so the error
-can name the offending field (`backend/app/listings.py:65-97`); messages check
-the body (`backend/app/messages.py:132-140`). Blocked content returns 422;
+can name the offending field (`backend/app/listings.py:101-133`); messages check
+the body (`backend/app/messages.py:141-149`). Blocked content returns 422;
 flagged content is published with `is_flagged=True` and lands in the admin queue.
 
 ### 6.2 Layer 2 — AI, optional and strictly-additive
@@ -416,15 +473,19 @@ to bolt on:
 
 Users report a listing, a user or a message from a closed reason list
 (`backend/app/reports.py:26-42`). Reporting requires a login — the docstring at
-`backend/app/reports.py:111` says why: to close the anonymous-report-flood
+`backend/app/reports.py:148` says why: to close the anonymous-report-flood
 surface. The same user cannot report the same target twice, enforced both by a
 pre-check and by a database `UniqueConstraint`, with the race losing side turned
 into a 409 rather than a 500 (`backend/app/models.py:326-329`,
-`backend/app/reports.py:133-145`).
+`backend/app/reports.py:173-185`).
 
-What is *missing* is an access check on the target: any authenticated user can
-report message id 7 regardless of whether they can see it. That is finding
-**H4**.
+The reporter must also be able to see the target (`_reportable`,
+`backend/app/reports.py:76-110`, called at `:156`): a message only by a
+participant of its match, a listing only while it is public, a user only while
+not suspended. Anything else gets the same 404 as an id that does not exist.
+Before the **H4** fix, any account could push someone else's private message
+into the moderation queue by its id. Reports are also capped at 10 an hour per
+account (`backend/app/reports.py:154`).
 
 ### 6.4 Admin queue
 
@@ -446,7 +507,7 @@ section 9.
   /api/admin/listings/{id}` and `DELETE /api/admin/users/{id}` require a
   reason, write an `AdminAction`, and — importantly — *conversations survive*:
   deleting a listing NULLs `matches.listing_id` rather than deleting the chat
-  (`backend/app/listings.py:136-170`).
+  (`purge_listing`, `backend/app/listings.py:201-257`).
 - **2 — The reporter is never shown to the reported.** These endpoints are
   admin-only and reporter identity does not leak out of them. See **L1** for
   the one place where this principle leaks in the opposite direction.
@@ -474,7 +535,7 @@ Chat messages are encrypted before being written and decrypted on read:
 - Decryption at `backend/app/crypto.py:157-180`; a value not starting with the
   prefix is treated as legacy plaintext and returned as-is, because production
   already contains plaintext rows from before the feature existed.
-- Applied at the write path (`backend/app/messages.py:145`) and both read paths
+- Applied at the write path (`backend/app/messages.py:154`) and both read paths
   (`backend/app/messages.py:39-46`, `backend/app/admin.py:381`).
 - A row that fails to decrypt returns the sentinel `[unreadable]`
   (`backend/app/crypto.py:51`) rather than 500-ing the whole conversation. The
@@ -485,7 +546,7 @@ Chat messages are encrypted before being written and decrypted on read:
 The key is an environment variable on the server
 (`backend/app/crypto.py:83-113`). The server therefore *can* read every message,
 and does — the moderation layer runs on plaintext before encryption
-(`backend/app/messages.py:132`), and the admin queue decrypts reported messages
+(`backend/app/messages.py:141`), and the admin queue decrypts reported messages
 (`backend/app/admin.py:381`).
 
 This is a deliberate trade-off, not an oversight. Real end-to-end encryption
@@ -500,7 +561,7 @@ docstring instructs that no user-facing text may say "end-to-end"
 (`backend/app/crypto.py:5-8`), the messages module repeats it
 (`backend/app/messages.py:6-8`), and the Safety page copy says it outright —
 "the decryption key lives on the server, so anyone with access to the server can
-read the messages" (`frontend/src/i18n/translations.ts:1540`, TR at `:668`).
+read the messages" (`frontend/src/i18n/translations.ts:1655`, TR at `:672`).
 
 ### 7.3 Key management and the loss scenario
 
@@ -533,17 +594,18 @@ backup is the entire recovery plan.
 
 | Use | Primitive | Location | Note |
 |---|---|---|---|
-| Password storage | scrypt N=2¹⁴, r=8, p=1, per-password salt | `backend/app/auth.py:40` | Below OWASP's 2¹⁷ (**L6**) |
-| Session token storage | SHA-256 of a 256-bit random token | `backend/app/auth.py:105`, `:353` | Correct — input already has full entropy |
-| OTP storage | SHA-256 of a 6-digit code, unsalted | `backend/app/auth.py:105`, `:130` | 10⁶ space; inverts instantly (**M2**) |
-| Upload filenames | `secrets.token_hex(16)` | `backend/app/uploads.py:72` | Unguessable, but see **H6** |
+| Password storage | scrypt N=2¹⁴, r=8, p=1, per-password salt | `backend/app/auth.py:47` | Below OWASP's 2¹⁷ (**L6**) |
+| Session token storage | SHA-256 of a 256-bit random token | `backend/app/auth.py:220`, `:711` | Correct — input already has full entropy |
+| OTP storage | HMAC-SHA256 keyed with `OTP_KEY`; unsalted SHA-256 if the key is missing | `backend/app/auth.py:314-319` | A leaked row is useless without the key (**M2**, fixed) |
+| Upload filenames | `secrets.token_hex(16)` | `backend/app/uploads.py:465` | Unguessable, but public and permanent once known (section 3) |
 | Message AEAD | AES-256-GCM, no AAD | `backend/app/crypto.py:153`, `:175` | Ciphertext not bound to its row (**L6**) |
 
 ---
 
 ## 8. Privacy and third parties
 
-Two external services receive user data.
+Brevo and, when it is switched on, Anthropic receive user data to do a job for
+the app; Neon, Cloudflare R2, Render and Vercel host it (section 8.3).
 
 ### 8.1 Brevo — transactional email (always on in production)
 
@@ -559,7 +621,7 @@ recipient** (`backend/app/emailer.py:65-69`).
 
 Behaviour when email is unconfigured depends on `DEV_OTP`: with `DEV_OTP=0` the
 request fails loudly with 502 rather than silently leaving the user without a
-code (`backend/app/auth.py:146-150`).
+code (`backend/app/auth.py:355-359`).
 
 ### 8.2 Anthropic — content classification (opt-in)
 
@@ -572,8 +634,11 @@ id, no email, no name — just the text and a `İLAN`/`SOHBET MESAJI` label
 
 This is disclosed to users. The Safety page states that while the layer is on,
 "the full text of the listings and messages being screened is sent to Anthropic
-for classification" (`frontend/src/i18n/translations.ts:1534`, TR at `:662`).
-That is an unusually honest piece of product copy and it matches the code.
+for classification" (`frontend/src/i18n/translations.ts:1649`, TR at `:666`).
+That is an unusually honest piece of product copy and it matches the code. The
+privacy notice adds that the layer is currently off and nothing is sent to an
+AI provider (`frontend/src/i18n/translations.ts:1929-1930`), so setting
+`ANTHROPIC_API_KEY` means updating that notice first.
 
 ### 8.3 Storage providers
 
@@ -585,9 +650,25 @@ scoped to the one bucket; anyone holding it can read and delete every photo.
 
 ### 8.4 What is not disclosed
 
-There is no privacy notice and no `/privacy` route. Brevo (email processing) and
-Render (database hosting, outside Turkey) appear in no user-facing text. Under
-KVKK this is a compliance gap — see **L6**.
+A privacy notice exists (`/privacy`, `frontend/src/pages/Privacy.tsx`, route
+at `frontend/src/App.tsx:57`). It names Render, Neon, Cloudflare R2, Vercel and
+Brevo, says AI moderation is off, and says data goes to no one outside that
+list. Three things it leaves out (**L6**):
+
+- **Google Fonts.** The stylesheet loads its fonts from `fonts.googleapis.com`
+  (`frontend/src/index.css:3`), so every visitor's IP address reaches Google.
+- **OpenStreetMap tiles.** The explore map loads tiles from
+  `tile.openstreetmap.org` (`frontend/src/pages/Explore.tsx:145`), which sends
+  the visitor's IP address to the OpenStreetMap Foundation.
+- **What the audit trail keeps.** The notice says only the link to the user is
+  severed when an admin record outlives a deleted account
+  (`frontend/src/i18n/translations.ts:1943-1944`). In fact a user deletion
+  stores the deleted account's email, name and university in the record
+  (`backend/app/admin.py:1416-1422`), and a listing deletion stores the
+  owner's name (`:1170-1177`).
+
+Self-hosting the fonts closes the first gap; the other two need a sentence in
+the notice, or a change to what the audit row keeps.
 
 ---
 
@@ -625,7 +706,7 @@ Three design decisions worth understanding:
   eventually disagree.
 - **Deleting an admin does not delete their audit trail.** `actor_id` is
   nullable and `purge_user` NULLs it rather than cascading
-  (`backend/app/auth.py:594-608`). The comment says why: otherwise the easiest
+  (`backend/app/auth.py:1021-1035`). The comment says why: otherwise the easiest
   way to erase your own moderation history would be to delete your own account.
 
 What is recorded on a user deletion includes the deleted account's email, name
@@ -642,9 +723,52 @@ All findings below were **reproduced by execution** against a local instance
 the entry says otherwise. Severity reflects damage a real attacker can do to a
 real user, not theoretical worst case.
 
+### Status on 10 October 2026
+
+The write-ups below are kept as the audit found them, at `51e5bb4`. This table
+says where each finding stands in the current code, and each write-up opens
+with a **Now** note on what changed and what is left.
+
+| ID | Finding | Now | What is left |
+|---|---|---|---|
+| H1 | Chunked bodies bypass the size limit | Partly fixed | DELETE bodies are not capped |
+| H2 | Unbounded `photos` / `preferred_districts` elements | Fixed | — |
+| H3 | No rate limit on content endpoints | Fixed | Counters live in process memory (section 4.5) |
+| H4 | Report endpoint as id oracle and queue injection | Fixed | — |
+| H5 | `.edu.tr` checked only in the browser | Fixed | — |
+| H6 | Photos survive account deletion | Partly fixed | Deleting an account can delete *another* user's photo; photos removed by editing, or never attached, stay forever |
+| M1 | Lockout DoS | Partly fixed | Code sign-in still locks per email |
+| M2 | Hashes in error logs; OTP hash invertible | Fixed | — |
+| M3 | Email enumeration | Partly fixed | `register` 409, suspended 403, timing |
+| M4 | Upload URL from `Host`; no `nosniff` on files | Partly fixed | Profile photos are not allowlisted |
+| M5 | No security headers | Fixed | Not checked against production |
+| L1 | Suspension reason shown to the user | Open | — |
+| L2 | `_RATE_BUCKETS` grows without bound | Fixed | — |
+| L3 | Anonymous listings show owner name and university | Fixed | — |
+| L4 | 404-vs-403 enumeration | Fixed | — |
+| L5 | No entropy check on a raw `MESSAGE_KEY` | Open | — |
+| L6 | Other hardening items | 2 of 9 fixed | See its table |
+
+Two of the problems in the last column were found during this review, not by
+the audit: the DELETE gap in H1 and the cross-account photo deletion in H6.
+Both were reproduced against a local instance.
+
 ### HIGH
 
 #### H1 — Chunked uploads bypass the body-size limit → unbounded disk/memory write
+
+> **Now: partly fixed.** `BodySizeLimitMiddleware`
+> (`backend/app/main.py:267-345`) caps every request body at 6 MB
+> (`MAX_REQUEST_BYTES`, `:247`). A declared `Content-Length` over the cap gets
+> 413 before the body is read; a chunked body is counted as it streams and cut
+> off at the cap. **Left:** the middleware treats DELETE as bodyless and lets
+> it through (`:289`), but `DELETE /api/auth/me` and the admin delete
+> endpoints take a JSON body, and FastAPI reads it before it checks the token.
+> Reproduced locally on 10 October 2026: an anonymous 20 MB chunked DELETE was
+> read in full and answered 422, while the same body sent as a POST got 413.
+> Removing DELETE from `_BODYLESS` closes it. The middleware's docstring also
+> points at DEPLOY.md §5 for a proxy-level cap, but that section is about
+> keeping the API awake.
 
 **Where:** `backend/app/uploads.py:54-55` (the Content-Length check),
 `backend/app/main.py` (no ASGI-level body cap anywhere).
@@ -673,6 +797,12 @@ finishes first.
 **Effort:** medium (half a day); proxy config as a 1-hour stopgap.
 
 #### H2 — Unbounded element length in `photos` / `preferred_districts` → stored amplification on an anonymous endpoint
+
+> **Now: fixed.** Each listing photo must be at most 500 characters and pass
+> the photo allowlist (`_check_photos`, `backend/app/listings.py:48-75`).
+> Profile photos are capped at 6 × 500 characters and preferred districts at
+> 10 × 40 (`backend/app/auth.py:505-515`, applied at `:556-560`). Profile
+> photos are only length-checked, not allowlisted; see M4.
 
 **Where:** `backend/app/listings.py:223` (`photos: Field(..., min_length=3,
 max_length=6)` constrains the *count*, not the elements),
@@ -705,6 +835,14 @@ by one attacker. Combined with H3 (no rate limit) it scales.
 
 #### H3 — No rate limit on any content-producing endpoint
 
+> **Now: fixed.** Listings, messages, reports and photo uploads are
+> rate-limited per account (`backend/app/content_limits.py:25-40`, called at
+> `backend/app/listings.py:406`, `backend/app/messages.py:116`,
+> `backend/app/reports.py:154` and `backend/app/uploads.py:463`), and
+> registration and code requests per IP (`backend/app/auth.py:630-635`,
+> `:695`). The counters live in process memory, and the IP limits rely on
+> `TRUST_PROXY_HEADERS=1` (section 4.5).
+
 **Where:** rate limiting exists only at `backend/app/auth.py:49` and is applied
 only to the four auth endpoints. Unprotected:
 `backend/app/listings.py:290` (create listing),
@@ -727,6 +865,12 @@ per-process.
 **Effort:** medium (half a day) extending existing infrastructure.
 
 #### H4 — The report endpoint is an existence oracle, and lets an attacker inject private messages into the moderation queue
+
+> **Now: fixed.** `create_report` answers 404 unless the reporter can see the
+> target (`_reportable`, `backend/app/reports.py:76-110`, called at `:156`),
+> and an account can file 10 reports an hour (`:154`). The id of an active user
+> or listing still gets 201 where a missing one gets 404, but those ids are
+> visible in the app anyway.
 
 *(Originally rated HIGH by the scanning pass; downgraded to MEDIUM after
 verification — reasoning below.)*
@@ -764,6 +908,12 @@ listing must be visible to them. Add a per-user rate limit on the endpoint.
 
 #### H5 — The `.edu.tr` requirement is client-side only
 
+> **Now: fixed.** Registration accepts only a university address, checked on
+> the server (`StudentEmailIn`, `backend/app/auth.py:424-453`; test at
+> `backend/tests/test_auth.py:314`). Addresses in `ADMIN_EMAILS` are exempt;
+> section 4.1 has the details. The product copy that promises a `.edu.tr`
+> sign-up now matches the server.
+
 **Where:** `backend/app/auth.py:159-168` (`EmailIn._normalize` checks only for
 `@` and a dot in the domain). The only real check is
 `frontend/src/pages/Onboarding.tsx:124`.
@@ -791,6 +941,24 @@ corrected instead.
 **Effort:** low.
 
 #### H6 — Account deletion does not delete uploaded photos, and photo URLs are unauthenticated and permanent
+
+> **Now: partly fixed, and the fix opened a new hole.** Deleting an account
+> deletes the photo files its profile and listings point at (`purge_user`,
+> `backend/app/auth.py:973-975`, `:1054`). An admin listing deletion deletes
+> the listing's files unless another row still uses them (`purge_listing`,
+> `backend/app/listings.py:172-198`, `:244-250`). **Left:**
+>
+> - `purge_user` skips that check, so deleting an account also deletes files
+>   that belong to other people. An account can copy another user's photo URL
+>   into its own profile (profile photos are not allowlisted) or listing
+>   (own-host URLs pass the allowlist), delete itself, and the other user's
+>   photo is gone. Reproduced locally on 10 October 2026: account B put account
+>   A's photo URL in its profile and deleted itself; A's photo then answered
+>   404 while A's profile still listed it. Checking the remaining rows before
+>   deleting, as `purge_listing` does with `_photos_in_use_elsewhere`, closes
+>   it. **MEDIUM.**
+> - A photo removed from a listing or profile by editing, or uploaded and never
+>   attached, is never deleted. It stays public to anyone holding the URL.
 
 **Where:** `backend/app/auth.py:503` (`purge_user` touches only database rows),
 `backend/app/listings.py:136` (`purge_listing`, same), `backend/app/main.py:158`
@@ -825,6 +993,13 @@ the same photo is used by more than one row.
 
 #### M1 — Login/OTP lockout DoS: five requests lock a victim out of their own account for 15 minutes
 
+> **Now: partly fixed.** Login keys its counter on email plus IP and clears it
+> on success (`backend/app/auth.py:742`, `:760`), so an attacker fills only
+> their own IP's bucket. **Left:** `request-otp` and `verify-otp` still key on
+> the email alone (`:692`, `:778`), so five calls from anyone block that
+> address's code sign-in for 15 minutes. For `verify-otp` that is deliberate
+> (section 4.5), and password login stays open.
+
 *(Rated HIGH by the scanning pass; downgraded — availability-only, reversible, no
 confidentiality or integrity loss.)*
 
@@ -844,6 +1019,12 @@ login**; prefer exponential backoff over an email-keyed hard lockout.
 **Effort:** low-to-medium.
 
 #### M2 — `password_hash` and `otp_hash` appear in plaintext in error logs; `otp_hash` inverts in ~0.3 s
+
+> **Now: fixed.** The engine is created with `hide_parameters=True`
+> (`backend/app/db.py:78`), and codes are stored as HMAC-SHA256 under
+> `OTP_KEY` (`backend/app/auth.py:314-319`), which `render.yaml` generates.
+> Without `OTP_KEY` storage falls back to plain SHA-256 with a warning
+> (section 4.2).
 
 **Where:** `backend/app/db.py:44` — `create_engine(...)` is called without
 `hide_parameters=True`.
@@ -870,6 +1051,15 @@ scrypt-protected; the sharp edge is the OTP.
 **Effort:** very low for the one-liner; slightly more for the HMAC change.
 
 #### M3 — Email enumeration (explicit, plus a timing channel)
+
+> **Now: partly fixed.** `request-otp` gives the same 200 and text for
+> registered and unregistered addresses (`backend/app/auth.py:697-699`), and
+> registration is limited to 10 an hour per IP (`:630-635`). **Left:**
+> `register` still answers 409 for a taken address, on purpose (`:639-654`);
+> `request-otp` answers 403 for a suspended account (`:702`), and it is slower
+> for a registered address because only then does it send an email through
+> Brevo; login still skips the scrypt work for an unknown address
+> (`:744-749`).
 
 **Where:** `backend/app/auth.py:317-319` (register returns 409 "already
 registered"), `backend/app/auth.py:338-341` (request-otp returns 404 "not
@@ -902,6 +1092,18 @@ some thought.
 
 #### M4 — Upload URLs are derived from the `Host` header, and static files carry no `nosniff` / `Content-Disposition`
 
+> **Now: partly fixed.** Upload URLs are built from `PUBLIC_BASE_URL` when it
+> is set (`public_base_url`, `backend/app/uploads.py:131-140`), and
+> `render.yaml` sets it to `https://api.evdes.tr`. Files under `/uploads/`
+> carry `nosniff`, `Content-Disposition: attachment` and
+> `Cross-Origin-Resource-Policy` (`backend/app/main.py:184-199`, `:222-223`),
+> and listing photos must pass the allowlist. **Left:** profile photos are only
+> length-checked (`PhotoUrl`, `backend/app/auth.py:513-515`), so a profile can
+> still hold a foreign host, a `data:` or a `javascript:` URL. The site's CSP
+> keeps the browser from loading foreign image hosts, but it allows `data:`
+> images. A deployment without `PUBLIC_BASE_URL` still takes the URL from the
+> `Host` header.
+
 **Where:** `backend/app/uploads.py:75` builds the returned URL from
 `request.base_url`; `backend/Dockerfile:43` runs uvicorn with
 `--forwarded-allow-ips '*'`; `backend/app/main.py:158` mounts `StaticFiles` with
@@ -932,6 +1134,13 @@ middleware that sets `X-Content-Type-Options: nosniff` and
 
 #### M5 — No security headers on either the API or the frontend
 
+> **Now: fixed.** The API adds `X-Content-Type-Options`, `Referrer-Policy`,
+> `X-Frame-Options`, `Permissions-Policy` and, over HTTPS, HSTS to every
+> response (`SecurityHeadersMiddleware`, `backend/app/main.py:161-232`; tests
+> in `backend/tests/test_security_headers.py`). `frontend/vercel.json:74-104`
+> gives the site a CSP and the same set of headers. Not checked against
+> production (section 11).
+
 **Where:** `backend/app/main.py:161-187` — the only middleware is GZip and CORS;
 no security-header middleware exists. `frontend/vercel.json` contains a SPA
 rewrite and nothing else — no `headers` block.
@@ -952,6 +1161,10 @@ block in `frontend/vercel.json` adding CSP, XCTO and XFO.
 ### LOW
 
 #### L1 — The suspension reason (a free-text admin note) is shown to the suspended user, and can expose the reporter
+
+> **Now: open.** Login still returns the reason
+> (`backend/app/auth.py:756`). Until that changes, runbook A's rule applies:
+> never name a reporter in the reason.
 
 **Where:** `backend/app/auth.py:375` calls
 `_reject_if_suspended(user, include_reason=True)` on the login path;
@@ -982,6 +1195,11 @@ cheaper, a warning in the admin UI that this text will be shown to the user.
 
 #### L2 — `_RATE_BUCKETS` grows without bound (slow memory leak)
 
+> **Now: fixed.** Buckets idle for longer than the longest window are dropped,
+> at most once a minute, and the table is capped at 10,000 keys, oldest first
+> (`backend/app/auth.py:87-113`). Under a flood of fresh keys the cap can
+> evict an old bucket early.
+
 **Where:** `backend/app/auth.py:46` and `:51` — `setdefault` creates a key that is
 never removed; the pruning at `:52` only trims the timestamp list inside a bucket
 that is being accessed.
@@ -995,6 +1213,10 @@ multi-process deployments.
 **Effort:** low.
 
 #### L3 — Anonymous `GET /api/listings` returns the owner's name and university
+
+> **Now: fixed.** Anonymous callers get listings without `owner_name` and
+> `owner_university` (`_hide_owner`, `backend/app/listings.py:381-394`).
+> `owner_id` stays, on purpose.
 
 **Where:** `backend/app/listings.py:285-286` (`owner_name`, `owner_university` on
 `ListingOut`) with the endpoint depending on `get_optional_user`
@@ -1016,6 +1238,9 @@ photos, and `owner_id` hands it ready-made ids for the H4 oracle.
 
 #### L4 — Match/like enumeration via the 404-vs-403 distinction
 
+> **Now: fixed.** Non-participants get 404, the same answer as a missing id
+> (`backend/app/messages.py:50-63`, `backend/app/swipes.py:260-264`).
+
 **Where:** `backend/app/messages.py:53-57` (non-participant → 403) and
 `backend/app/swipes.py:261` (respond → 403). No content leaks; only the existence
 and rough count of rows is observable.
@@ -1029,6 +1254,8 @@ not the other.
 **Effort:** very low.
 
 #### L5 — No entropy check on the raw-string `MESSAGE_KEY` path
+
+> **Now: open.** Unchanged (`backend/app/crypto.py:111-112`).
 
 **Where:** `backend/app/crypto.py:111-112` — only a length check (≥ 32) followed
 by a single unsalted SHA-256.
@@ -1045,17 +1272,19 @@ an entropy threshold on the raw path.
 
 #### L6 — Other hardening items
 
-| Item | Where | Status | Fix |
-|---|---|---|---|
-| `/docs` and `/openapi.json` open in production | `backend/app/main.py:147` (no `docs_url=None`) | 200/200 locally; not directly exploitable since authz is enforced, but it eases reconnaissance | `docs_url=None, redoc_url=None, openapi_url=None` in production |
-| `DEV_OTP` code default is `"1"` | `backend/app/auth.py:136` | `render.yaml` pins `"0"`, so *this repo's* production is safe; risk is any deployment not using the blueprint. Reproduced locally: the first account to register an `ADMIN_EMAILS` address became admin instantly, and the OTP came back in the response body | Default to `"0"` so the unsafe value is opt-in |
-| scrypt N=2¹⁴ | `backend/app/auth.py:40` | Below OWASP's N=2¹⁷; `password_hash` is `String(200)`, which accommodates an upgrade | Raise N, re-hash on next successful login |
-| AES-GCM used without AAD | `backend/app/crypto.py:153`, `:175` | Ciphertext is not bound to its row, so a DB-write attacker could move messages between rows. Requires database write access — this is defence-in-depth, not a primary control | Pass `message.id` / `match_id` as associated data |
-| Container runs as root | `backend/Dockerfile` (no `USER` directive) | — | Add a non-root `USER` |
-| No KVKK privacy notice; Brevo/Render transfers undisclosed | no `/privacy` route exists | Anthropic *is* disclosed honestly (`translations.ts:1534`); Brevo and Render appear nowhere | Write the notice, add the route |
-| `react-router-dom@6.30.1` | `frontend/package.json` | `@remix-run/router` open-redirect XSS advisory (fixed in 6.30.4+). **No concrete path from untrusted input to navigation was found in this codebase** — vulnerable version only, exploitability not demonstrated | `npm audit fix` |
-| Python dependencies pinned with `>=` | `backend/requirements.txt` | Non-reproducible builds; no known critical CVE in the currently installed versions | Pin exact versions, add a lockfile |
-| Deleted account's email survives in the audit trail | `backend/app/admin.py:1416-1422` (`detail`), `backend/app/admin.py:1202-1225` (search-prefix narrowing can reconstruct an email letter by letter) | Only relevant against a curious-admin model | Store a hash or a redacted form; drop email search |
+> **Now:** two of the nine items are fixed; the last column has each one.
+
+| Item | Where | Found | Fix | Now |
+|---|---|---|---|---|
+| `/docs` and `/openapi.json` open in production | `backend/app/main.py:147` (no `docs_url=None`) | 200/200 locally; not directly exploitable since authz is enforced, but it eases reconnaissance | `docs_url=None, redoc_url=None, openapi_url=None` in production | **Fixed.** Off unless `API_DOCS=1` (`backend/app/config.py:128`, `backend/app/main.py:350-356`); all three paths answer 404 (`backend/tests/test_api_docs.py`) |
+| `DEV_OTP` code default is `"1"` | `backend/app/auth.py:136` | `render.yaml` pins `"0"`, so *this repo's* production is safe; risk is any deployment not using the blueprint. Reproduced locally: the first account to register an `ADMIN_EMAILS` address became admin instantly, and the OTP came back in the response body | Default to `"0"` so the unsafe value is opt-in | **Open.** Default still `"1"` (`backend/app/auth.py:345`); `render.yaml` still pins `"0"` |
+| scrypt N=2¹⁴ | `backend/app/auth.py:40` | Below OWASP's N=2¹⁷; `password_hash` is `String(200)`, which accommodates an upgrade | Raise N, re-hash on next successful login | **Open.** `backend/app/auth.py:47` |
+| AES-GCM used without AAD | `backend/app/crypto.py:153`, `:175` | Ciphertext is not bound to its row, so a DB-write attacker could move messages between rows. Requires database write access — this is defence-in-depth, not a primary control | Pass `message.id` / `match_id` as associated data | **Open.** |
+| Container runs as root | `backend/Dockerfile` (no `USER` directive) | — | Add a non-root `USER` | **Open.** Still no `USER` in `backend/Dockerfile` |
+| No KVKK privacy notice; Brevo/Render transfers undisclosed | no `/privacy` route exists | Anthropic *is* disclosed honestly (`translations.ts:1534`); Brevo and Render appear nowhere | Write the notice, add the route | **Fixed, with gaps.** `/privacy` exists and names Render, Neon, Cloudflare R2, Vercel and Brevo; Google Fonts, OpenStreetMap tiles and what the audit trail keeps are left out (section 8.4) |
+| `react-router-dom@6.30.1` | `frontend/package.json` | `@remix-run/router` open-redirect XSS advisory (fixed in 6.30.4+). **No concrete path from untrusted input to navigation was found in this codebase** — vulnerable version only, exploitability not demonstrated | `npm audit fix` | **Open.** `frontend/package-lock.json` still resolves 6.30.1 |
+| Python dependencies pinned with `>=` | `backend/requirements.txt` | Non-reproducible builds; no known critical CVE in the currently installed versions | Pin exact versions, add a lockfile | **Open.** All 14 lines still use `>=` |
+| Deleted account's email survives in the audit trail | `backend/app/admin.py:1416-1422` (`detail`), `backend/app/admin.py:1202-1225` (search-prefix narrowing can reconstruct an email letter by letter) | Only relevant against a curious-admin model | Store a hash or a redacted form; drop email search | **Open.** The privacy notice says only the link to the user is severed (section 8.4) |
 
 ---
 
@@ -1073,9 +1302,10 @@ Recording these matters as much as recording the findings.
 - **Production `DEV_OTP=0`, production `Host` header behaviour, production
   security headers.** Attacking production is out of scope, so these are
   confirmed only from code and from `render.yaml` plus a local instance. The
-  claim that production returns no HSTS/CSP/XCTO/XFO comes from a `curl -I`
+  claim that production returned no HSTS/CSP/XCTO/XFO came from a `curl -I`
   observation reported during the audit and was **not independently re-verified
-  here**.
+  here**. The code now sends those headers (M5); nobody has checked
+  production's responses since.
 - **`react-router-dom` advisory.** The vulnerable version is present; no
   exploitable path within this application was found.
 
@@ -1088,11 +1318,12 @@ does not re-litigate them, and so that a future change that breaks one of them i
 visibly a regression.
 
 - **IDOR.** Attacker → `PATCH`/`DELETE` on another user's listing → 403
-  (`backend/app/listings.py:438`, `:499`). `POST` to a match they are not part of
-  → 403 (`backend/app/messages.py:57`). `GET` of an inactive listing → 404.
+  (`backend/app/listings.py:566`, `:627`). `POST` to a match they are not part of
+  → 404 since the L4 fix (`backend/app/messages.py:60-62`). `GET` of an
+  inactive listing → 404.
 - **Mass assignment.** `PATCH /api/auth/me` with `is_admin`, `verified`, `email`,
   `university`, `password_hash`, `is_suspended`, `id` → none changed. The schema
-  does not declare them (`backend/app/auth.py:208`) and `is_admin` is a property,
+  does not declare them (`backend/app/auth.py:518`) and `is_admin` is a property,
   not a column (`backend/app/models.py:83`).
 - **Admin authorization.** Non-admin → `GET /api/admin/summary` → 403; anonymous
   → 401 (`backend/app/reports.py:54`).
@@ -1101,30 +1332,32 @@ visibly a regression.
   in `backend/app/migrate.py` and interpolates a constant schema; user input never
   reaches it.
 - **File-type and path traversal on upload.** Magic-byte signature verification
-  (`backend/app/uploads.py:29-37`) rejects SVG/HTML with 415; the stored filename
-  is generated server-side (`backend/app/uploads.py:72`) so `../` in the client
+  (`backend/app/uploads.py:107-115`) rejects SVG/HTML with 415; the stored filename
+  is generated server-side (`backend/app/uploads.py:465`) so `../` in the client
   filename is irrelevant.
 - **Session hygiene.** Suspension and password change drop all tokens
-  (`backend/app/admin.py:1336`, `backend/app/auth.py:468`); 30-day TTL enforced
+  (`backend/app/admin.py:1336`, `backend/app/auth.py:865`); 30-day TTL enforced
   on read; `get_optional_user` re-checks suspension as a second gate
-  (`backend/app/auth.py:294`).
+  (`backend/app/auth.py:606`).
 - **Foreign-key cleanup on account deletion.** A user with heavy FK references
   deleted cleanly (204, no 500). The nullable-FK sweep is derived from SQLAlchemy
   metadata rather than a hand-maintained list
-  (`backend/app/auth.py:474-500`) — the docstring records that the same
-  "cannot delete account" bug recurred three times before this. *(Photo files are
-  the exception — H6.)*
+  (`backend/app/auth.py:871-897`) — the docstring records that the same
+  "cannot delete account" bug recurred three times before this. *(Photo files
+  are deleted too now, but see H6 for what deleting an account can do to other
+  people's photos.)*
 - **CORS.** `allow_credentials` is never passed, so it defaults to False
-  (`backend/app/main.py:178-186`); no ACAO is returned to an arbitrary origin.
+  (`backend/app/main.py:406-414`); no ACAO is returned to an arbitrary origin.
 - **SSRF.** No user-supplied URL is ever fetched by the server; photo URLs are
   stored and echoed, never dereferenced server-side.
 - **Frontend XSS.** No `dangerouslySetInnerHTML`, `innerHTML`, `eval`, or
-  user-controlled `href`; React escapes by default. `photos` accepts
-  `javascript:` and `data:` URLs but they only ever land in `<img src>`, so this
-  is not XSS today — the tracking risk is captured in M4.
+  user-controlled `href`; React escapes by default. Profile `photos` still
+  accept `javascript:` and `data:` URLs (listing photos no longer do), but they
+  only ever land in `<img src>`, so this is not XSS today — the rest is M4.
 - **OTP cryptography.** CSPRNG generation, single use, 5-attempts-per-15-minutes,
-  10-minute TTL, constant-time comparison (`backend/app/auth.py:128-132`,
-  `:400`). *(The storage weakness is M2.)*
+  10-minute TTL, constant-time comparison (`backend/app/auth.py:337-341`,
+  `:322-334`). *(The storage weakness, M2, is fixed: codes are stored under an
+  HMAC key.)*
 
 ---
 
@@ -1134,8 +1367,8 @@ Things this platform deliberately does not do, or does not yet do. None of these
 are findings; they are the boundaries of the current design.
 
 1. **Identity is an email address.** No student-card verification, no phone
-   number, no ID check. A determined bad actor re-registers after a ban. (And
-   per H5, currently without even needing a university address.)
+   number, no ID check. A determined bad actor re-registers after a ban. Since
+   the H5 fix the new address must at least be a university one (section 4.1).
 2. **Admin authority is a string comparison.** No second factor, no role table,
    no separation between "can suspend" and "can permanently delete". Documented
    as an accepted risk at `backend/app/config.py:64-72`.
@@ -1144,25 +1377,31 @@ are findings; they are the boundaries of the current design.
 4. **No key rotation.** Losing `MESSAGE_KEY` permanently destroys all encrypted
    messages. The only recovery is an operator's manual backup of the value.
 5. **Rate limiting is per-process and in-memory.** It resets on restart and does
-   not work correctly under more than one worker.
+   not work correctly under more than one worker. The IP limits also depend on
+   `TRUST_PROXY_HEADERS=1` and on Render being the only proxy in front of the
+   app (section 4.5).
 6. **Uploads are public, and durable only with a bucket.** With `S3_BUCKET`
    set, photos live in R2 and survive redeploys; without it they fall back to
-   the container disk, which the Render free plan wipes (`DEPLOY.md` §1.5). Per
-   H6 they used *not* to vanish on account deletion; account and listing
-   deletion now remove them from whichever store is in use. Files are served with no authorization
-   (`backend/app/main.py:158`).
+   the container disk, which the Render free plan wipes (`DEPLOY.md` §1.5).
+   Files are served to anyone with the URL (`serve_photo`,
+   `backend/app/uploads.py:479-482`). Account deletion and admin listing
+   deletion remove the files from whichever store is in use; a user's own
+   listing "delete" is a deactivation and keeps them (item 7). Photos removed
+   by editing, or uploaded and never attached, are never deleted, and account
+   deletion can currently remove other people's files too (H6).
 7. **Listing deletion is deactivation, not deletion.** `DELETE
    /api/listings/{id}` sets `is_active=False` and the row stays
-   (`backend/app/listings.py:500`). The Safety copy says this explicitly
-   (`frontend/src/i18n/translations.ts:673-674`). Only *account* deletion is
-   permanent, and only in the database.
+   (`backend/app/listings.py:628`). The Safety copy says this explicitly
+   (`frontend/src/i18n/translations.ts:677-678`). Only *account* deletion is
+   permanent.
 8. **A user cannot re-publish their own deactivated listing.** Republishing
    currently goes through an admin (`POST /api/admin/listings/{id}/publish`).
    Documented honestly in the endpoint docstring at
-   `backend/app/listings.py:476-493`.
+   `backend/app/listings.py:604-621`.
 9. **No user-level block or mute.** The only remedies are report and admin
    suspension.
-10. **No KVKK privacy notice.** See section 8.3.
+10. **The privacy notice has gaps.** Google Fonts, OpenStreetMap tiles and
+    what the audit trail keeps are not disclosed (section 8.4).
 11. **Moderation is intentionally lenient.** `block` is reserved for
     unambiguous violations; fraud heuristics can never block on their own
     (`backend/app/moderation.py:70-72`). Scam listings *will* get published and
@@ -1204,18 +1443,24 @@ listed here does not exist.
   a **mandatory reason**, both writing an `AdminAction`
   (`backend/app/admin.py:1382`, `:1144`).
 - **Conversations survive a listing deletion by design** —
-  `matches.listing_id` is NULLed (`backend/app/listings.py:164-166`).
-- ⚠️ **Photo files are NOT deleted (H6).** Until that is fixed, complete
-  erasure requires manually removing the files from `UPLOADS_DIR` on the Render
-  disk. Collect the URLs from the account's `photos` arrays *before* deleting
-  the row — afterwards they are unrecoverable.
-- ⚠️ The audit entry retains the deleted account's email
-  (`backend/app/admin.py:1416-1422`).
+  `matches.listing_id` is NULLed (`backend/app/listings.py:236-238`).
+- **Photo files go with the rows.** Both endpoints delete the files the
+  deleted rows pointed at, from R2 or the container disk (`purge_user`,
+  `backend/app/auth.py:1054`; `purge_listing`,
+  `backend/app/listings.py:244-250`), and the response's `cleanup.photos`
+  says how many.
+- ⚠️ Photos the person removed by editing, or uploaded and never attached, are
+  not tracked anywhere and stay in the bucket.
+- ⚠️ Until H6 is fixed, a user deletion also deletes files that other accounts
+  still use.
+- ⚠️ The audit entry keeps the deleted account's email, name and university
+  (`backend/app/admin.py:1416-1422`), which the privacy notice does not say
+  (section 8.4).
 
 ### D. A session is believed to be compromised
 
 - **The user's own move:** `POST /api/auth/change-password` — this deletes every
-  token for that user (`backend/app/auth.py:468-470`), a genuine
+  token for that user (`backend/app/auth.py:865-867`), a genuine
   log-out-everywhere.
 - **The admin's move:** suspend, which drops all tokens
   (`backend/app/admin.py:1336`), then unsuspend. Clumsy, but it is the only
@@ -1236,14 +1481,16 @@ before you need it.
 
 ### F. The service is being flooded (H1 / H2 / H3)
 
-There is no application-level throttle to reach for. The available levers are all
-outside the app:
+The app throttles on its own now: request bodies are capped at 6 MB (except
+DELETE, see H1), listings, messages, reports and uploads are limited per
+account, and registration and code requests per IP (section 4.5). The
+counters reset when the container restarts. When that is not enough:
 
 1. Rate-limit or body-cap at Render / Cloudflare.
 2. Identify the offending account and suspend it (which kills its tokens).
-3. If a bloated row is being served to everyone (H2), delete or truncate it
+3. If a bloated row is being served to everyone, delete or truncate it
    directly in the database — `GET /api/listings` is anonymous, so every visitor
-   pays for it until you do.
+   pays for it until you do. H2's caps stop new rows from growing that large.
 
 ### G. Suspected admin-account compromise
 
@@ -1279,9 +1526,11 @@ outside the app:
 - **Static review only for `frontend/`** apart from the two claims checked
   directly (client-side `.edu.tr` validation, token storage). No browser-side
   dynamic testing was performed.
-- **The findings are a snapshot.** They reflect the repository at commit
-  `51e5bb4` on branch `main`. Nothing in this audit was fixed as part of writing
-  this document — every finding in section 10 is, as of writing, still present.
+- **The findings are a snapshot.** The write-ups in section 10 reflect the
+  repository at commit `51e5bb4` on branch `main`. Most were fixed in `dfd79b8`,
+  the commit that added this document, and in later commits. The table at the
+  top of section 10 records where each stood on 10 October 2026, checked
+  against the code and its tests, not against production.
 - **Section 10 severities are judgement calls.** Two findings were explicitly
   downgraded from an earlier assessment (H4, M1) because verification showed the
   practical impact was smaller than the initial claim. Reasonable people can
