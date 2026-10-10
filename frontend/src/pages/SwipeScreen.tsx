@@ -12,8 +12,8 @@ import {
 } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
 import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon, Flag } from "lucide-react";
-import { type Listing, type UserProfile } from "@/data/mockData";
 import LifestyleTag from "@/components/LifestyleTag";
+import UserAvatar from "@/components/UserAvatar";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,47 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 import { BRAND } from "@/lib/brand";
 
-// Deste kartı: mock tipine ek olarak gerçek ilanın ev özelliklerini taşır.
+// Kartın altındaki profil şeridi: ilan sahibi.
+interface UserProfile {
+  id: string;
+  name: string;
+  gender: "erkek" | "kadın" | "belirtmek_istemiyorum";
+  birthYear: number;
+  university: string;
+  department: string;
+  year: number;
+  budgetMin: number;
+  budgetMax: number;
+  smoking: boolean;
+  pets: boolean;
+  alcohol: boolean;
+  sleepSchedule: "erken" | "gece" | "esnek";
+  preferredDistrict: string;
+  bio: string;
+  photos: string[];
+}
+
+// Destedeki kart. Sunucudaki ilan (ApiListing) toDeckListing ile buna çevrilir.
+interface Listing {
+  id: string;
+  userId: string;
+  type: "ev_ilani" | "kisisel_ilan";
+  title: string;
+  description: string;
+  rent?: number;
+  budgetMin?: number;
+  budgetMax?: number;
+  district: string;
+  roomCount?: string;
+  smokingAllowed?: boolean;
+  petsAllowed?: boolean;
+  photos: string[];
+  isActive: boolean;
+  createdAt: string;
+  user: UserProfile;
+}
+
+// Deste kartı: kart tipine ek olarak gerçek ilanın ev özelliklerini taşır.
 type DeckListing = Listing & {
   features?: Partial<Record<ListingFeature, boolean>>;
 };
@@ -91,8 +131,9 @@ const isDefaultFilters = (f: ListingFilters): boolean =>
   f.lifestyle.length === 0 &&
   f.features.length === 0;
 
-// API ilanlarının henüz sahibi yok (auth sonraki dilim); kart altındaki
-// profil şeridi için nötr bir yer tutucu kullanılır.
+// API ilanı sahibinin yalnızca adını ve üniversitesini taşır; kart altındaki
+// profil şeridinin geri kalanı için nötr bir yer tutucu kullanılır. Fotoğrafı
+// yok: şeritte sahibin adının baş harfleri görünür (UserAvatar).
 const anonUser: UserProfile = {
   id: "anon",
   name: "",
@@ -109,7 +150,7 @@ const anonUser: UserProfile = {
   sleepSchedule: "esnek",
   preferredDistrict: "",
   bio: "",
-  photos: ["https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch"],
+  photos: [],
 };
 
 const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
@@ -129,7 +170,7 @@ const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
   features: Object.fromEntries(
     LISTING_FEATURES.map(key => [key, a[key] === true]),
   ) as Partial<Record<ListingFeature, boolean>>,
-  photos: a.photos.length > 0 ? a.photos : anonUser.photos,
+  photos: a.photos,
   isActive: a.is_active,
   createdAt: a.created_at,
   user: {
@@ -209,8 +250,7 @@ const SwipeScreen = () => {
     setActiveFilters(isDefaultFilters(f) ? null : f);
 
   const handleSwipe = useCallback((direction: "left" | "right") => {
-    // Gerçek (API'den gelen) ilanlarda karar sunucuya yazılır; mock kartlar
-    // yalnızca demo malzemesi olduğundan atlanır.
+    // Karar sunucuya yalnızca girişliyken ve sunucudaki bir ilan için yazılır.
     const card = cards[cards.length - 1];
     if (card && isLoggedIn && card.id.startsWith("api-")) {
       const listingId = Number(card.id.slice(4));
@@ -395,7 +435,14 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
   return (
     <div className="card-listing h-full flex flex-col">
       <div className="relative flex-[0_0_65%] overflow-hidden">
-        <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover" />
+        {listing.photos[0] ? (
+          <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover" />
+        ) : (
+          // Sunucu ilan başına en az 3 fotoğraf ister; bu yalnızca bir güvence.
+          <div className="w-full h-full bg-lavender/40 flex items-center justify-center">
+            <Home className="w-16 h-16 text-primary/40" />
+          </div>
+        )}
         <div className="absolute top-4 left-4">
           <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
             isHouse ? "bg-lavender/80 text-foreground" : "bg-accent/80 text-accent-foreground"
@@ -441,7 +488,7 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
           )}
         </div>
         <div className="flex items-center gap-3 pt-1">
-          <img src={listing.user.photos[0]} alt="" className="w-8 h-8 rounded-full object-cover" />
+          <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-8 h-8 text-xs" />
           <span className="text-xs text-muted-foreground font-medium">{listing.user.name}</span>
         </div>
       </div>
@@ -462,7 +509,7 @@ interface SwipeCardDraggableProps {
 const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direction, onReport }: SwipeCardDraggableProps) => {
   const { t } = useI18n();
   const { isLoggedIn } = useAuth();
-  // Yalnızca sunucudaki ilanların id'si vardır; mock kart raporlanamaz.
+  // Yalnızca sunucudaki ilanların id'si vardır ("api-<id>").
   const apiListingId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
@@ -528,7 +575,7 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
                 </div>
               )}
               <div className="card-listing p-4 flex items-center gap-3">
-                <img src={listing.user.photos[0]} alt="" className="w-14 h-14 rounded-full object-cover" />
+                <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-14 h-14 text-lg" />
                 <div>
                   <p className="font-semibold text-foreground">{listing.user.name}</p>
                   <p className="text-xs text-muted-foreground">{listing.user.university} • {listing.user.department}</p>

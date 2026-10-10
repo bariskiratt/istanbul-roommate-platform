@@ -27,8 +27,8 @@ def _clear_rate_limits():
 def _allow_fixture_photo_host(monkeypatch):
     """Testlerdeki example.com fotoğraf adresleri kabul edilsin.
 
-    Fotoğraf adresi artık kapalı bir listeye göre doğrulanıyor
-    (app.uploads.is_allowed_photo_url) ve üretim listesinde example.com YOKTUR.
+    Fotoğraf adresi app.uploads.is_allowed_photo_url ile doğrulanıyor: kendi
+    yüklemelerimiz dışında yalnızca EXTRA_PHOTO_HOSTS'taki barındırıcılar geçer.
     Sınamalar RFC 2606'nın ayırdığı bu adı kullandığı için listeyi üretimde de
     gevşetmek yerine, dağıtıma özel ek barındırıcı değişkeni testlerde
     dolduruluyor.

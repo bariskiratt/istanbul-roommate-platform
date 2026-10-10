@@ -79,8 +79,8 @@ By what you are trying to do:
 
 ## Quick start
 
-Setup — prerequisites, the two-terminal local run, demo seeding, deployment — is
-in the root README and is not repeated here:
+Setup — prerequisites, the two-terminal local run, deployment — is in the root
+README and is not repeated here:
 
 - **Run it locally:** [root README](../README.md), section *Running locally
   (two terminals)*
@@ -96,10 +96,10 @@ Render deploys a `main` commit only once they pass (`render.yaml`,
 2026-10-10.
 
 ```bash
-# backend — 419 passed
+# backend — 428 passed
 cd backend && source venv/bin/activate && python -m pytest tests/ -q
 
-# frontend — 84 passed in 10 files
+# frontend — 88 passed in 11 files
 cd frontend && npm test
 
 # frontend — type check. `vite build` transpiles without checking types, so
@@ -216,8 +216,8 @@ unrecoverable. SECURITY.md §7.1–7.3.
   §10", "MODEL.md §7") are not links to anchors and will silently point at the
   wrong section if a document is renumbered. Check the target's own table of
   contents if a reference looks off.
-- **The measured numbers are a snapshot** of 2026-10-10: 419 backend tests
-  passing, 84 frontend tests passing, a clean `npm run typecheck`, a successful
+- **The measured numbers are a snapshot** of 2026-10-10: 428 backend tests
+  passing, 88 frontend tests passing, a clean `npm run typecheck`, a successful
   build. CI re-runs the commands on every change, but it does not update the
   counts written here. (The repository once also had a keepalive ping on a
   GitHub Actions cron; it was removed once measurement showed GitHub honoured
@@ -228,9 +228,8 @@ unrecoverable. SECURITY.md §7.1–7.3.
   claim's `file:line` reference is the only reliable freshness check.
 - **Coverage is uneven.** The offline pipeline is only covered where a
   runtime feature depends on it — `build_market_values.py` and
-  `fetch_transit.py` appear inside ALGORITHMS.md §1–2 and MODEL.md §2, and
-  `seed_demo.py` is not documented anywhere beyond a one-line mention in the
-  root README. The email path stops at SECURITY.md §8.1. Operations —
+  `fetch_transit.py` appear inside ALGORITHMS.md §1–2 and MODEL.md §2. The
+  email path stops at SECURITY.md §8.1. Operations —
   monitoring, backups, rollback — is documented neither here nor in DEPLOY.md.
 - **`backend/README.md` is not part of this set.** It is an older Turkish
   project overview and describes some things aspirationally (it mentions

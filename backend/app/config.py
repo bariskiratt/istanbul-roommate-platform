@@ -118,6 +118,15 @@ ADMIN_EMAILS = {
 # vekil başlığı kendisi yazıyorsa TRUST_PROXY_HEADERS=1 ver.
 TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "0") == "1"
 
+# API belgesi: Swagger (/docs), ReDoc (/redoc) ve şema (/openapi.json).
+#
+# Varsayılan KAPALI; yerelde görmek için API_DOCS=1 ver. Yayında açık
+# kaldığında herkese bütün uçların ve alanların haritasını veriyordu (yetki
+# denetimi yine de uçlarda, ama keşfi kolaylaştırıyor; docs/SECURITY.md L6).
+# Kapalı varsayılan, yayında ayrıca bir değişken unutulsa da güvenli tarafta
+# kalınmasını sağlar.
+API_DOCS = os.getenv("API_DOCS", "0") == "1"
+
 # Kullanıcı fotoğrafları (yerelde üretilir, git'e girmez).
 # Yayında kalıcı disk bağlanan yolu UPLOADS_DIR env ile ver.
 UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))

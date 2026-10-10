@@ -4,12 +4,11 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { REMOVED_CONTENT, UNREADABLE_CONTENT, fetchMatches } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
-
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 // Çözülemeyen ("[unreadable]") ve moderasyonca kaldırılmış
 // ("[removed_by_moderation]") mesajlar için backend sabit ASCII dize döner.
@@ -52,11 +51,7 @@ const Messages = () => {
               className="w-full card-listing p-5 flex items-center gap-4 hover:shadow-lg transition-shadow"
             >
               <div className="relative flex-shrink-0">
-                <img
-                  src={other.photos[0] ?? placeholderAvatar}
-                  alt={other.name}
-                  className="w-14 h-14 rounded-full object-cover"
-                />
+                <UserAvatar name={other.name} photo={other.photos[0]} className="w-14 h-14 text-lg" />
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-accent border-2 border-card" />
               </div>
               <div className="flex-1 min-w-0 text-left">

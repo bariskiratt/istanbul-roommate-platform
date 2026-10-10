@@ -5,6 +5,7 @@ import { Send, Home, ArrowLeft, Flag } from "lucide-react";
 import { toast } from "sonner";
 import BottomNav from "@/components/layout/BottomNav";
 import ReportDialog from "@/components/ReportDialog";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ApiError,
@@ -16,8 +17,6 @@ import {
 } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
-
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 // UNREADABLE_CONTENT ("[unreadable]"): mesaj şifreli yazılmış ama sunucu onu
 // çözememiş (backend/app/crypto.py).
@@ -134,11 +133,7 @@ const ChatScreen = () => {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <img
-          src={other?.photos[0] ?? placeholderAvatar}
-          alt=""
-          className="w-10 h-10 rounded-full object-cover"
-        />
+        <UserAvatar name={other?.name ?? ""} photo={other?.photos[0]} className="w-10 h-10 text-sm" />
         <div className="flex-1 min-w-0">
           {/* Sohbet kapalıysa eşleşme kaydı elimizde yok: karşı tarafın adını
               bilmiyoruz. "İsimsiz" yazmak profili hakkında yanlış bir şey

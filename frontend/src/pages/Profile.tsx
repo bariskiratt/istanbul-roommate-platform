@@ -8,12 +8,11 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
-
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch-me";
 
 const Profile = () => {
   const { isLoggedIn, user: me } = useAuth();
@@ -85,7 +84,7 @@ const Profile = () => {
     alcohol: me.alcohol ?? false,
     sleepSchedule: (me.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
     bio: me.bio,
-    photos: me.photos.length > 0 ? me.photos : [placeholderAvatar],
+    photos: me.photos,
   };
 
   const matchCount = myMatches.length;
@@ -123,10 +122,11 @@ const Profile = () => {
           <div className="flex items-start gap-4">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
-              <img
-                src={user.photos[0]}
-                alt={user.name}
-                className="w-20 h-20 rounded-full object-cover object-top border-4 border-card shadow-lg"
+              <UserAvatar
+                name={user.name}
+                photo={user.photos[0]}
+                className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
+                imageClassName="object-top"
               />
             </div>
             {/* Info right of avatar */}
@@ -247,7 +247,11 @@ const Profile = () => {
                 transition={{ delay: i * 0.1 }}
                 className="card-listing overflow-hidden flex"
               >
-                <img src={listing.photos[0] ?? placeholderAvatar} alt="" className="w-28 h-28 object-cover" />
+                {listing.photos[0] ? (
+                  <img src={listing.photos[0]} alt="" className="w-28 h-28 object-cover" />
+                ) : (
+                  <div className="w-28 h-28 shrink-0 bg-muted" />
+                )}
                 <div className="p-4 flex-1">
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${

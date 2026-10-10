@@ -10,9 +10,8 @@
  * uzun süre görünmeyiz. "evdes.tr" hem ayırt edici hem de kullanıcının
  * adres çubuğuna yazacağı şeyin aynısı.
  *
- * DİKKAT: bu yalnızca GÖRÜNEN ad. Depolanan anahtarlar (localStorage
- * "roommatch_token", demo hesapların "demo.roommatch.tr" alan adı) bilerek
- * eski adında bırakıldı — değiştirmek herkesin oturumunu düşürür ve
- * üretimdeki demo hesapları sahipsiz bırakır.
+ * DİKKAT: bu yalnızca GÖRÜNEN ad. Depolanan anahtar (localStorage
+ * "roommatch_token") bilerek eski adında bırakıldı — değiştirmek herkesin
+ * oturumunu düşürür.
  */
 export const BRAND = "evdes.tr";

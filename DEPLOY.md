@@ -45,8 +45,6 @@ Notes:
   sees no checks at all is not deployed either. Once the blueprint has synced,
   Service → Settings → **Auto-Deploy** should read *After CI Checks Pass*; if it
   still says *On Commit*, pick that option there.
-- **Demo content:** you can run `python -m scripts.seed_demo` from the Render
-  Shell to insert 100 demo listings.
 
 ### 1.1) Message encryption key (`MESSAGE_KEY`) — read this
 
@@ -354,8 +352,7 @@ that wakes it in well under a second, and the engine's `pool_pre_ping`
 `Application startup complete.` means the API reached the database; then
 <https://api.evdes.tr/api/health> should show `"database": "ok"` and
 `https://api.evdes.tr/api/listings` should answer `[]` instead of an error.
-Sign up once to confirm writes work. Demo listings are optional
-(`python -m scripts.seed_demo` needs Shell, see the notes in section 1).
+Sign up once to confirm writes work.
 
 **The old database.** If `roommatch-db` still appears in Render, delete it once
 the API runs on Neon. Its data can only be read again by upgrading it to a paid
@@ -374,7 +371,8 @@ choice.
 ## 3) Checklist
 
 - [ ] `https://YOUR-API/` → returns the endpoint list
-- [ ] `https://YOUR-API/docs` → Swagger loads
+- [ ] `https://YOUR-API/docs` → 404: the API docs stay off in production
+      unless `API_DOCS=1` is set
 - [ ] The budget heatmap loads on the Vercel address (means CORS is correct)
 - [ ] Sign-up flow works (in dev mode the OTP appears in a toast)
 - [ ] `crypto.key_available()` returns `True` in Render Shell (section 1.1)
@@ -465,3 +463,5 @@ already delivering 10% of the requested schedule.
 | `UPLOADS_DIR` | `data/uploads` | Directory photos are written to while `S3_BUCKET` is unset — local development. On Render's free plan this is inside the container, i.e. photos are lost on redeploy and sleep. |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
+| `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
+| `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |

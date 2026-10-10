@@ -55,8 +55,8 @@ def _check_photos(value: list[str] | None) -> list[str] | None:
     ilan fotoğrafı saldırganın sunucusundan çekilebiliyordu.
 
     Kural: her öğe en fazla MAX_PHOTO_URL_LENGTH karakter VE
-    uploads.is_allowed_photo_url'den geçmeli (kendi yüklemelerimiz + kapalı
-    listedeki barındırıcılar).
+    uploads.is_allowed_photo_url'den geçmeli (kendi yüklemelerimiz +
+    EXTRA_PHOTO_HOSTS'ta yazılı barındırıcılar).
     """
     if value is None:
         return value

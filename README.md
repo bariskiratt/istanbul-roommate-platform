@@ -7,7 +7,8 @@ with an admin review queue, and rail-network-based **alternative district
 suggestions** — all in one app, in Turkish and English.
 
 **Live:** https://evdes.tr
-**API:** https://api.evdes.tr ([docs](https://api.evdes.tr/docs))
+**API:** https://api.evdes.tr (interactive docs are off in production; run the
+API locally with `API_DOCS=1` to see them)
 
 ---
 
@@ -85,7 +86,7 @@ app/locations.py  district -> neighbourhood list, filtered to model coverage
 app/content_limits.py  per-user quotas on content endpoints
 app/migrate.py    additive schema migration + drift warning on startup
 app/emailer.py    OTP email via Brevo
-scripts/          offline: train_model, build_market_values, fetch_transit, seed_demo
+scripts/          offline: train_model, build_market_values, fetch_transit
 ```
 
 ## 🛡️ Moderation & the admin panel
@@ -169,7 +170,10 @@ python -m app.main
 ```
 
 On macOS, LightGBM needs: `brew install libomp`. Transit data ships with the
-repo; re-download with `python -m scripts.fetch_transit` if needed.
+repo; re-download with `python -m scripts.fetch_transit` if needed. The
+interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off by default,
+production included; start the API with `API_DOCS=1 python -m app.main` to see
+them.
 
 **2) Frontend** (http://localhost:8080)
 
@@ -180,15 +184,8 @@ cp .env.example .env            # VITE_API_URL defaults to 127.0.0.1:8000
 npm run dev
 ```
 
-Optional demo content — 5 profiles and 5 hand-written listings with real
-photos, rents derived from that neighbourhood's median and indexed like any
-other estimate: `python -m scripts.seed_demo` (`--force` replaces existing demo
-rows). Sign in as `demo1@demo.roommatch.tr` … `demo5@…` with `Demo1234!`, using
-the password tab — those addresses receive no mail, so the code path will not
-work for them.
-
-**Tests:** `python -m pytest tests/` (backend, 419) · `npm test` (frontend,
-84) · `npm run typecheck` · `npm run lint`. GitHub Actions runs all of them,
+**Tests:** `python -m pytest tests/` (backend, 428) · `npm test` (frontend,
+88) · `npm run typecheck` · `npm run lint`. GitHub Actions runs all of them,
 plus `npm run build`, on every pull request and every push to `main`
 (`.github/workflows/ci.yml`); Render deploys a `main` commit only after they
 pass.
@@ -207,7 +204,7 @@ Backend environment variables: `DATABASE_URL`, `CORS_ORIGINS`, `DEV_OTP`,
 `ANTHROPIC_API_KEY`, `BREVO_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`,
 `ADMIN_EMAILS`, `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`,
 `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `UPLOADS_DIR`, `RENT_INDEX_FACTOR`,
-`MAX_REQUEST_BYTES`, `EXTRA_PHOTO_HOSTS`. DEPLOY.md explains what each one does and what happens
+`MAX_REQUEST_BYTES`, `EXTRA_PHOTO_HOSTS`, `API_DOCS`. DEPLOY.md explains what each one does and what happens
 when it is missing. Several fail *quietly* rather than loudly, which is the
 dangerous kind:
 

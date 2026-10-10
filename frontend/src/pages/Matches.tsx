@@ -9,11 +9,11 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
 import { useI18n } from "@/i18n";
-
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
+import { initials } from "@/lib/utils";
 
 // API beğenisini kart bileşeninin beklediği görünüme çevirir
 const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
@@ -33,7 +33,7 @@ const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
     alcohol: r.user.alcohol ?? false,
     sleepSchedule: (r.user.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
     bio: r.user.bio,
-    photos: r.user.photos.length > 0 ? r.user.photos : [placeholderAvatar],
+    photos: r.user.photos,
   },
 });
 
@@ -211,14 +211,17 @@ const Matches = () => {
               <h2 className="text-3xl font-extrabold text-foreground">{t("likes.matched")}</h2>
 
               <div className="flex items-center justify-center">
-                <motion.img
+                <motion.div
                   initial={{ x: -40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src={me?.photos[0] ?? placeholderAvatar}
-                  alt=""
-                  className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
-                />
+                >
+                  <UserAvatar
+                    name={me?.name ?? ""}
+                    photo={me?.photos[0]}
+                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
+                  />
+                </motion.div>
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -227,14 +230,17 @@ const Matches = () => {
                 >
                   <Heart className="w-5 h-5 text-accent-foreground" />
                 </motion.div>
-                <motion.img
+                <motion.div
                   initial={{ x: 40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src={matchPopup.user.photos[0]}
-                  alt=""
-                  className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
-                />
+                >
+                  <UserAvatar
+                    name={matchPopup.user.name}
+                    photo={matchPopup.user.photos[0]}
+                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
+                  />
+                </motion.div>
               </div>
 
               <p className="text-muted-foreground text-sm">
@@ -346,7 +352,13 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
       <div className="card-listing h-full flex flex-col">
         {/* Photo — top 55% */}
         <div className="relative flex-[0_0_55%] overflow-hidden rounded-t-2xl">
-          <img src={user.photos[0]} alt={user.name} className="w-full h-full object-cover object-top" />
+          {user.photos[0] ? (
+            <img src={user.photos[0]} alt={user.name} className="w-full h-full object-cover object-top" />
+          ) : (
+            <div className="w-full h-full bg-lavender/60 flex items-center justify-center">
+              <span className="text-6xl font-bold text-foreground/60">{initials(user.name)}</span>
+            </div>
+          )}
           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5 pt-16">
             <h3 className="font-bold text-2xl text-white leading-tight">{user.name}</h3>
             <div className="flex items-center gap-1.5 mt-1 text-white/90 text-sm">
