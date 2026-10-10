@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 
-// @ts-expect-error - .mjs betiğinin tip bildirimi yok
+// .mjs betiğinin tip bildirimi yok; tsconfig.app.json'da noImplicitAny kapalı
+// olduğu için içe aktarılanlar `any` olur ve tsc hata vermez.
 import { slug, slugDropsCharacters } from "../../scripts/slug.mjs";
 
 describe("semt slug", () => {

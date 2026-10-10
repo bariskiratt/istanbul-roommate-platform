@@ -8,6 +8,8 @@ npm install
 cp .env.example .env   # VITE_API_URL, defaults to http://127.0.0.1:8000
 npm run dev            # http://localhost:8080
 npm test               # vitest
+npm run typecheck      # tsc on both tsconfigs (plain `npx tsc --noEmit` checks nothing)
+npm run lint           # eslint
 npm run build          # production build (used by Vercel)
 ```
 

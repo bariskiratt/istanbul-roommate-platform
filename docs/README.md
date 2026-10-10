@@ -89,27 +89,34 @@ in the root README and is not repeated here:
   [`frontend/README.md`](../frontend/README.md)
 
 What the root README does not spell out is how to check that a working tree is
-healthy before and after a change. All four commands below were run against
-commit `51e5bb4`; the numbers are what they printed.
+healthy before and after a change. GitHub Actions runs exactly these commands on
+every pull request and every push to `main` (`.github/workflows/ci.yml`), and
+Render deploys a `main` commit only once they pass (`render.yaml`,
+`autoDeployTrigger: checksPass`). The numbers are what they printed on
+2026-10-10.
 
 ```bash
-# backend — 381 passed
+# backend — 419 passed
 cd backend && source venv/bin/activate && python -m pytest tests/ -q
 
-# frontend — 71 passed in 7 files
+# frontend — 84 passed in 10 files
 cd frontend && npm test
 
-# frontend — type check (clean; `vite build` transpiles without checking types,
-# so this is a separate manual step — FRONTEND.md §11)
-cd frontend && npx tsc --noEmit
+# frontend — type check. `vite build` transpiles without checking types, so
+# this is a separate step. Plain `npx tsc --noEmit` checks NOTHING here: the
+# root tsconfig.json lists no files, only references, so it exits 0 with zero
+# files read. That is how five type errors reached main unnoticed.
+cd frontend && npm run typecheck
+
+# frontend — lint: 0 errors, 18 warnings (FRONTEND.md §10)
+cd frontend && npm run lint
 
 # frontend — production bundle, the same command Vercel runs
 cd frontend && npm run build   # succeeds; the 500 kB chunk warning is known
 ```
 
-`npm run lint` is *not* clean and is not a gate — FRONTEND.md §11 lists the one
-error and 17 warnings it currently reports. What the test suites do and do not
-cover is ARCHITECTURE.md §7 (backend) and FRONTEND.md §10 (frontend).
+What the test suites do and do not cover is ARCHITECTURE.md §7 (backend) and
+FRONTEND.md §10 (frontend).
 
 ---
 
@@ -209,13 +216,13 @@ unrecoverable. SECURITY.md §7.1–7.3.
   §10", "MODEL.md §7") are not links to anchors and will silently point at the
   wrong section if a document is renumbered. Check the target's own table of
   contents if a reference looks off.
-- **The measured numbers are a snapshot** of commit `51e5bb4` on `main`: 381
-  backend tests passing, 71 frontend tests passing, a clean `tsc`, a successful
-  build. Nothing re-verifies them: the repository has **no** GitHub Actions
-  workflows at all, so every command above is manual — as FRONTEND.md §11 also
-  notes for `tsc`, `vitest` and `eslint`. (There was one keepalive ping; it was
-  removed once measurement showed GitHub honoured 10% of its schedule, see
-  DEPLOY.md §5.)
+- **The measured numbers are a snapshot** of 2026-10-10: 419 backend tests
+  passing, 84 frontend tests passing, a clean `npm run typecheck`, a successful
+  build. CI re-runs the commands on every change, but it does not update the
+  counts written here. (The repository once also had a keepalive ping on a
+  GitHub Actions cron; it was removed once measurement showed GitHub honoured
+  10% of its schedule, see DEPLOY.md §5. CI is triggered by pushes, not by a
+  schedule, so that problem does not apply to it.)
 - **The five documents are not uniformly current.** Only SECURITY.md pins itself
   to a commit (`51e5bb4`, §15); the others carry no staleness marker, so a
   claim's `file:line` reference is the only reliable freshness check.

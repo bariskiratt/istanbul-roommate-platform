@@ -1,0 +1,6 @@
+# Test bağımlılıkları (çalışma zamanına ek). CI (.github/workflows/ci.yml)
+# yalnız bunu kurar; xgboost gibi eğitim paketleri requirements-dev.txt'te.
+-r requirements.txt
+
+pytest>=8.0
+httpx>=0.27        # FastAPI TestClient

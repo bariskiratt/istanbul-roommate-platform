@@ -46,6 +46,7 @@ import {
   type AdminUserRow,
   type FlaggedItem,
   type FlaggedKind,
+  type FlaggedReviewResult,
   type FlaggedStatus,
   type RestoreResult,
 } from "@/lib/api";
@@ -197,6 +198,18 @@ type AdminAction =
   | { kind: "unsuspend"; label: string; userId: number }
   // Kalıcı: hesap ve bağlı verisi gider, geri getirilemez.
   | { kind: "deleteUser"; label: string; userId: number };
+
+/**
+ * Bir AdminAction'ın sunucudan dönebilecek yanıtı. Açıkça yazılır: dallar
+ * farklı tipte Promise döndürünce TypeScript sonucun tipini ilk dala
+ * (AdminReport) sabitliyor ve diğer dallar tip hatası veriyordu.
+ */
+type AdminActionResult =
+  | AdminReport
+  | FlaggedReviewResult
+  | RestoreResult
+  | AdminUserRow
+  | AdminDeleteResult;
 
 /**
  * "suspended" sekmesi "users" ile BİRLEŞTİRİLDİ. Askıdakiler listesi, yeni
@@ -919,7 +932,7 @@ const Admin = () => {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ a, note }: { a: AdminAction; note: string }) => {
+    mutationFn: ({ a, note }: { a: AdminAction; note: string }): Promise<AdminActionResult> => {
       switch (a.kind) {
         case "resolve":
           return resolveAdminReport(a.reportId, true, note);

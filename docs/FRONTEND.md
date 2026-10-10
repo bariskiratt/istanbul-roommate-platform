@@ -542,8 +542,9 @@ What the hand-rolled version buys instead is worth naming:
 - **tr/en parity is enforced by the compiler.** The English dictionary is
   declared as `const en: Record<TranslationKey, string>`
   (`src/i18n/translations.ts:883`). Adding a Turkish key without its English
-  twin fails `npx tsc --noEmit`. Both dictionaries currently hold 739 keys;
-  they cannot drift, because drifting does not compile.
+  twin fails `npm run typecheck`, which CI runs on every pull request. Both
+  dictionaries currently hold 739 keys; they cannot drift, because drifting
+  does not compile.
 
 ### 7.2 Key layout
 
@@ -924,14 +925,21 @@ reload on three files.
 
 ```bash
 cd frontend
-npx tsc --noEmit   # types, incl. the tr/en dictionary parity check (§7.1)
+npm run typecheck  # types, incl. the tr/en dictionary parity check (§7.1)
 npm test           # vitest run
 npm run build      # vite build → dist/
 npm run lint       # eslint
 ```
 
-At the time of writing `tsc` and `vitest` are clean; `eslint` reports 1 error
-and 17 warnings (§11).
+`npm run typecheck` runs `tsc --noEmit` once per tsconfig
+(`tsconfig.app.json`, `tsconfig.node.json`). A bare `npx tsc --noEmit` reads
+the root `tsconfig.json`, which lists only references and no files, so it
+checks nothing and always exits 0; five type errors reached `main` that way.
+
+GitHub Actions runs all four on every pull request and every push to `main`
+(`.github/workflows/ci.yml`). As of 2026-10-10 `typecheck` and `vitest` are
+clean and `eslint` reports 0 errors and 18 warnings, so a lint warning does not
+fail CI but a lint error does.
 
 ---
 
@@ -1031,13 +1039,14 @@ Honest list, all verified against the current tree.
 
 **Tooling**
 
-- CI runs no frontend checks — the repository has no GitHub Actions workflows at
-  all, so `tsc`, `vitest` and `eslint` are manual. (Keeping the Render backend
-  awake is now an external uptime monitor, DEPLOY.md §5.)
-- `npm run lint` is not clean: one error (`@typescript-eslint/no-require-imports`
-  on `frontend/tailwind.config.ts:140`) and 17 warnings. Also
-  `@typescript-eslint/no-unused-vars` is switched off entirely
-  (`frontend/eslint.config.js:23`).
+- CI gates on errors only. `npm run lint` reports 18 warnings that never fail a
+  build, and `@typescript-eslint/no-unused-vars` is switched off entirely
+  (`frontend/eslint.config.js:23`). (Keeping the Render backend awake is an
+  external uptime monitor, DEPLOY.md §5, not CI.)
+- Vercel, as set up for this project, deploys `main` without waiting for CI;
+  only Render waits (`render.yaml`, `autoDeployTrigger: checksPass`). A broken frontend is kept
+  out of production by requiring the CI checks before merging into `main`, which
+  is a GitHub branch-protection setting, not something in this repository.
 - No accessibility audit. `aria-label` is used on icon buttons, `ReportDialog`
   restores focus to the trigger on close (`src/components/ReportDialog.tsx:45-48`)
   and the `LocationPicker` menu supports keyboard navigation
