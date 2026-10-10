@@ -95,13 +95,16 @@ const tr = {
 
   // ---- keşfet (kaydırma) ----
   "swipe.emptyTitle": "Şimdilik bu kadar!",
-  "swipe.emptyAll": "Mevcut tüm ilanlara karar verdin. Yeni ilan eklendiğinde burada görünecek.",
+  "swipe.emptyAll": "Şu an sana gösterecek yeni ilan yok. Yeni ilanlar eklendikçe burada görünecek.",
   "swipe.emptyFiltered": "Filtrelerine uyan ilan kalmadı. Filtreleri gevşetmeyi dene.",
   "swipe.clearFilters": "Filtreleri temizle",
+  "swipe.emptyCreate": "Kendi ilanını ver",
+  "swipe.emptyMap": "Bütçe haritasına bak",
   "swipe.matched": "Eşleştiniz! 🎉",
   "swipe.matchedDesc": "Eşleşmeni Beğeniler sayfasında görebilirsin.",
   "swipe.like": "BEĞENDİM ✓",
   "swipe.pass": "GEÇ ✗",
+  "swipe.likeLabel": "Beğen",
   "swipe.owner": "İlan Sahibi",
   "swipe.resetDeck": "Desteyi sıfırla (yönetici)",
   "swipe.resetConfirm":
@@ -1078,13 +1081,16 @@ const en: Record<TranslationKey, string> = {
 
   // ---- discover (swipe) ----
   "swipe.emptyTitle": "That's everything for now!",
-  "swipe.emptyAll": "You've reviewed every available listing. New ones will show up here.",
+  "swipe.emptyAll": "There are no new listings to show you right now. New ones will show up here.",
   "swipe.emptyFiltered": "No listings match your filters. Try loosening them.",
   "swipe.clearFilters": "Clear filters",
+  "swipe.emptyCreate": "Post your own listing",
+  "swipe.emptyMap": "Check the budget map",
   "swipe.matched": "It's a match! 🎉",
   "swipe.matchedDesc": "You can find it on the Likes page.",
   "swipe.like": "LIKED ✓",
   "swipe.pass": "PASS ✗",
+  "swipe.likeLabel": "Like",
   "swipe.owner": "Listing owner",
   "swipe.resetDeck": "Reset deck (admin)",
   "swipe.resetConfirm":

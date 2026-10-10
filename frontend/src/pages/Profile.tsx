@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Trash2, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -43,7 +43,10 @@ const Profile = () => {
       toast.error(err instanceof Error ? err.message : t("profile.removeFailed")),
   });
 
-  const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">("photos");
+  // İlan yayınlandıktan sonra doğrudan "İlanlarım" sekmesi açılır.
+  const location = useLocation();
+  const initialTab = (location.state as { tab?: string } | null)?.tab === "listings" ? "listings" : "photos";
+  const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">(initialTab);
   const [bioExpanded, setBioExpanded] = useState(false);
 
   // Kancalardan SONRA erken çıkışlar. Girişsizken AuthGate, oturum açıkken
@@ -110,8 +113,10 @@ const Profile = () => {
         }
       />
 
-      {/* Compact hero — max 200px */}
-      <div className="relative" style={{ maxHeight: 200 }}>
+      {/* Compact hero. Yükseklik sınırı yok: dar ekranda yaşam tarzı
+          etiketleri iki satıra inince alttaki istatistik kutusunun üstüne
+          taşıyordu. */}
+      <div className="relative">
         <div className="h-[100px]" style={{ background: "linear-gradient(135deg, hsl(var(--lavender)) 0%, hsl(var(--background)) 100%)" }} />
         
         <div className="px-6 -mt-10 relative z-10">

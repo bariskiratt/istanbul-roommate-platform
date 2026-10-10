@@ -159,6 +159,7 @@ const Matches = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={() => handleDecision("left")}
+              aria-label={t("likes.pass")}
               className="w-16 h-16 rounded-full bg-card flex items-center justify-center text-destructive transition-all active:scale-95"
               style={{ boxShadow: '0 4px 16px hsl(6 100% 69% / 0.25)' }}
             >
@@ -169,6 +170,7 @@ const Matches = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={() => handleDecision("right")}
+              aria-label={t("likes.match")}
               className="w-16 h-16 rounded-full bg-card flex items-center justify-center text-accent transition-all active:scale-95"
               style={{ boxShadow: '0 4px 16px hsl(165 70% 58% / 0.25)' }}
             >
