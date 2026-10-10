@@ -38,6 +38,13 @@ Notes:
   only on paid instances, so checks in this guide that say "Render Shell" need
   a paid instance. The photo bucket and the database are verified from the
   **Logs** tab instead (sections 1.5 and 1.6).
+- **Deploys wait for CI.** `render.yaml` sets `autoDeployTrigger: checksPass`:
+  a push to `main` is deployed only after the GitHub Actions checks in
+  `.github/workflows/ci.yml` pass. A commit with a failing check is never
+  deployed and the previous version keeps running; a commit on which Render
+  sees no checks at all is not deployed either. Once the blueprint has synced,
+  Service → Settings → **Auto-Deploy** should read *After CI Checks Pass*; if it
+  still says *On Commit*, pick that option there.
 - **Demo content:** you can run `python -m scripts.seed_demo` from the Render
   Shell to insert 100 demo listings.
 

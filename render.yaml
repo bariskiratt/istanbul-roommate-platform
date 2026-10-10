@@ -7,6 +7,12 @@ services:
     runtime: docker
     rootDir: backend
     plan: free
+    # main'e gelen commit, GitHub Actions'taki kontroller (.github/workflows/
+    # ci.yml) geçince yayına alınır; biri kırmızıysa o commit HİÇ yayına
+    # çıkmaz, eski sürüm çalışmaya devam eder. Dikkat: Render commit'te HİÇ
+    # kontrol görmezse de yayına almaz, bu yüzden ci.yml main'deki her push'ta
+    # koşar ve yol filtresi taşımaz.
+    autoDeployTrigger: checksPass
     envVars:
       - key: CORS_ORIGINS
         sync: false        # Vercel adresini elle gir (ör. https://roommatch.vercel.app)

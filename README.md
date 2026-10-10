@@ -187,8 +187,11 @@ rows). Sign in as `demo1@demo.roommatch.tr` … `demo5@…` with `Demo1234!`, us
 the password tab — those addresses receive no mail, so the code path will not
 work for them.
 
-**Tests:** `python -m pytest tests/` (backend, 419) · `npx vitest run`
-(frontend, 71).
+**Tests:** `python -m pytest tests/` (backend, 419) · `npm test` (frontend,
+84) · `npm run typecheck` · `npm run lint`. GitHub Actions runs all of them,
+plus `npm run build`, on every pull request and every push to `main`
+(`.github/workflows/ci.yml`); Render deploys a `main` commit only after they
+pass.
 
 ## 🚀 Deployment
 

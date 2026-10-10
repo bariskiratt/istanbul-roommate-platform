@@ -27,9 +27,11 @@ import {
   postSwipe,
   restoreRemoved,
   reviewFlagged,
+  type AdminDeleteResult,
   type AdminListing,
   type AdminListingStatus,
   type AdminListingUpdate,
+  type FlaggedReviewResult,
   type ListingFeature,
   type RestoreResult,
 } from "@/lib/api";
@@ -682,6 +684,13 @@ type DialogAction =
   | { kind: "restore"; listing: AdminListing }
   | { kind: "delete"; listing: AdminListing };
 
+/**
+ * Bir DialogAction'ın sunucudan dönebilecek yanıtı. Açıkça yazılır: dallar
+ * farklı tipte Promise döndürünce TypeScript sonucun tipini ilk dala
+ * sabitliyor ve diğer dallar tip hatası veriyordu.
+ */
+type DialogActionResult = FlaggedReviewResult | RestoreResult | AdminDeleteResult;
+
 const ListingRow = ({
   listing,
   busy,
@@ -904,7 +913,7 @@ const Listings = () => {
   });
 
   const actionMutation = useMutation({
-    mutationFn: ({ a, note }: { a: DialogAction; note: string }) => {
+    mutationFn: ({ a, note }: { a: DialogAction; note: string }): Promise<DialogActionResult> => {
       switch (a.kind) {
         case "unpublish":
           return reviewFlagged("listing", a.listing.id, "remove", note);

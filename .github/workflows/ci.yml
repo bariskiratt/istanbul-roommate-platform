@@ -1,0 +1,63 @@
+# Her PR'da ve main'e her girişte testler, tip kontrolü, lint ve derleme.
+#
+# Neden: main'e giren her commit doğrudan yayına çıkıyor (Render: backend,
+# Vercel: frontend). Bu iş akışı, bozuk bir değişikliğin o yola girmeden
+# yakalandığı kapıdır. render.yaml'daki `autoDeployTrigger: checksPass` da
+# Render'ın main'deki commit'i ancak buradaki işler geçince yayına almasını
+# sağlar; bu yüzden main'deki her push'ta da koşar ve yol filtresi YOKTUR.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Aynı PR'a art arda push gelirse eski koşu iptal edilir. main'de her commit
+# kendi grubundadır: Render her commit için sonucu bekler, iptal edilmemeli.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+      # Dockerfile ile aynı sürüm (python:3.12-slim).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-test.txt
+      # Eğitilmiş model gerekmez: hiçbir test adil fiyat modeline dokunmuyor
+      # (model yoksa uygulama /api/estimate'i kapatıp yine açılır).
+      - run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      # prebuild adımı (scripts/generate-seo.mjs) backend/data'dan semt
+      # sayfalarını üretir; Vercel'in çalıştırdığı komutun aynısı.
+      - run: npm run build
