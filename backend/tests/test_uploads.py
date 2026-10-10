@@ -158,6 +158,29 @@ def test_delete_removes_our_files_and_skips_others(client, tmp_path):
 
 
 # --------------------------------------------------------------------------
+# Fotoğraf adresi politikası (is_allowed_photo_url)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "host", ["images.unsplash.com", "api.dicebear.com", "randomuser.me"]
+)
+def test_former_demo_hosts_are_rejected(host):
+    # Demo verisi ve varsayılan avatarlar için açılmıştı; ikisi de kaldırıldı.
+    assert not uploads_module.is_allowed_photo_url(f"https://{host}/x.jpg")
+
+
+def test_extra_photo_hosts_are_the_only_outside_hosts(monkeypatch):
+    monkeypatch.setenv("EXTRA_PHOTO_HOSTS", "cdn.example.org, Media.Example.net")
+
+    assert uploads_module.is_allowed_photo_url("https://cdn.example.org/a.jpg")
+    assert uploads_module.is_allowed_photo_url("https://media.example.net/a.jpg")
+    # Dış barındırıcı yalnız https ile; listede olmayan hiçbir alan adı geçmez.
+    assert not uploads_module.is_allowed_photo_url("http://cdn.example.org/a.jpg")
+    assert not uploads_module.is_allowed_photo_url("https://example.com/a.jpg")
+
+
+# --------------------------------------------------------------------------
 # S3 uyumlu kova (Cloudflare R2) — S3_BUCKET tanımlıyken
 # --------------------------------------------------------------------------
 

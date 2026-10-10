@@ -9,11 +9,10 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
 import { useI18n } from "@/i18n";
-
-const placeholderAvatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=roommatch";
 
 // API beğenisini kartın beklediği görünüme çevirir
 const toNotification = (r: ReceivedLike, unnamed: string) => ({
@@ -28,7 +27,7 @@ const toNotification = (r: ReceivedLike, unnamed: string) => ({
     smoking: r.user.smoking ?? false,
     pets: r.user.pets ?? false,
     sleepSchedule: (r.user.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
-    photos: r.user.photos.length > 0 ? r.user.photos : [placeholderAvatar],
+    photos: r.user.photos,
   },
 });
 
@@ -152,14 +151,17 @@ const Notifications = () => {
               
               {/* Avatar merge */}
               <div className="flex items-center justify-center gap-[-8px]">
-                <motion.img
+                <motion.div
                   initial={{ x: -40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src={matchPopup.user.photos[0]}
-                  alt=""
-                  className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
-                />
+                >
+                  <UserAvatar
+                    name={matchPopup.user.name}
+                    photo={matchPopup.user.photos[0]}
+                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
+                  />
+                </motion.div>
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -168,14 +170,17 @@ const Notifications = () => {
                 >
                   <Heart className="w-5 h-5 text-accent-foreground" />
                 </motion.div>
-                <motion.img
+                <motion.div
                   initial={{ x: 40, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  src={me?.photos[0] ?? placeholderAvatar}
-                  alt=""
-                  className="w-20 h-20 rounded-full object-cover border-4 border-card shadow-lg"
-                />
+                >
+                  <UserAvatar
+                    name={me?.name ?? ""}
+                    photo={me?.photos[0]}
+                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
+                  />
+                </motion.div>
               </div>
 
               <p className="text-muted-foreground text-sm">
@@ -240,7 +245,7 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
   const { t, n } = useI18n();
   return (
     <div className="card-listing p-5 flex items-center gap-4">
-      <img src={user.photos[0]} alt={user.name} className="w-14 h-14 rounded-full object-cover" />
+      <UserAvatar name={user.name} photo={user.photos[0]} className="w-14 h-14 text-lg" />
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground truncate">{user.name}</p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">

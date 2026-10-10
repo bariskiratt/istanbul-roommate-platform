@@ -86,23 +86,15 @@ UPLOADS_PREFIX = "/uploads/"
 # Bizim ürettiğimiz dosya adı: secrets.token_hex(16) -> 32 onaltılık karakter.
 _LOCAL_PHOTO_NAME = re.compile(r"[0-9a-f]{32}\.(?:jpg|png|webp)")
 
-# Kendi yüklemelerimiz dışında kabul edilen barındırıcılar. Liste KAPALIDIR:
-# demo/tohum verisi ve arayüzün varsayılan avatarları bunları kullanıyor,
-# bunların dışındaki her adres reddedilir. Gerekçe: ilan fotoğrafı arayüzde
-# <img src> olarak basılıyor; serbest bırakıldığında ilan sayfasını açan
-# herkesin IP'si saldırganın sunucusuna düşer (izleme pikseli) ve ilanlar
-# üçüncü tarafın istediği an değiştirebildiği içerikle doldurulabilir.
-ALLOWED_PHOTO_HOSTS = frozenset(
-    {
-        "images.unsplash.com",
-        "api.dicebear.com",
-        "randomuser.me",
-    }
-)
-
-# Dağıtıma özel ek barındırıcı (virgülle ayrılmış). Kendi CDN'ini bağlayan
-# kurulum kaynağı değiştirmek zorunda kalmasın diye var; boş bırakılırsa
-# yalnızca yukarıdaki kapalı liste geçerlidir.
+# Kendi yüklemelerimiz dışında kabul edilen barındırıcılar: yalnızca bu
+# değişkende virgülle yazılanlar; boşsa (varsayılan) hiçbiri. Kendi CDN'ini
+# bağlayan kurulum kaynağı değiştirmek zorunda kalmasın diye var. Gerekçe:
+# ilan fotoğrafı arayüzde <img src> olarak basılıyor; adres serbest kalsaydı
+# ilan sayfasını açan herkesin IP'si saldırganın sunucusuna düşerdi (izleme
+# pikseli) ve ilanlar üçüncü tarafın istediği an değiştirebildiği içerikle
+# doldurulabilirdi. Eskiden demo verisi ve arayüzün varsayılan avatarları
+# için Unsplash, DiceBear ve randomuser.me de kodda açıktı; demo verisi de
+# varsayılan avatarlar da kaldırıldığı için bu üç barındırıcı artık reddedilir.
 EXTRA_PHOTO_HOSTS_ENV = "EXTRA_PHOTO_HOSTS"
 
 # Dönen mutlak URL'nin tabanı. Tanımlıysa Host başlığı YOK SAYILIR (bulgu M4:
@@ -350,7 +342,7 @@ def is_allowed_photo_url(url: str) -> bool:
       1. Kendi /uploads/ yolumuz (göreli ya da mutlak). PUBLIC_BASE_URL
          tanımlıysa mutlak adresin alan adı da ona uymalıdır; aksi hâlde
          "https://evil.tld/uploads/<32 hex>.jpg" bizim dosyamız gibi görünürdü.
-      2. Kapalı listedeki dış barındırıcılar — yalnız https.
+      2. EXTRA_PHOTO_HOSTS'ta yazılı dış barındırıcılar — yalnız https.
 
     Başka her şey (data:, javascript:, rastgele alan adları, 500 karakteri
     aşan dizeler) reddedilir.
@@ -375,16 +367,16 @@ def is_allowed_photo_url(url: str) -> bool:
     if parsed.scheme != "https":
         return False
     host = (parsed.hostname or "").lower()
-    return host in (ALLOWED_PHOTO_HOSTS | _extra_photo_hosts())
+    return host in _extra_photo_hosts()
 
 
 def delete_local_photos(urls: list[str]) -> int:
     """Verilen adreslerden BİZE AİT olanların dosyalarını depodan siler.
 
-    Dış barındırıcıdaki adresler (Unsplash vb.) ve tanımadığımız desendeki
-    yollar atlanır. Silinen dosya sayısını döner. Kovada S3 silme isteği
-    nesnenin var olup olmadığını söylemez; orada sayı, hatasız tamamlanan
-    silme isteklerinin sayısıdır.
+    Dış barındırıcıdaki adresler ve tanımadığımız desendeki yollar atlanır.
+    Silinen dosya sayısını döner. Kovada S3 silme isteği nesnenin var olup
+    olmadığını söylemez; orada sayı, hatasız tamamlanan silme isteklerinin
+    sayısıdır.
 
     Neden gerekli: hesap/ilan silmede yalnızca veritabanı satırı siliniyordu;
     yüklenen fotoğraflar /uploads/ altında girişsiz ve kalıcı kalıyordu —

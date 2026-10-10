@@ -45,8 +45,6 @@ Notes:
   sees no checks at all is not deployed either. Once the blueprint has synced,
   Service → Settings → **Auto-Deploy** should read *After CI Checks Pass*; if it
   still says *On Commit*, pick that option there.
-- **Demo content:** you can run `python -m scripts.seed_demo` from the Render
-  Shell to insert 100 demo listings.
 
 ### 1.1) Message encryption key (`MESSAGE_KEY`) — read this
 
@@ -354,8 +352,7 @@ that wakes it in well under a second, and the engine's `pool_pre_ping`
 `Application startup complete.` means the API reached the database; then
 <https://api.evdes.tr/api/health> should show `"database": "ok"` and
 `https://api.evdes.tr/api/listings` should answer `[]` instead of an error.
-Sign up once to confirm writes work. Demo listings are optional
-(`python -m scripts.seed_demo` needs Shell, see the notes in section 1).
+Sign up once to confirm writes work.
 
 **The old database.** If `roommatch-db` still appears in Render, delete it once
 the API runs on Neon. Its data can only be read again by upgrading it to a paid
@@ -374,7 +371,8 @@ choice.
 ## 3) Checklist
 
 - [ ] `https://YOUR-API/` → returns the endpoint list
-- [ ] `https://YOUR-API/docs` → Swagger loads
+- [ ] `https://YOUR-API/docs` → 404: the API docs stay off in production
+      unless `API_DOCS=1` is set
 - [ ] The budget heatmap loads on the Vercel address (means CORS is correct)
 - [ ] Sign-up flow works (in dev mode the OTP appears in a toast)
 - [ ] `crypto.key_available()` returns `True` in Render Shell (section 1.1)
@@ -396,7 +394,7 @@ choice.
 | OTP email | Brevo integration is ready (`app/emailer.py`). To activate: create a Brevo account → verify your sender address → get an API key → set on Render: `BREVO_API_KEY`, `EMAIL_FROM`. Until those are set, OTP sign-in returns 502 on a correctly configured deployment (`DEV_OTP=0`) — do **not** "fix" that by setting `DEV_OTP=1` on a public deployment, see section 1.3. |
 | Photo storage | Cloudflare R2 once the `S3_*` variables are set (section 1.5). Without them, the container disk, which loses every photo on redeploy and on sleep. Photos are served through the API, so they load only while it is awake. |
 | Database | Neon free (section 1.6): 1 GB, 100 compute-hours a month, 6 hours of restore history. Usage is on the Neon dashboard; an app with people chatting all day will outgrow the compute hours before the storage. |
-| Rate limiting | Auth endpoints are limited to 5 requests per 15 min per email, but the counter lives **in process memory**: it resets on restart and is not shared between instances. Other endpoints are unlimited. |
+| Rate limiting | Auth endpoints allow 5 requests per 15 min per email (login: per email and IP), sign-up 10 an hour per IP and code requests 15 an hour per IP; listings, messages, reports and photo uploads are limited per account. Every counter lives **in process memory**: it resets on restart and is not shared between instances. The per-IP limits need `TRUST_PROXY_HEADERS=1` behind Render's proxy (the blueprint sets it), see docs/SECURITY.md §4.5. |
 | Message encryption | At rest only, and only while `MESSAGE_KEY` is set correctly (section 1.1). Not end-to-end. |
 | Moderation | Rule-based and therefore bypassable; the AI layer is optional and off by default. Reports and flagged content are reviewed by hand in the admin panel (section 1.4) by accounts listed in `ADMIN_EMAILS` — no automatic enforcement, and no appeal flow for the person acted on. Every removal has an undo, within the limits in section 1.4. Undoing keeps no history: reopening a report or lifting a suspension clears the reverted decision rather than recording it. |
 | Sleep mode | Render's free plan sleeps after 15 idle minutes and a cold start costs ~43 s. An **external uptime monitor** must ping `https://api.evdes.tr/` every 5 minutes — see section 5. Do not use a GitHub Actions cron for this; the repository tried one and it did not work (section 5 has the measurements). |
@@ -465,3 +463,5 @@ already delivering 10% of the requested schedule.
 | `UPLOADS_DIR` | `data/uploads` | Directory photos are written to while `S3_BUCKET` is unset — local development. On Render's free plan this is inside the container, i.e. photos are lost on redeploy and sleep. |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
+| `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
+| `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |

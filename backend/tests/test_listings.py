@@ -211,6 +211,17 @@ def test_uc_fotograftan_az_ilan_reddedilir(client):
     assert res.status_code == 422
 
 
+def test_izinsiz_barindiricidaki_fotograf_reddedilir(client):
+    # Unsplash eskiden demo ilanları için izinliydi; artık kabul edilmez.
+    headers = _auth_headers(client)
+    photos = [f"https://images.unsplash.com/photo-{i}.jpg" for i in range(3)]
+
+    res = client.post("/api/listings", json=EV_ILANI | {"photos": photos}, headers=headers)
+
+    assert res.status_code == 422
+    assert "Fotoğraf adresi kabul edilmiyor" in res.text
+
+
 def test_fotografsiz_ilan_reddedilir(client):
     headers = _auth_headers(client)
 

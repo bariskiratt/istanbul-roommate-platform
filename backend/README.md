@@ -64,7 +64,6 @@ app/                        FastAPI uygulaması
 scripts/                    offline betikler (sunucuda çalışmaz)
   build_market_values.py    ham ilanlardan mahalle medyanlarını üretir
   train_model.py            adil fiyat modelini eğitir
-  seed_demo.py              demo kullanıcı + ilan üretir
   fetch_transit.py          OSM'den metro/Marmaray istasyonlarını indirir
 data/
   raw/                      dokunulmamış kaynak veri
@@ -90,6 +89,10 @@ python -m app.main                      # API + arayüz: http://127.0.0.1:8000
 
 Geliştirirken otomatik yeniden yükleme için:
 `uvicorn app.main:app --reload`
+
+Etkileşimli API belgesi (`/docs`, `/redoc`, `/openapi.json`) varsayılan olarak
+kapalıdır, yayında da öyle kalır. Yerelde görmek için API'yi `API_DOCS=1` ile
+başlat: `API_DOCS=1 python -m app.main`.
 
 macOS'ta LightGBM için OpenMP gerekiyor: `brew install libomp`.
 

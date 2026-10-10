@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import (
+    API_DOCS,
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
@@ -344,7 +345,15 @@ class BodySizeLimitMiddleware:
             await _send_413(send)
 
 
-app = FastAPI(title="İstanbul Emlak Isı Haritası", lifespan=lifespan)
+# Belge sayfaları yalnızca API_DOCS=1 iken açılır (bkz. config.API_DOCS);
+# kapalıyken üçü de 404 döner.
+app = FastAPI(
+    title="evdes.tr API",
+    lifespan=lifespan,
+    docs_url="/docs" if API_DOCS else None,
+    redoc_url="/redoc" if API_DOCS else None,
+    openapi_url="/openapi.json" if API_DOCS else None,
+)
 app.include_router(listings_router)
 app.include_router(auth_router)
 app.include_router(swipes_router)
@@ -418,7 +427,8 @@ async def index():
     """Kök adres: API tanıtımı. Asıl arayüz React uygulamasında (frontend/)."""
     return {
         "name": app.title,
-        "docs": "/docs",
+        # Belge kapalıyken (yayında) olmayan bir sayfaya bağlantı verilmez.
+        **({"docs": app.docs_url} if app.docs_url else {}),
         "endpoints": [
             "/api/geojson",
             "/api/heatmap",

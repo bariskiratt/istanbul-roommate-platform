@@ -1004,8 +1004,6 @@ Honest list, all verified against the current tree.
   endpoint and the client code both still exist.
 - `/notifications` duplicates `/matches` and is unreachable from the UI
   (`src/components/layout/BottomNav.tsx:7-8`).
-- `src/data/mockData.ts` is still imported by `src/pages/SwipeScreen.tsx:14`
-  (for types only) and has not been removed.
 
 **i18n**
 
