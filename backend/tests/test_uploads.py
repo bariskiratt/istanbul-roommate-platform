@@ -47,14 +47,14 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides.clear()
 
 
-def _auth_headers(client):
+def _auth_headers(client, email="ali@uni.edu.tr"):
     res = client.post(
         "/api/auth/register",
-        json={"email": "ali@uni.edu.tr", "password": "Sifre1234"},
+        json={"email": email, "password": "Sifre1234"},
     )
     code = res.json()["dev_code"]
     token = client.post(
-        "/api/auth/verify-otp", json={"email": "ali@uni.edu.tr", "code": code}
+        "/api/auth/verify-otp", json={"email": email, "code": code}
     ).json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -155,6 +155,63 @@ def test_delete_removes_our_files_and_skips_others(client, tmp_path):
     assert deleted == 1
     assert not (tmp_path / name).exists()
     assert client.get(f"/uploads/{name}").status_code == 404
+
+
+def _delete_account(client, headers):
+    res = client.request(
+        "DELETE", "/api/auth/me", headers=headers, json={"password": "Sifre1234"}
+    )
+    assert res.status_code == 204, res.text
+
+
+def test_account_deletion_keeps_photos_another_account_uses(client, tmp_path):
+    """Bir hesabı silmek, başka bir hesabın kullandığı dosyayı silmemeli (H6).
+
+    Eskiden hesap silme profilde ve ilanlarda geçen HER dosyayı siliyordu.
+    B, A'nın fotoğraf adresini kendi profiline yazıp hesabını silince A'nın
+    fotoğrafı 404 veriyordu: herkes başkasının fotoğrafını silebiliyordu.
+    """
+    ayse = _auth_headers(client, "ayse@uni.edu.tr")
+    berk = _auth_headers(client, "berk@uni.edu.tr")
+    url = _upload(client, ayse)
+    name = url.rsplit("/", 1)[-1]
+    for headers in (ayse, berk):
+        res = client.patch("/api/auth/me", headers=headers, json={"photos": [url]})
+        assert res.status_code == 200, res.text
+
+    _delete_account(client, berk)
+    assert client.get(f"/uploads/{name}").status_code == 200
+
+    # Son kullanan da gidince dosya silinir.
+    _delete_account(client, ayse)
+    assert not (tmp_path / name).exists()
+
+
+def test_account_deletion_keeps_a_photo_used_by_another_listing(client):
+    ayse = _auth_headers(client, "ayse@uni.edu.tr")
+    berk = _auth_headers(client, "berk@uni.edu.tr")
+    shared = _upload(client, ayse)
+    res = client.post(
+        "/api/listings",
+        headers=ayse,
+        json={
+            "type": "ev_ilani",
+            "title": "Kadıköy'de 2+1",
+            "description": "Moda'ya 5 dakika.",
+            "district": "Kadıköy",
+            "photos": [shared, _upload(client, ayse), _upload(client, ayse)],
+            "rent": 18000,
+            "room_count": "2+1",
+        },
+    )
+    assert res.status_code == 201, res.text
+    res = client.patch("/api/auth/me", headers=berk, json={"photos": [shared]})
+    assert res.status_code == 200, res.text
+
+    _delete_account(client, berk)
+
+    name = shared.rsplit("/", 1)[-1]
+    assert client.get(f"/uploads/{name}").status_code == 200
 
 
 # --------------------------------------------------------------------------

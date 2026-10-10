@@ -96,7 +96,7 @@ Render deploys a `main` commit only once they pass (`render.yaml`,
 2026-10-10.
 
 ```bash
-# backend — 428 passed
+# backend — 436 passed
 cd backend && source venv/bin/activate && python -m pytest tests/ -q
 
 # frontend — 88 passed in 11 files
@@ -216,7 +216,7 @@ unrecoverable. SECURITY.md §7.1–7.3.
   §10", "MODEL.md §7") are not links to anchors and will silently point at the
   wrong section if a document is renumbered. Check the target's own table of
   contents if a reference looks off.
-- **The measured numbers are a snapshot** of 2026-10-10: 428 backend tests
+- **The measured numbers are a snapshot** of 2026-10-10: 436 backend tests
   passing, 88 frontend tests passing, a clean `npm run typecheck`, a successful
   build. CI re-runs the commands on every change, but it does not update the
   counts written here. (The repository once also had a keepalive ping on a

@@ -38,6 +38,18 @@ RUN python -m scripts.train_model --fast
 ENV HOST=0.0.0.0
 EXPOSE 8000
 
+# Sunucu root olarak ÇALIŞMAZ (SECURITY.md L6): uygulamada bir açık
+# bulunsa bile saldırgan konteynerde tam yetkili olmasın. Kod ve eğitilmiş
+# model root'a ait kalır, yani bu kullanıcı onları okuyabilir ama
+# değiştiremez. Yazabildiği tek yer data/: DATABASE_URL boşken SQLite
+# dosyası (data/app.db), S3_BUCKET boşken yüklenen fotoğraflar
+# (data/uploads/). Yayında ikisi de dışarıda (Neon, R2). chown bilerek -R
+# değil: data/ altındaki ham veri dosyaları salt okunur kalır.
+RUN useradd --create-home --uid 10001 app \
+    && mkdir -p /app/data/uploads \
+    && chown app:app /app/data /app/data/uploads
+USER app
+
 # --proxy-headers: Render proxy'si arkasında request.base_url https üretsin
 # (yoksa yüklenen fotoğraf URL'leri http:// olur ve tarayıcı engeller)
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]

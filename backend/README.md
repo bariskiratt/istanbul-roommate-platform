@@ -84,11 +84,21 @@ pip install -r requirements.txt
 
 python -m scripts.build_market_values   # piyasa değerleri (opsiyonel, CSV hazır)
 python -m scripts.train_model           # adil fiyat modeli (~1 dk, zorunlu)
-python -m app.main                      # API + arayüz: http://127.0.0.1:8000
+DEV_OTP=1 python -m app.main            # API + arayüz: http://127.0.0.1:8000
 ```
 
+`DEV_OTP=1`, doğrulama kodunu API yanıtında (`dev_code`) da döndürür ve
+arayüz onu bildirim olarak gösterir; böylece e-posta sağlayıcısı (Brevo)
+kurmadan kayıt olunabilir. Varsayılanı kapalıdır ve herkese açık bir
+kurulumda kapalı kalmalıdır: açıkken herkes her adresle, yönetici adresleri
+dâhil, şifresiz giriş yapabilir (DEPLOY.md §1.3).
+
 Geliştirirken otomatik yeniden yükleme için:
-`uvicorn app.main:app --reload`
+`DEV_OTP=1 uvicorn app.main:app --reload`
+
+`requirements.txt` her paketi tam sürüme sabitleyen bir kilit dosyasıdır ve
+elle düzenlenmez. Paket eklemek ya da sürüm yükseltmek için
+`requirements.in`'i düzenleyip kilidi yeniden üret; komut o dosyanın başında.
 
 Etkileşimli API belgesi (`/docs`, `/redoc`, `/openapi.json`) varsayılan olarak
 kapalıdır, yayında da öyle kalır. Yerelde görmek için API'yi `API_DOCS=1` ile

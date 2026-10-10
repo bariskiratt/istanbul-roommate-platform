@@ -118,6 +118,77 @@ def test_profile_update(client):
     assert res.status_code == 422
 
 
+def test_profile_photos_must_pass_the_allowlist(client):
+    """Profil fotoğrafı da ilan fotoğrafı gibi izin listesinden geçer (M4).
+
+    conftest yalnızca example.com'u EXTRA_PHOTO_HOSTS'a ekler.
+    """
+    token, _ = _register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for url in (
+        "https://tracker.invalid/pixel.gif",
+        "http://example.com/1.jpg",
+        "data:image/png;base64,AAAA",
+    ):
+        res = client.patch("/api/auth/me", headers=headers, json={"photos": [url]})
+        assert res.status_code == 422, url
+
+    ok = ["https://example.com/1.jpg", "/uploads/" + "a" * 32 + ".jpg"]
+    res = client.patch("/api/auth/me", headers=headers, json={"photos": ok})
+    assert res.status_code == 200, res.text
+    assert res.json()["photos"] == ok
+
+
+def test_profile_keeps_a_photo_saved_before_the_allowlist(client):
+    """Kuraldan önce kaydedilmiş bir adres profili kilitlememeli.
+
+    Arayüz her kayıtta fotoğraf listesinin tamamını yolluyor; eski adres
+    yüzünden ad değişikliği bile 422 alırdı. Eski adres kalabilir ya da
+    silinebilir, ama yanına yeni bir yabancı adres eklenemez.
+    """
+    from app import models
+
+    token, user = _register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    legacy = "https://api.dicebear.com/7.x/avataaars/svg?seed=ali"
+    db = next(app.dependency_overrides[get_db]())
+    db.get(models.User, user["id"]).photos = [legacy]
+    db.commit()
+
+    res = client.patch(
+        "/api/auth/me", headers=headers, json={"name": "Ali", "photos": [legacy]}
+    )
+    assert res.status_code == 200, res.text
+
+    res = client.patch(
+        "/api/auth/me",
+        headers=headers,
+        json={"photos": [legacy, "https://tracker.invalid/pixel.gif"]},
+    )
+    assert res.status_code == 422
+
+    res = client.patch("/api/auth/me", headers=headers, json={"photos": []})
+    assert res.status_code == 200
+    assert res.json()["photos"] == []
+
+
+def test_dev_otp_is_off_unless_set(client, monkeypatch):
+    """DEV_OTP tanımlı değilse kod yanıtta DÖNMEZ (L6).
+
+    Eskiden varsayılan "1"di: değişkeni unutan bir dağıtımda kod API
+    yanıtında dönüyordu ve ADMIN_EMAILS'teki bir adresle kayıt olan herkes
+    şifresiz yönetici oluyordu. E-posta da ayarlı değilse kayıt 502 ile
+    görünür biçimde başarısız olur.
+    """
+    monkeypatch.delenv("DEV_OTP", raising=False)
+
+    res = client.post("/api/auth/register", json=REGISTER)
+
+    assert res.status_code == 502
+    assert "dev_code" not in res.text
+
+
 def test_listing_ownership_and_mine(client):
     token, user = _register_and_login(client)
     headers = {"Authorization": f"Bearer {token}"}

@@ -75,7 +75,7 @@ minutes, and the `PYTHONUNBUFFERED` note at `backend/Dockerfile:21` exists
 because someone needed to see where those minutes went.
 
 **One process, one worker.** The container's command starts uvicorn with no
-`--workers` flag (`backend/Dockerfile:43`), so there is exactly one Python
+`--workers` flag (`backend/Dockerfile:55`), so there is exactly one Python
 process. That single fact explains several design choices later in this
 document: the in-process `STATE` cache is not duplicated, and the in-memory
 rate limiter (`backend/app/auth.py:46`) actually limits something.
@@ -84,7 +84,7 @@ rate limiter (`backend/app/auth.py:46`) actually limits something.
 `request.base_url` (`backend/app/uploads.py:75`). Behind Render's TLS
 terminator, without the flag, that base URL would be `http://` and browsers
 would block the images on an `https://` page — which is exactly what the
-comment at `backend/Dockerfile:41` records.
+comment at `backend/Dockerfile:53` records.
 
 **Postgres lives on Neon**, and its connection string is entered by hand as
 `DATABASE_URL`. The blueprint used to provision a free Render Postgres, but
@@ -300,7 +300,7 @@ included, took 0.62 s wall time on the same run.)
 The model dominates both time and memory: a 6.2 MB file on disk expands to
 roughly 90 MB resident. That is the number to keep in mind before adding
 uvicorn workers — the cache is per *process*, so `--workers 4` would mean four
-copies. Today there is one worker (`backend/Dockerfile:43`).
+copies. Today there is one worker (`backend/Dockerfile:55`).
 
 ### The `STATE` dictionary
 

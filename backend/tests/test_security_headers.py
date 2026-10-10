@@ -261,15 +261,48 @@ def test_chunked_body_under_limit_passes_through(client):
     assert res.status_code != 413
 
 
-def test_bodyless_methods_are_not_wrapped(client):
-    """GET/HEAD/DELETE gövde sarmalayıcısına hiç girmemeli.
+def test_requests_without_a_body_are_not_wrapped(client):
+    """Gövdesi olmayan istek (ne Content-Length ne Transfer-Encoding) 413 almaz.
 
-    Sınır 1 bayta çekilse bile gövdesiz yöntemler 413 almamalı. HEAD için kök
-    adres kullanılır: FastAPI GET rotalarına HEAD'i kendiliğinden eklemez,
-    yalnızca api_route ile açıkça bildirilen yollarda yanıt verir.
+    Sınır 1 bayta çekilse bile. HEAD için kök adres kullanılır: FastAPI GET
+    rotalarına HEAD'i kendiliğinden eklemez, yalnızca api_route ile açıkça
+    bildirilen yollarda yanıt verir.
     """
     _body_limit_middleware().max_bytes = 1
     assert client.get("/api/legend").status_code == 200
     assert client.head("/").status_code == 200
-    # DELETE gövdesizdir: kimlik doğrulamada takılır ama 413 ALMAZ.
+    # Gövdesiz DELETE kimlik doğrulamada takılır ama 413 ALMAZ.
     assert client.delete("/api/listings/1").status_code != 413
+
+
+def test_chunked_delete_body_over_limit_is_cut_off(client):
+    """DELETE de gövde taşır: hesap silme şifreyi JSON gövdesinde alıyor.
+
+    Eskiden DELETE yöntem adına bakılarak hiç denetlenmiyordu ve FastAPI
+    gövdeyi token'dan ÖNCE okuduğu için girişsiz bir istek bile sonuna kadar
+    okunup 422 alıyordu.
+    """
+    _body_limit_middleware().max_bytes = 256 * 1024
+    res = client.request("DELETE", "/api/auth/me", content=_chunks(2 * 1024 * 1024))
+    assert res.status_code == 413
+
+
+def test_declared_delete_body_over_limit_is_rejected(client):
+    _body_limit_middleware().max_bytes = 1024
+    res = client.request("DELETE", "/api/auth/me", content=b"y" * 5000)
+    assert res.status_code == 413
+
+
+def test_chunked_delete_under_limit_still_deletes_the_account(client):
+    """Sayan sarmalayıcı DELETE gövdesini bozmamalı (yanlış pozitif yok)."""
+    token = _token(client)
+    res = client.request(
+        "DELETE",
+        "/api/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        content=iter([b'{"password": ', b'"Sifre1234"}']),
+    )
+    assert res.status_code == 204, res.text
