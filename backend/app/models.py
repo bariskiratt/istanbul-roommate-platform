@@ -235,7 +235,7 @@ class Swipe(Base):
     target_kind: Mapped[str | None] = mapped_column(String(10))
     # photo: beğenildiği ANDAKİ fotoğraf adresi (sıra sonradan değişse de
     # beğenilen kare kaybolmasın diye dizin değil adres saklanır).
-    # prompt: kart anahtarı (app.swipes.PROMPT_KEYS).
+    # prompt: kart anahtarı (app.swipes.PromptKey).
     target_ref: Mapped[str | None] = mapped_column(String(500))
     # Yorum, mesajlar gibi şifreli saklanır (app.crypto). Eşleşme olunca
     # sohbetin ilk mesajına dönüşür; o andan sonra comment_delivered True.

@@ -291,6 +291,19 @@ shared pieces live next to it: `Wordmark`, `PriceRuler` (the fair-price ruler
 used on listing cards, in the listing form and on the landing page) and
 `MapSketch`.
 
+Profiles are laid out the way Hinge lays them out: photos with
+question-and-answer cards between them ("Uyku düzenim / Gece kuşuyum").
+`ProfileTimeline` (`src/components/campus/ProfileTimeline.tsx`) renders the
+sequence for the deck card, the Likes screen and the own-profile preview. A
+prompt card is deliberately a plain bordered card with a large serif answer and
+**no** paper texture: ruled paper means text the person wrote (bio, listing
+description), while a prompt's answer is generated from choices they made in
+onboarding or the listing form. The generation lives in `src/lib/prompts.ts` as
+pure functions, and it has one rule worth keeping: an empty field produces no
+card. An unknown value is never filled with a default and then written in the
+person's own voice. The budget card is the only prompt that uses the
+highlighter, because the budget is the key number on a person's profile.
+
 ### 4.6 The `@import` ordering trap (worth remembering)
 
 Fonts are loaded from Google Fonts with a plain CSS `@import`
@@ -416,8 +429,8 @@ a round trip — but more importantly, it avoids a refetch **whose result would
 destroy local state**.
 
 The swipe deck is that case. `SwipeScreen` keeps the visible card stack in
-component state (`src/pages/SwipeScreen.tsx:144`), rebuilt from the query
-result by an effect (`:196-201`). If a swipe invalidated the deck query, the
+component state (`src/pages/SwipeScreen.tsx:205`), rebuilt from the query
+result by an effect (`:264-269`). If a swipe invalidated the deck query, the
 effect would fire and reset the stack — the user's remaining cards would jump.
 But leaving the cache untouched is also wrong: navigating away and back
 remounts the component, which rebuilds the deck from that same stale cache and
@@ -432,19 +445,21 @@ queryClient.setQueriesData<ApiListing[]>(
   old => old?.filter(l => l.id !== listingId),
 );
 ```
-`src/pages/SwipeScreen.tsx:221-224`, with the reasoning written out at
-`:216-220`. Note `setQueriesData` (plural): the key also carries `isLoggedIn`
+`src/pages/SwipeScreen.tsx:283-286`, with the reasoning written out at
+`:278-282`. Both kinds of like go through it: a plain swipe calls it after the
+server answers but drops the card at once, and a like with a comment (§9) drops
+the card only after the server has accepted the comment. Note `setQueriesData` (plural): the key also carries `isLoggedIn`
 and the feature filter, so there may be several matching entries — the prefix
 hits all of them.
 
 The contrast is right below. "Reset my deck" changes the answer wholesale, so
-it invalidates instead (`src/pages/SwipeScreen.tsx:252-254`).
+it invalidates instead (`src/pages/SwipeScreen.tsx:342-343`).
 
 A related discipline shows up in `Matches` and `Notifications`, which copy the
 query result into local queue state so a card can animate out before the server
-confirms (`src/pages/Matches.tsx:58-61`, `src/pages/Notifications.tsx:52-55`).
+confirms (`src/pages/Matches.tsx:57-59`, `src/pages/Notifications.tsx:59-61`).
 Because those two *do* invalidate after the server answers
-(`src/pages/Matches.tsx:73-74`), the effect re-seeds the queue from the fresh
+(`src/pages/Matches.tsx:71-72`), the effect re-seeds the queue from the fresh
 list, which is the correct outcome there — the decided like is gone from the
 server's response.
 
@@ -792,20 +807,42 @@ Two modes on one form (`:19`): password (`POST /api/auth/login`) or e-mail code
 
 **`SwipeScreen` — the deck** (`src/pages/SwipeScreen.tsx`).
 The core screen. Fetches undecided listings via
-`GET /api/listings?unswiped=true&features=…` (`:173-181`), renders a draggable
-card stack (`:448-476`), and writes each decision with `POST /api/swipes`
-(`:214`). Cache surgery is described in §5.4. A match raises a toast
-(`:227-229`); a rejected swipe surfaces the server's reason instead of being
-swallowed (`:231-236`). Filters live in `FilterModal`; the report box is
-mounted **outside** the card because a dragged card carries a `transform`,
-which would trap a `position: fixed` panel inside it (`:153-157`).
+`GET /api/listings?unswiped=true&features=…` (`:241-248`), renders a draggable
+card stack (`:417-435`), and writes each decision with `POST /api/swipes`
+(`:307`). Cache surgery is described in §5.4. A match raises a toast
+(`:289-291`); a rejected swipe surfaces the server's reason instead of being
+swallowed (`:309-314`).
+
+Each card scrolls like a Hinge profile (`SwipeCard`): the cover photo, title
+and price, the owner's description on ruled paper, prompt cards interleaved
+with the remaining photos (§4.5), the detailed fair-price badge, and the
+owner's `StudentCard` at the end. The inner scroller carries `touch-pan-y`, so
+a vertical move scrolls the card and a horizontal one still drags it. The
+house cards come from the listing; the roommate cards come from
+`owner_profile`, which the server fills only for logged-in requests.
+
+When logged in, every photo and card on the top card has a heart that opens
+`LikeComposer` for an optional comment of up to 300 characters. The like
+names a photo by its index (the server stores the URL it reads from the
+listing, never one the client sends) or a card by a key from a closed list.
+Unlike a plain swipe it is **not** optimistic (`sendLike`, `:320-332`): the
+card leaves only after the server accepts, so a comment rejected by moderation
+(422) stays in the box with the reason under it, the same rule `ChatScreen`
+follows. Filters live in `FilterModal`. The report box and the like composer
+are mounted **outside** the card because a dragged card carries a `transform`,
+which would trap a `position: fixed` panel inside it (`:213-229`).
 
 **`Matches` / `Notifications`** (`src/pages/Matches.tsx`,
 `src/pages/Notifications.tsx`).
 Both read `GET /api/swipes/received` and answer with
-`POST /api/swipes/{id}/respond` (`Matches.tsx:52-56`, `:70-74`). They show the
+`POST /api/swipes/{id}/respond` (`Matches.tsx:50-54`, `:68-72`). They show the
 same data; `/notifications` is no longer linked from the navigation
-(`src/components/layout/BottomNav.tsx:7-8`).
+(`src/components/layout/BottomNav.tsx:7-8`). Each like opens with what it was
+for (`src/components/LikeContext.tsx`): the liked photo, or the liked card
+rebuilt from the receiver's own current data, and the comment on ruled paper.
+Notifications shows a compact version. Below that, Matches shows the person as
+a timeline: student card, prompt cards and photos, then the bio. When the like
+is accepted, the server turns its comment into the first chat message.
 
 **`Messages`** (`src/pages/Messages.tsx`).
 Conversation list from `GET /api/matches` (`:32-36`). Last-message previews go
@@ -855,8 +892,9 @@ implemented but switched off behind a constant (`:17-20`).
 
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
 `src/pages/ProfileEdit.tsx`).
-Profile reads `GET /api/listings?mine=true` and `GET /api/matches` (`:23-33`)
-and can delete a listing (`:36-44`). Editing writes `PATCH /api/auth/me`;
+Profile reads `GET /api/listings?mine=true` and `GET /api/matches` (`:24-34`)
+and can delete a listing (`:37-45`). Its first tab, Preview, shows the profile
+the way other people see it in Likes: the same timeline, then the bio. Editing writes `PATCH /api/auth/me`;
 university is intentionally not editable because the server derives it from the
 e-mail domain (`src/lib/api.ts:332`).
 
@@ -892,7 +930,7 @@ Vitest with a jsdom environment, globals enabled, and one setup file
 stubs `window.matchMedia`, which jsdom lacks and next-themes needs
 (`src/test/setup.ts:1-15`).
 
-Current state: **7 files, 71 tests**, all passing (`npx vitest run`, ~1 s).
+Current state: **12 files, 105 tests**, all passing (`npx vitest run`, ~3 s).
 
 | File | Tests | Subject |
 | --- | --- | --- |
@@ -902,6 +940,11 @@ Current state: **7 files, 71 tests**, all passing (`npx vitest run`, ~1 s).
 | `src/test/adminUsers.test.ts` | 13 | User-row actions, audit-log detail parsing |
 | `src/test/restoreOutcome.test.ts` | 8 | Which sentence a restore prints |
 | `src/test/createListingPayload.test.ts` | 6 | Listing request body |
+| `src/test/prompts.test.ts` | 17 | Profile prompt cards, timeline order, liked-card lookup |
+| `src/test/pageMeta.test.ts` | 6 | Per-route page titles |
+| `src/test/initials.test.ts` | 4 | Avatar initials |
+| `src/test/seo-slug.test.ts` | 4 | District slugs |
+| `src/test/routing.test.ts` | 3 | Route redirects |
 | `src/test/example.test.ts` | 1 | Placeholder |
 
 ### The pattern: extract the decision, test the decision
