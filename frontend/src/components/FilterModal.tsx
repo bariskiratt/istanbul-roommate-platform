@@ -141,14 +141,14 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-[640px] max-h-[85vh] flex flex-col"
+            className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-[640px] max-h-[85vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div />
-              <h2 className="text-base font-bold text-foreground">{t("filter.title")}</h2>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80">
+              <h2 className="font-display text-xl font-semibold text-foreground">{t("filter.title")}</h2>
+              <button onClick={onClose} aria-label={t("common.close")} className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -158,7 +158,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Recommended */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.recommended")}</h3>
+                <h3 className="text-lg text-foreground mb-3">{t("filter.recommended")}</h3>
                 <div className="grid grid-cols-4 gap-3">
                   {quickFilters.map(f => {
                     const active = isQuickActive(f);
@@ -166,12 +166,12 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                       <button
                         key={f.value}
                         onClick={() => toggleQuick(f)}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
-                          active ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
+                          active ? "border-foreground bg-muted" : "border-border hover:border-foreground/40"
                         }`}
                       >
-                        <f.icon className={`w-6 h-6 ${active ? "text-primary" : "text-muted-foreground"}`} />
-                        <span className="text-[11px] font-medium text-foreground text-center leading-tight">{t(f.key)}</span>
+                        <f.icon className={`w-6 h-6 ${active ? "text-foreground" : "text-muted-foreground"}`} />
+                        <span className="text-[12px] font-semibold text-foreground text-center leading-tight">{t(f.key)}</span>
                       </button>
                     );
                   })}
@@ -182,13 +182,13 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Listing type */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.listingType")}</h3>
+                <h3 className="text-lg text-foreground mb-3">{t("filter.listingType")}</h3>
                 <div className="flex rounded-xl border border-border overflow-hidden">
                   {listingTypeOptions.map(opt => (
                     <button
                       key={opt.value}
                       onClick={() => setListingType(opt.value)}
-                      className={`flex-1 py-3 text-sm font-medium transition-all ${
+                      className={`flex-1 py-3 text-sm font-medium transition-colors ${
                         listingType === opt.value
                           ? "bg-primary text-primary-foreground"
                           : "bg-card text-foreground hover:bg-muted"
@@ -204,7 +204,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Price range */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.budget")}</h3>
+                <h3 className="text-lg text-foreground mb-1">{t("filter.budget")}</h3>
                 <p className="text-xs text-muted-foreground mb-4">{t("filter.budgetSub")}</p>
                 {/* Histogram */}
                 <div className="flex items-end gap-[2px] h-16 mb-2">
@@ -240,11 +240,11 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                 </div>
                 <div className="flex justify-between">
                   <div className="border border-border rounded-xl px-4 py-2.5">
-                    <div className="text-[10px] text-muted-foreground">{t("filter.min")}</div>
+                    <div className="text-[12px] text-muted-foreground">{t("filter.min")}</div>
                     <div className="text-sm font-semibold text-foreground">{n(priceRange[0])} ₺</div>
                   </div>
                   <div className="border border-border rounded-xl px-4 py-2.5 text-right">
-                    <div className="text-[10px] text-muted-foreground">{t("filter.max")}</div>
+                    <div className="text-[12px] text-muted-foreground">{t("filter.max")}</div>
                     <div className="text-sm font-semibold text-foreground">{n(priceRange[1])} ₺</div>
                   </div>
                 </div>
@@ -255,7 +255,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
               {/* Rooms — ilanlarda yalnızca oda sayısı var; kişi/banyo verisi
                   toplanmadığı için o sayaçlar kaldırıldı. */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.rooms")}</h3>
+                <h3 className="text-lg text-foreground mb-1">{t("filter.rooms")}</h3>
                 <p className="text-xs text-muted-foreground mb-2">{t("filter.roomsSub")}</p>
                 <div className="flex items-center justify-between py-3">
                   <span className="text-sm text-foreground">{t("filter.roomsMin")}</span>
@@ -284,7 +284,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Lifestyle */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.lifestyle")}</h3>
+                <h3 className="text-lg text-foreground mb-3">{t("filter.lifestyle")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {lifestyleChips.map(c => {
                     const active = selectedLifestyle.includes(c.value);
@@ -292,8 +292,8 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                       <button
                         key={c.value}
                         onClick={() => toggleChip(selectedLifestyle, setSelectedLifestyle, c.value)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
+                        className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                          active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-foreground/40"
                         }`}
                       >
                         {t(c.key)}
@@ -307,7 +307,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Features */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-1">{t("filter.features")}</h3>
+                <h3 className="text-lg text-foreground mb-1">{t("filter.features")}</h3>
                 <p className="text-xs text-muted-foreground mb-1">{t("filter.featuresSub")}</p>
                 {/* Kapsam notu: bu koşul yalnızca ev ilanlarına uygulanır,
                     kişisel ilanlar (ev arayan kişiler) listede kalır. Hem
@@ -321,8 +321,8 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                       <button
                         key={c.value}
                         onClick={() => toggleChip(selectedFeatures, setSelectedFeatures, c.value)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
+                        className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                          active ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-foreground/40"
                         }`}
                       >
                         {t(c.key)}
@@ -336,14 +336,14 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Gender */}
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("filter.gender")}</h3>
+                <h3 className="text-lg text-foreground mb-3">{t("filter.gender")}</h3>
                 <div className="flex gap-2">
                   {genderOptions.map(g => (
                     <button
                       key={g.value}
                       onClick={() => setGender(g.value)}
-                      className={`px-5 py-2 rounded-full text-sm font-medium border transition-all ${
-                        gender === g.value ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/30"
+                      className={`px-5 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        gender === g.value ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-foreground/40"
                       }`}
                     >
                       {t(g.key)}
@@ -360,7 +360,7 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
               </button>
               <Button
                 onClick={applyFilters}
-                className="rounded-full bg-foreground text-background hover:bg-foreground/90 px-6 h-11 text-sm font-bold"
+                className="rounded-full bg-foreground text-background hover:bg-foreground/90 px-6 h-11 text-sm font-semibold"
               >
                 {t("filter.show")}
               </Button>

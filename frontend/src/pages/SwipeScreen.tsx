@@ -11,7 +11,7 @@ import {
   type ListingFeature,
 } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, DollarSign, GraduationCap, ChevronDown, Home, User as UserIcon, Flag } from "lucide-react";
+import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, GraduationCap, ChevronDown, Home, Flag } from "lucide-react";
 import LifestyleTag from "@/components/LifestyleTag";
 import UserAvatar from "@/components/UserAvatar";
 import BottomNav from "@/components/layout/BottomNav";
@@ -306,14 +306,13 @@ const SwipeScreen = () => {
 
   const currentCard = cards[cards.length - 1];
   const nextCard = cards[cards.length - 2];
-  const thirdCard = cards[cards.length - 3];
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
       <AppHeader
         title={BRAND}
         rightAction={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {/* Deste sıfırlama — yalnızca yönetici (sunucu ucu da öyle) */}
             {isAdmin && (
               <button
@@ -321,37 +320,34 @@ const SwipeScreen = () => {
                 disabled={resetting}
                 title={t("swipe.resetDeck")}
                 aria-label={t("swipe.resetDeck")}
-                className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-40"
-                style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-40"
               >
-                <RotateCcw className={`w-5 h-5 ${resetting ? "animate-spin" : ""}`} />
+                <RotateCcw className={`w-[18px] h-[18px] ${resetting ? "animate-spin" : ""}`} />
               </button>
             )}
             <button
               onClick={() => setFilterOpen(true)}
               title={t("filter.title")}
               aria-label={t("filter.title")}
-              className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              className={`relative w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                activeFilters ? "border-foreground bg-foreground text-background" : "border-border text-foreground hover:bg-muted"
+              }`}
             >
-              <SlidersHorizontal className="w-5 h-5" />
+              <SlidersHorizontal className="w-[18px] h-[18px]" />
             </button>
           </div>
         }
       />
 
-      <div className="flex-1 relative flex items-center justify-center px-6 pt-2">
+      <div className="flex-1 relative flex items-center justify-center px-4 pt-3">
         {isPending ? (
-          <div className="w-full max-w-sm animate-pulse" style={{ height: '70vh' }}>
+          <div className="w-full max-w-sm animate-pulse" style={{ height: '68vh' }}>
             <div className="h-full rounded-2xl bg-muted" />
           </div>
         ) : cards.length === 0 ? (
-          <div className="text-center space-y-4 animate-fade-in">
-            <div className="w-24 h-24 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto">
-              <Home className="w-12 h-12 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold text-foreground">{t("swipe.emptyTitle")}</h2>
-            <p className="text-muted-foreground text-sm max-w-[260px] mx-auto">
+          <div className="w-full max-w-sm px-2 text-left space-y-4 animate-fade-in">
+            <h2 className="text-[2rem] leading-tight text-foreground">{t("swipe.emptyTitle")}</h2>
+            <p className="text-muted-foreground leading-relaxed">
               {t(activeFilters ? "swipe.emptyFiltered" : "swipe.emptyAll")}
             </p>
             {activeFilters ? (
@@ -361,25 +357,20 @@ const SwipeScreen = () => {
             ) : (
               // Yayının ilk günlerinde deste çoğu zaman boş olacak; öğrenci
               // burada takılı kalmasın, ilan vermeye ya da haritaya geçsin.
-              <div className="flex flex-col items-center gap-2 pt-2">
+              <div className="flex flex-wrap items-center gap-2 pt-2">
                 <Button onClick={() => navigate(isLoggedIn ? "/create-listing" : "/onboarding")}>
                   {t("swipe.emptyCreate")}
                 </Button>
-                <Button variant="ghost" onClick={() => navigate("/explore")}>
+                <Button variant="outline" onClick={() => navigate("/explore")}>
                   {t("swipe.emptyMap")}
                 </Button>
               </div>
             )}
           </div>
         ) : (
-          <div className="relative w-full max-w-sm" style={{ height: '70vh' }}>
-            {thirdCard && (
-              <div className="absolute inset-x-3 top-5 bottom-0 scale-[0.90] opacity-40 rounded-2xl overflow-hidden">
-                <div className="card-listing h-full bg-card" />
-              </div>
-            )}
+          <div className="relative w-full max-w-sm" style={{ height: '68vh' }}>
             {nextCard && (
-              <div className="absolute inset-x-1.5 top-2.5 bottom-0 scale-[0.95] opacity-60 rounded-2xl overflow-hidden">
+              <div className="absolute inset-0 translate-y-2 scale-[0.96] rounded-2xl overflow-hidden" aria-hidden="true">
                 <SwipeCard listing={nextCard} isTop={false} />
               </div>
             )}
@@ -401,12 +392,12 @@ const SwipeScreen = () => {
       </div>
 
       {cards.length > 0 && (
-        <div className="flex items-center justify-center gap-8 py-4">
-          <button onClick={() => handleSwipe("left")} aria-label={t("likes.pass")} className="btn-swipe-pass w-[60px] h-[60px] flex items-center justify-center">
-            <X className="w-7 h-7" />
+        <div className="flex items-center justify-center gap-6 py-4">
+          <button onClick={() => handleSwipe("left")} aria-label={t("likes.pass")} className="btn-swipe-pass w-16 h-16 flex items-center justify-center">
+            <X className="w-7 h-7" strokeWidth={2.4} />
           </button>
-          <button onClick={() => handleSwipe("right")} aria-label={t("swipe.likeLabel")} className="btn-swipe-like w-[60px] h-[60px] flex items-center justify-center">
-            <Heart className="w-7 h-7" />
+          <button onClick={() => handleSwipe("right")} aria-label={t("swipe.likeLabel")} className="btn-swipe-like w-16 h-16 flex items-center justify-center">
+            <Heart className="w-7 h-7" strokeWidth={2.2} />
           </button>
         </div>
       )}
@@ -427,69 +418,65 @@ const SwipeScreen = () => {
   );
 };
 
-/* Card content — photo-dominant with overlay */
+/*
+ * Kart: Hinge gibi fotoğraf üstte ve çerçeveli, metin altta kâğıdın üstünde.
+ * Fotoğrafın üstüne yazı basılmaz; başlık ve fiyat her fotoğrafta okunur.
+ * İlan sahibinin kendi yazdığı açıklama çizgili kâğıtta durur.
+ */
 const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolean }) => {
   const isHouse = listing.type === "ev_ilani";
   const { t, n } = useI18n();
+  const apiId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
 
   return (
     <div className="card-listing h-full flex flex-col">
-      <div className="relative flex-[0_0_65%] overflow-hidden">
+      <div className="relative flex-[0_0_50%] m-2 mb-0 rounded-xl overflow-hidden bg-muted">
         {listing.photos[0] ? (
-          <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover" />
+          <img src={listing.photos[0]} alt={isTop ? listing.title : ""} className="w-full h-full object-cover" draggable={false} />
         ) : (
           // Sunucu ilan başına en az 3 fotoğraf ister; bu yalnızca bir güvence.
-          <div className="w-full h-full bg-lavender/40 flex items-center justify-center">
-            <Home className="w-16 h-16 text-primary/40" />
+          <div className="w-full h-full flex items-center justify-center">
+            <Home className="w-12 h-12 text-muted-foreground/50" />
           </div>
         )}
-        <div className="absolute top-4 left-4">
-          <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
-            isHouse ? "bg-lavender/80 text-foreground" : "bg-accent/80 text-accent-foreground"
-          }`}>
-            {isHouse ? `🏠 ${t("common.houseListing")}` : `👤 ${t("common.personalListing")}`}
-          </span>
+        <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[12px] font-semibold bg-card/95 text-foreground">
+          {isHouse ? t("common.houseListing") : t("common.personalListing")}
+        </span>
+      </div>
+
+      <div className="px-4 pt-3 pb-4 flex-1 min-h-0 flex flex-col gap-2.5">
+        <div>
+          <h3 className="font-display text-[1.45rem] leading-tight text-foreground line-clamp-1">{listing.title}</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5" />
+            {listing.district}
+            {listing.roomCount && <span className="ml-1.5">{listing.roomCount}</span>}
+          </p>
         </div>
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5 pt-16">
-          <h3 className="font-bold text-xl text-white leading-tight">{listing.title}</h3>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="flex items-center gap-1 text-white/90 text-sm"><MapPin className="w-4 h-4" />{listing.district}</span>
-            <span className="font-bold text-white text-lg">
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="text-[15px]">
+            <span className="marker font-semibold text-[17px]">
               {isHouse
                 ? `${n(listing.rent ?? 0)} ₺`
                 : `${n(listing.budgetMin ?? 0)}–${n(listing.budgetMax ?? 0)} ₺`}
             </span>
-            {isHouse && <span className="text-white/70 text-xs">{t("common.roomShare")}</span>}
-          </div>
+            {isHouse && <span className="text-muted-foreground text-[13px] ml-0.5">{t("common.roomShare")}</span>}
+          </p>
           {/* Gerçek ilanlarda modelin adil fiyat kıyası */}
-          {isHouse && listing.id.startsWith("api-") && (
-            <div className="mt-2">
-              <FairPriceBadge listingId={Number(listing.id.slice(4))} onPhoto />
-            </div>
-          )}
-          {listing.user.university && (
-            <div className="flex items-center gap-1.5 mt-1.5 text-white/80 text-xs">
-              <GraduationCap className="w-3.5 h-3.5" />{listing.user.university}
-            </div>
-          )}
+          {isHouse && apiId !== null && isTop && <FairPriceBadge listingId={apiId} />}
         </div>
-      </div>
-      <div className="p-5 flex-1 space-y-3">
-        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{listing.description}</p>
-        <div className="flex flex-wrap gap-1.5">
-          {isHouse && listing.smokingAllowed !== undefined && <LifestyleTag type="smoking" value={listing.smokingAllowed} />}
-          {isHouse && listing.petsAllowed !== undefined && <LifestyleTag type="pets" value={listing.petsAllowed} />}
-          {/* Profil bilinmiyorsa ("anon") uydurma yaşam tarzı etiketi basılmaz */}
-          {!isHouse && listing.user.id !== "anon" && (
-            <>
-              <LifestyleTag type="smoking" value={listing.user.smoking} />
-              <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-3 pt-1">
-          <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-8 h-8 text-xs" />
-          <span className="text-xs text-muted-foreground font-medium">{listing.user.name}</span>
+
+        <p className="paper-ruled rounded-lg text-[14px] text-foreground flex-1 min-h-[3.5rem] overflow-hidden">
+          {listing.description}
+        </p>
+
+        <div className="flex items-center gap-2.5">
+          <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-7 h-7 text-[11px]" />
+          <p className="text-[13px] text-muted-foreground truncate">
+            <span className="font-semibold text-foreground">{listing.user.name}</span>
+            {listing.user.university && <>, {listing.user.university}</>}
+          </p>
         </div>
       </div>
     </div>
@@ -512,7 +499,7 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
   // Yalnızca sunucudaki ilanların id'si vardır ("api-<id>").
   const apiListingId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-12, 12]);
+  const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
@@ -522,7 +509,7 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
   };
 
   const exitX = direction === "right" ? 500 : direction === "left" ? -500 : 0;
-  const exitRotate = direction === "right" ? 20 : direction === "left" ? -20 : 0;
+  const exitRotate = direction === "right" ? 18 : direction === "left" ? -18 : 0;
 
   return (
     <motion.div
@@ -535,11 +522,12 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
       animate={direction ? { x: exitX, rotate: exitRotate, opacity: 0 } : {}}
       transition={{ duration: 0.3 }}
     >
-      <motion.div className="absolute top-8 right-6 z-10 bg-accent/90 backdrop-blur-sm text-accent-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[-15deg]" style={{ opacity: likeOpacity }}>
-        {t("swipe.like")}
+      {/* Sürüklerken basılan lastik mühürler */}
+      <motion.div className="absolute top-10 left-6 z-10 -rotate-[14deg] pointer-events-none" style={{ opacity: likeOpacity }}>
+        <span className="stamp text-2xl px-4 py-1.5 bg-card/80">{t("swipe.like")}</span>
       </motion.div>
-      <motion.div className="absolute top-8 left-6 z-10 bg-destructive/90 backdrop-blur-sm text-destructive-foreground px-5 py-2.5 rounded-2xl font-bold text-xl rotate-[15deg]" style={{ opacity: nopeOpacity }}>
-        {t("swipe.pass")}
+      <motion.div className="absolute top-10 right-6 z-10 rotate-[14deg] pointer-events-none" style={{ opacity: nopeOpacity }}>
+        <span className="stamp stamp-red text-2xl px-4 py-1.5 bg-card/80">{t("swipe.pass")}</span>
       </motion.div>
 
       <div className="h-full" onClick={onToggleExpand}>
@@ -549,22 +537,22 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
       <AnimatePresence>
         {expanded && (
           <motion.div
-            initial={{ y: "100%" }} animate={{ y: "40%" }} exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="absolute inset-0 bg-card rounded-t-3xl overflow-y-auto z-20"
+            initial={{ y: "100%" }} animate={{ y: "22%" }} exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="absolute inset-0 bg-card rounded-2xl border border-border overflow-y-auto z-20"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-center pt-3 pb-4"><div className="w-10 h-1 rounded-full bg-muted" /></div>
-            <div className="px-6 pb-8 space-y-5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xl text-foreground">{listing.title}</h3>
-                <button onClick={onToggleExpand} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <div className="flex justify-center pt-3 pb-3"><div className="w-10 h-1 rounded-full bg-border" /></div>
+            <div className="px-5 pb-[30%] space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-display text-2xl leading-tight text-foreground">{listing.title}</h3>
+                <button onClick={onToggleExpand} aria-label={t("common.close")} className="w-9 h-9 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted">
                   <ChevronDown className="w-5 h-5 text-foreground" />
                 </button>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{listing.description}</p>
-              {listing.type === "ev_ilani" && listing.id.startsWith("api-") && (
-                <FairPriceBadge listingId={Number(listing.id.slice(4))} detailed />
+              <p className="paper-ruled rounded-lg text-[15px] text-foreground whitespace-pre-line">{listing.description}</p>
+              {listing.type === "ev_ilani" && apiListingId !== null && (
+                <FairPriceBadge listingId={apiListingId} detailed />
               )}
               {listing.user.id !== "anon" && (
                 <div className="flex flex-wrap gap-2">
@@ -574,18 +562,22 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
                   <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
                 </div>
               )}
-              <div className="card-listing p-4 flex items-center gap-3">
-                <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-14 h-14 text-lg" />
-                <div>
-                  <p className="font-semibold text-foreground">{listing.user.name}</p>
-                  <p className="text-xs text-muted-foreground">{listing.user.university} • {listing.user.department}</p>
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-12 h-12 text-base" />
+                <div className="min-w-0">
+                  <p className="font-display text-lg leading-tight text-foreground truncate">{listing.user.name}</p>
+                  {listing.user.university && (
+                    <p className="text-[13px] text-muted-foreground flex items-center gap-1 truncate">
+                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />{listing.user.university}
+                    </p>
+                  )}
                 </div>
               </div>
               {/* Bildirme girişli kullanıcıya açıktır (sunucu 401 döner) */}
               {isLoggedIn && apiListingId !== null && (
                 <button
                   onClick={() => onReport(apiListingId, listing.title)}
-                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-destructive transition-colors"
+                  className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground hover:text-destructive transition-colors"
                 >
                   <Flag className="w-3.5 h-3.5" />
                   {t("report.reportListing")}

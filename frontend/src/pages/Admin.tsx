@@ -248,12 +248,12 @@ const fmtDateTime = (iso: string, locale: string) =>
 const Chip = ({ children, tone = "muted" }: { children: React.ReactNode; tone?: "muted" | "warn" | "danger" | "ok" }) => {
   const tones = {
     muted: "bg-muted text-muted-foreground",
-    warn: "bg-sand text-foreground",
+    warn: "bg-highlighter/60 text-foreground",
     danger: "bg-destructive/10 text-destructive",
-    ok: "bg-lavender/50 text-foreground",
+    ok: "bg-accent/10 text-accent",
   } as const;
   return (
-    <span className={`inline-block text-[10px] px-2.5 py-1 rounded-full font-medium ${tones[tone]}`}>
+    <span className={`inline-block text-[12px] px-2.5 py-0.5 rounded-full font-semibold ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -273,8 +273,8 @@ const Segmented = <V extends string>({
       <button
         key={opt.value}
         onClick={() => onChange(opt.value)}
-        className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-          value === opt.value ? "bg-primary text-primary-foreground" : "bg-card text-foreground hover:bg-muted"
+        className={`flex-1 py-2.5 text-[13px] font-semibold transition-colors ${
+          value === opt.value ? "bg-foreground text-background" : "bg-card text-foreground hover:bg-muted"
         }`}
       >
         {opt.label}
@@ -284,19 +284,17 @@ const Segmented = <V extends string>({
 );
 
 const EmptyState = ({ icon: Icon, title, desc }: { icon: typeof Flag; title: string; desc: string }) => (
-  <div className="text-center py-16 animate-fade-in">
-    <div className="w-20 h-20 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto mb-4">
-      <Icon className="w-9 h-9 text-primary" />
-    </div>
-    <p className="font-medium text-foreground">{title}</p>
-    <p className="text-sm text-muted-foreground mt-1">{desc}</p>
+  <div className="py-14">
+    <Icon className="w-6 h-6 text-muted-foreground mb-3" />
+    <p className="font-display text-2xl text-foreground">{title}</p>
+    <p className="text-[14px] text-muted-foreground mt-1">{desc}</p>
   </div>
 );
 
 const StatTile = ({ value, label }: { value: string; label: string }) => (
-  <div className="card-listing p-3 text-center">
-    <p className="text-xl font-extrabold text-foreground tabular-nums">{value}</p>
-    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{label}</p>
+  <div className="rounded-xl border border-border p-3">
+    <p className="font-display text-2xl font-semibold leading-none text-foreground">{value}</p>
+    <p className="text-[12px] text-muted-foreground leading-tight mt-1">{label}</p>
   </div>
 );
 
@@ -337,10 +335,10 @@ const ActionButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`h-9 px-4 rounded-full text-xs font-bold transition-all active:scale-95 ${
+    className={`h-9 px-4 rounded-full text-[13px] font-semibold border transition-colors active:scale-95 ${
       destructive
-        ? "bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-        : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+        ? "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+        : "border-input text-foreground hover:bg-foreground hover:text-background"
     }`}
   >
     {label}
@@ -377,7 +375,7 @@ const ReportCard = ({ report, onAction }: { report: AdminReport; onAction: (a: A
         <div className="min-w-0">
           <p className="font-semibold text-sm text-foreground">{reasonLabel}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {t("admin.reportedBy", { name: report.reporter_name })} · {fmtDateTime(report.created_at, locale)}
+            {t("admin.reportedBy", { name: report.reporter_name })}, {fmtDateTime(report.created_at, locale)}
           </p>
         </div>
         <Chip tone={report.resolved ? "ok" : "danger"}>
@@ -416,7 +414,7 @@ const ReportCard = ({ report, onAction }: { report: AdminReport; onAction: (a: A
           <>
             <p className="text-sm font-medium text-foreground break-words">{target.title}</p>
             <p className="text-xs text-muted-foreground">
-              {target.district ? `${target.district} · ` : ""}
+              {target.district ? `${target.district}, ` : ""}
               {t("admin.ownerLabel", { name: target.owner_name ?? "" })}
             </p>
           </>
@@ -429,7 +427,7 @@ const ReportCard = ({ report, onAction }: { report: AdminReport; onAction: (a: A
           <>
             <p className="text-sm text-foreground break-words">{contentText(target.content ?? "", t)}</p>
             <p className="text-xs text-muted-foreground">
-              {t("admin.senderLabel", { name: target.sender_name ?? "" })} ·{" "}
+              {t("admin.senderLabel", { name: target.sender_name ?? "" })},{" "}
               {t("admin.matchLabel", { id: target.match_id ?? 0 })}
             </p>
           </>
@@ -535,8 +533,8 @@ const FlaggedCard = ({
           {item.title && <p className="font-semibold text-sm text-foreground break-words">{item.title}</p>}
           <p className="text-xs text-muted-foreground mt-0.5">
             {item.kind === "listing"
-              ? `${item.district ? `${item.district} · ` : ""}${t("admin.ownerLabel", { name: item.author_name ?? "" })}`
-              : `${t("admin.senderLabel", { name: item.author_name ?? "" })} · ${t("admin.matchLabel", { id: item.match_id ?? 0 })}`}
+              ? `${item.district ? `${item.district}, ` : ""}${t("admin.ownerLabel", { name: item.author_name ?? "" })}`
+              : `${t("admin.senderLabel", { name: item.author_name ?? "" })}, ${t("admin.matchLabel", { id: item.match_id ?? 0 })}`}
           </p>
         </div>
         <Chip tone={removed ? "danger" : "warn"}>
@@ -574,7 +572,7 @@ const FlaggedCard = ({
       <p className="text-[11px] text-muted-foreground">
         {fmtDateTime(item.created_at, locale)}
         {removed && item.reviewed_at
-          ? ` · ${t("admin.removedAt", { date: fmtDateTime(item.reviewed_at, locale) })}`
+          ? `, ${t("admin.removedAt", { date: fmtDateTime(item.reviewed_at, locale) })}`
           : ""}
       </p>
 
@@ -762,8 +760,8 @@ const ActionCard = ({ row }: { row: AdminActionRow }) => {
             {/* Aktörü silinmiş kayıtta ad UYDURULMAZ; nötr bir metin durur. */}
             {t("admin.logActorLabel", {
               name: row.actor_name ?? t("admin.logActorDeleted"),
-            })}{" "}
-            · {fmtDateTime(row.created_at, locale)}
+            })}
+            {", "}{fmtDateTime(row.created_at, locale)}
           </p>
         </div>
         <Chip>{`${targetKey ? t(targetKey) : row.target_type} #${row.target_id}`}</Chip>

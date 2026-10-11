@@ -31,7 +31,7 @@ API locally with `API_DOCS=1` to see them)
 | **Admin moderation panel** | `/admin` — dashboard counters, the report queue, the flagged-content queue, the removed-content queue, user search and suspension, and an audit log of irreversible actions. Admins can also edit, publish, take down or permanently delete any listing, and delete any account. Access is decided solely by membership in `ADMIN_EMAILS`; all 15 `/api/admin/*` endpoints enforce it server-side. See below for which actions can be undone. |
 | **Message encryption** | Chat messages are stored AES-256-GCM encrypted (`MESSAGE_KEY`) and decrypted on read. This is **at-rest** encryption, not end-to-end — the server holds the key. Without the key the app still runs, but messages are stored as plain text. |
 | **Abuse limits** | Per-user quotas on the content endpoints: 20 listings/hour, 30 messages/minute, 10 reports/hour, 100 photo uploads/day. Auth endpoints are limited per email *and* per IP, and a successful sign-in clears the counter so a stranger cannot lock someone out of their own account. |
-| **Theming** | Hinge-inspired editorial design; light & dark themes (default dark). |
+| **Theming** | Hinge-inspired layout with a campus notebook language: student ID cards, ruled paper for what people write, graph paper for what the model computes, a highlighter for the key number. Light "notebook" and dark "blackboard" themes (default light). |
 
 ## 📚 Documentation
 

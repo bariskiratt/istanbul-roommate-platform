@@ -15,7 +15,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        display: ["Newsreader", "Georgia", "serif"],
+        hand: ["Kalam", "cursive"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,21 +53,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        lavender: {
-          DEFAULT: "hsl(var(--lavender))",
+        highlighter: {
+          DEFAULT: "hsl(var(--highlighter))",
+          foreground: "hsl(var(--highlighter-foreground))",
         },
-        sand: {
-          DEFAULT: "hsl(var(--sand))",
-        },
-        coral: {
-          DEFAULT: "hsl(var(--coral))",
-        },
-        mint: {
-          DEFAULT: "hsl(var(--mint))",
-        },
-        indigo: {
-          DEFAULT: "hsl(var(--indigo))",
-        },
+        rule: "hsl(var(--rule))",
+        redline: "hsl(var(--redline))",
+        grid: "hsl(var(--grid))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -111,10 +105,6 @@ export default {
           "0%": { transform: "translateY(-100%) rotate(0deg)", opacity: "1" },
           "100%": { transform: "translateY(100vh) rotate(720deg)", opacity: "0" },
         },
-        "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--indigo) / 0.3)" },
-          "50%": { boxShadow: "0 0 0 12px hsl(var(--indigo) / 0)" },
-        },
         "swipe-right": {
           "0%": { transform: "translateX(0) rotate(0deg)", opacity: "1" },
           "100%": { transform: "translateX(150%) rotate(20deg)", opacity: "0" },
@@ -132,7 +122,6 @@ export default {
         "scale-in": "scale-in 0.3s ease-out",
         "slide-up": "slide-up 0.4s ease-out",
         "confetti": "confetti-fall 1.5s ease-in forwards",
-        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "swipe-right": "swipe-right 0.4s ease-in forwards",
         "swipe-left": "swipe-left 0.4s ease-in forwards",
       },

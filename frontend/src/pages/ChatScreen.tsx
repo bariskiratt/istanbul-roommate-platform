@@ -125,11 +125,12 @@ const ChatScreen = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
-      {/* Header */}
-      <div className="nav-header px-6 py-4 flex items-center gap-3 sticky top-0 z-50">
+      {/* Başlık */}
+      <div className="nav-header px-3 h-16 flex items-center gap-3 sticky top-0 z-50">
         <button
           onClick={() => navigate("/messages")}
-          className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+          aria-label={t("common.back")}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -138,10 +139,10 @@ const ChatScreen = () => {
           {/* Sohbet kapalıysa eşleşme kaydı elimizde yok: karşı tarafın adını
               bilmiyoruz. "İsimsiz" yazmak profili hakkında yanlış bir şey
               söylerdi; onun yerine sohbetin durumunu yazıyoruz. */}
-          <p className="font-bold text-sm text-foreground truncate">
+          <p className="font-display text-lg leading-tight text-foreground truncate">
             {other ? other.name || t("messages.unnamed") : closed ? t("chat.closedTitle") : ""}
           </p>
-          <p className="text-[11px] text-muted-foreground">{other?.university ?? ""}</p>
+          <p className="text-[12px] text-muted-foreground truncate">{other?.university ?? ""}</p>
         </div>
         {/* Karşı kullanıcıyı bildir; eşleşme yüklenmeden hedef id bilinmez */}
         {other && (
@@ -149,30 +150,24 @@ const ChatScreen = () => {
             onClick={() => setReportOpen(true)}
             aria-label={t("report.reportUser")}
             title={t("report.reportUser")}
-            className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors shrink-0"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors shrink-0"
           >
             <Flag className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* Eşleşme ilanı */}
+      {/* Eşleşme ilanı: sohbetin neden başladığı */}
       {match?.listing_title && (
-        <div className="px-6 py-2">
-          <div className="card-listing p-4 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-lavender/50 flex items-center justify-center">
-              <Home className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground">{t("chat.matchListing")}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{match.listing_title}</p>
-            </div>
-          </div>
+        <div className="px-5 py-2.5 border-b border-border flex items-center gap-2 text-[13px]">
+          <Home className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-muted-foreground shrink-0">{t("chat.matchListing")}</span>
+          <span className="font-semibold text-foreground truncate">{match.listing_title}</span>
         </div>
       )}
 
       {/* Mesajlar */}
-      <div className="flex-1 overflow-y-auto px-6 py-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
         {messagesQuery.isError ? (
           <p className="text-center text-sm text-destructive py-8">{t("chat.loadFailed")}</p>
         ) : (
@@ -192,7 +187,7 @@ const ChatScreen = () => {
                 <p className={`text-[15px] leading-relaxed${placeholder ? " italic opacity-70" : ""}`}>
                   {removed ? t("chat.removed") : unreadable ? t("chat.unreadable") : msg.content}
                 </p>
-                <p className={`text-[10px] mt-1.5 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                <p className={`text-[11px] mt-1 ${isMine ? "text-secondary-foreground/70" : "text-muted-foreground"}`}>
                   {parseUtc(msg.created_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
@@ -206,25 +201,26 @@ const ChatScreen = () => {
           Kutuyu göstermek, gönderilemeyeceği belli olan bir alanı canlı
           bırakıp 403'ü kullanıcının yüzüne çarpmaktan dürüst. */}
       {closed ? (
-        <div className="sticky bottom-20 bg-card/80 backdrop-blur-lg px-6 py-3" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
-          <p className="text-xs font-semibold text-foreground">{t("chat.closedTitle")}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{t("chat.closedDesc")}</p>
+        <div className="sticky bottom-20 bg-background/95 backdrop-blur-md border-t border-border px-5 py-3">
+          <p className="text-sm font-semibold text-foreground">{t("chat.closedTitle")}</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">{t("chat.closedDesc")}</p>
         </div>
       ) : (
-      <div className="sticky bottom-20 bg-card/80 backdrop-blur-lg px-6 py-3 flex items-center gap-3" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
+      <div className="sticky bottom-20 bg-background/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-2">
         <input
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSend()}
           placeholder={t("chat.placeholder")}
-          className="flex-1 h-12 bg-background rounded-full px-5 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+          aria-label={t("chat.placeholder")}
+          className="flex-1 h-12 bg-card border border-input rounded-full px-5 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus-visible:outline-none focus:border-secondary transition-colors"
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || send.isPending}
-          className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition-opacity active:scale-95 shadow-md"
+          aria-label={t("chat.send")}
+          className="w-12 h-12 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition-opacity active:scale-95"
         >
           <Send className="w-5 h-5" />
         </button>

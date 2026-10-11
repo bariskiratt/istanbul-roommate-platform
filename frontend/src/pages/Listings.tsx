@@ -98,12 +98,12 @@ const Chip = ({
 }) => {
   const tones = {
     muted: "bg-muted text-muted-foreground",
-    warn: "bg-sand text-foreground",
+    warn: "bg-highlighter/60 text-foreground",
     danger: "bg-destructive/10 text-destructive",
-    ok: "bg-lavender/50 text-foreground",
+    ok: "bg-accent/10 text-accent",
   } as const;
   return (
-    <span className={`inline-block text-[10px] px-2.5 py-1 rounded-full font-medium ${tones[tone]}`}>
+    <span className={`inline-block text-[12px] px-2.5 py-0.5 rounded-full font-semibold ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -124,10 +124,10 @@ const ActionButton = ({
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`h-9 px-4 rounded-full text-xs font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${
+    className={`h-9 px-4 rounded-full text-[13px] font-semibold border transition-colors active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${
       destructive
-        ? "bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-        : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+        ? "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+        : "border-input text-foreground hover:bg-foreground hover:text-background"
     }`}
   >
     {label}
@@ -236,26 +236,20 @@ const ConfirmDialog = ({
             aria-modal="true"
             aria-labelledby={headingId}
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
+            className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start gap-3 px-6 py-4 border-b border-border">
-              <div
-                className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                  destructive ? "bg-destructive/10" : "bg-primary/10"
-                }`}
-              >
-                <ShieldAlert className={`w-4 h-4 ${destructive ? "text-destructive" : "text-primary"}`} />
-              </div>
+              <ShieldAlert className={`w-5 h-5 mt-1 shrink-0 ${destructive ? "text-destructive" : "text-foreground"}`} />
               <div className="flex-1 min-w-0">
-                <h2 id={headingId} className="text-base font-bold text-foreground">{title}</h2>
+                <h2 id={headingId} className="font-display text-xl font-semibold leading-tight text-foreground">{title}</h2>
               </div>
               <button
                 ref={closeRef}
                 type="button"
                 onClick={onClose}
                 aria-label={t("common.close")}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80 shrink-0"
+                className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -273,7 +267,7 @@ const ConfirmDialog = ({
               {input !== "none" && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-foreground">{inputLabel}</h3>
+                    <h3 className="text-[15px] font-semibold text-foreground">{inputLabel}</h3>
                     <span className="text-[11px] text-muted-foreground tabular-nums">
                       {t("report.noteCounter", { count: note.length, max: NOTE_MAX })}
                     </span>
@@ -308,7 +302,7 @@ const ConfirmDialog = ({
               <Button
                 onClick={() => onConfirm(note)}
                 disabled={blocked}
-                className={`rounded-full h-11 px-6 text-sm font-bold ${
+                className={`rounded-full h-11 px-6 text-sm font-semibold ${
                   destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""
                 }`}
               >
@@ -445,7 +439,7 @@ export const validateListingForm = (
 };
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-sm font-bold text-foreground mb-2">{children}</h3>
+  <h3 className="text-[15px] font-semibold text-foreground mb-2">{children}</h3>
 );
 
 /**
@@ -514,12 +508,12 @@ const EditDialog = ({
           aria-modal="true"
           aria-labelledby={headingId}
           initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-card rounded-2xl shadow-2xl w-full max-w-[520px] max-h-[88vh] flex flex-col"
+          className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-[520px] max-h-[88vh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-start gap-3 px-6 py-4 border-b border-border">
             <div className="flex-1 min-w-0">
-              <h2 id={headingId} className="text-base font-bold text-foreground">
+              <h2 id={headingId} className="font-display text-xl font-semibold leading-tight text-foreground">
                 {t("listings.dlgEditTitle")}
               </h2>
               <p className="text-xs text-muted-foreground truncate">{listing.title}</p>
@@ -528,7 +522,7 @@ const EditDialog = ({
               type="button"
               onClick={onClose}
               aria-label={t("common.close")}
-              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80 shrink-0"
+              className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -603,8 +597,8 @@ const EditDialog = ({
                           onClick={() => set({ features: { ...form.features, [key]: !on } })}
                           className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                             on
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-card border border-border text-foreground hover:border-primary/30"
+                              ? "border border-foreground bg-foreground text-background"
+                              : "bg-card border border-input text-foreground hover:border-foreground/40"
                           }`}
                         >
                           {t(featureLabels[key])}
@@ -664,7 +658,7 @@ const EditDialog = ({
               <Button
                 onClick={submit}
                 disabled={pending || changedCount === 0}
-                className="rounded-full h-11 px-6 text-sm font-bold"
+                className="rounded-full h-11 px-6 text-sm font-semibold"
               >
                 {pending ? t("common.saving") : t("common.save")}
               </Button>
@@ -744,23 +738,22 @@ const ListingRow = ({
             <Chip>{typeLabel}</Chip>
           </div>
 
-          <p className="font-bold text-[15px] text-foreground break-words">{listing.title}</p>
+          <p className="font-display text-[17px] font-semibold leading-snug text-foreground break-words">{listing.title}</p>
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <MapPin className="w-3 h-3" /> {listing.district}
-              {listing.neighborhood ? ` · ${listing.neighborhood}` : ""}
+              {listing.neighborhood ? `, ${listing.neighborhood}` : ""}
             </span>
-            {listing.room_count && <span>· {listing.room_count}</span>}
-            <span>·</span>
-            <span className="font-bold text-accent">{priceLabel(listing, n)}</span>
+            {listing.room_count && <span>{listing.room_count}</span>}
+            <span className="font-semibold text-foreground">{priceLabel(listing, n)}</span>
           </div>
 
           <p className="text-xs text-muted-foreground break-words">
             {listing.owner_name
               ? t("admin.ownerLabel", { name: listing.owner_name })
-              : t("listings.ownerUnknown")}{" "}
-            · {t("listings.createdAt", { date: fmtDate(listing.created_at, locale) })}
+              : t("listings.ownerUnknown")}
+            {", "}{t("listings.createdAt", { date: fmtDate(listing.created_at, locale) })}
           </p>
         </div>
       </div>
@@ -811,7 +804,7 @@ const ListingRow = ({
         <button
           type="button"
           onClick={onDetails}
-          className="h-9 px-2 text-xs text-primary font-medium hover:underline"
+          className="h-9 px-2 text-[13px] text-secondary font-semibold hover:underline"
         >
           {t("listings.details")}
         </button>
@@ -971,8 +964,7 @@ const Listings = () => {
             onClick={() => listQuery.refetch()}
             aria-label={t("admin.refresh")}
             title={t("admin.refresh")}
-            className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+            className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors"
           >
             <RefreshCw className="w-5 h-5" />
           </button>
@@ -980,7 +972,7 @@ const Listings = () => {
       />
 
       <div className="px-6 pt-4 pb-2">
-        <h1 className="text-2xl font-bold text-foreground">{t("listings.heading")}</h1>
+        <h1 className="text-3xl text-foreground">{t("listings.heading")}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t("listings.sub")}</p>
       </div>
 
@@ -1015,10 +1007,10 @@ const Listings = () => {
             <button
               key={option.value}
               onClick={() => setStatus(option.value)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+              className={`h-9 px-4 rounded-full border text-[14px] font-semibold whitespace-nowrap transition-colors ${
                 status === option.value
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-card border border-border text-foreground hover:border-primary/30"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-input bg-card text-foreground hover:border-foreground/40"
               }`}
             >
               {t(option.key)}
@@ -1286,17 +1278,13 @@ const ListingDetailModal = ({
           {/* Info */}
           <div className="p-5 space-y-4">
             <div>
-              <h2 className="text-xl font-bold text-foreground">{listing.title}</h2>
+              <h2 className="text-2xl text-foreground leading-tight">{listing.title}</h2>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {listing.district}</span>
                 {listing.room_count && (
-                  <>
-                    <span>·</span>
-                    <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {listing.room_count}</span>
-                  </>
+                  <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {listing.room_count}</span>
                 )}
-                <span>·</span>
-                <span className="font-bold text-accent text-base">
+                <span className="marker font-semibold text-foreground text-base">
                   {priceLabel(listing, n)}{house ? t("common.perMonth") : ""}
                 </span>
               </div>
@@ -1309,7 +1297,7 @@ const ListingDetailModal = ({
 
             {/* Description */}
             <div>
-              <h3 className="text-sm font-bold text-foreground mb-2">{t("listings.description")}</h3>
+              <h3 className="text-[15px] font-semibold text-foreground mb-2">{t("listings.description")}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{listing.description}</p>
             </div>
 
@@ -1330,7 +1318,7 @@ const ListingDetailModal = ({
                   <h4 className="text-xs font-semibold text-foreground mb-2">{t("listings.features")}</h4>
                   <div className="flex flex-wrap gap-2">
                     {features.map(key => (
-                      <span key={key} className="px-3 py-1 rounded-full text-[11px] font-medium bg-lavender/50 text-foreground">
+                      <span key={key} className="px-3 py-1 rounded-full border border-border bg-card text-[12px] font-semibold text-foreground">
                         {t(featureLabels[key])}
                       </span>
                     ))}
@@ -1360,8 +1348,9 @@ const ListingDetailModal = ({
             {/* CTA */}
             {!isOwn && contactable && (
               <Button
+                size="lg"
                 onClick={handleContact}
-                className="w-full h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground font-bold text-sm"
+                className="w-full h-12 text-base"
               >
                 <MessageCircle className="w-4 h-4 mr-2" /> {isLoggedIn ? t("listings.contact") : t("listings.contactLogin")}
               </Button>

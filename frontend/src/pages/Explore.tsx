@@ -7,7 +7,6 @@ import {
   fetchAlternatives,
   fetchGeojson,
   fetchHeatmap,
-  fetchLegend,
   type AlternativesResponse,
   type StatusKey,
 } from "@/lib/api";
@@ -19,14 +18,23 @@ import type { TranslationKey } from "@/i18n/translations";
 // ve buradaki kod duruyor; geri açmak için bu bayrağı true yap.
 const ALTERNATIVES_ENABLED = false;
 
-// Durum -> renk. Backend /api/legend ile aynı; ağ hatasında yedek olsun diye
-// burada da sabit tutuluyor.
-const FALLBACK_COLORS: Record<StatusKey, string> = {
-  safe: "#2ecc71",
-  borderline: "#f1c40f",
-  expensive: "#e74c3c",
-  nodata: "#95a5a6",
+// Durum -> renk. Anlamı /api/legend ile aynı, renkler sitenin kalemleri:
+// öğretmen yeşili uyar, fosforlu sarı sınırda, kırmızı kalem aşıyor. Ana
+// sayfadaki kroki (MapSketch) de aynı üç rengi kullanır; harita onunla
+// aynı dili konuşsun diye sunucunun düz renkleri yerine bunlar çizilir.
+const COLORS: Record<StatusKey, string> = {
+  safe: "#1b7450",
+  borderline: "#ffe83d",
+  expensive: "#d4252e",
+  nodata: "#9298aa",
 };
+
+const LEGEND: { key: StatusKey; label: TranslationKey }[] = [
+  { key: "safe", label: "landing.mapFits" },
+  { key: "borderline", label: "landing.mapEdge" },
+  { key: "expensive", label: "landing.mapOver" },
+  { key: "nodata", label: "map.legendNoData" },
+];
 
 // Durum çubuğu metni: parçalar render sırasında çevrilir, böylece dil
 // değiştiğinde ekrandaki metin de anında güncellenir.
@@ -41,7 +49,6 @@ const Explore = () => {
   const statusesRef = useRef<StatusKey[]>([]);
   const lowConfRef = useRef<boolean[]>([]);
   const altMarkersRef = useRef<L.Marker[]>([]);
-  const colorsRef = useRef<Record<StatusKey, string>>(FALLBACK_COLORS);
   const seqRef = useRef(0);
 
   const [budget, setBudget] = useState(25000);
@@ -67,8 +74,8 @@ const Explore = () => {
   // Az ilana dayanan mahalleler yine renklenir (harita boş kalmasın) ama
   // soluk dolgu + kesik çizgiyle "bu tahmin zayıf" sinyali verilir.
   const styleFor = (s: StatusKey, lowConfidence = false): L.PathOptions => ({
-    fillColor: colorsRef.current[s] ?? FALLBACK_COLORS[s],
-    fillOpacity: s === "nodata" ? 0.25 : lowConfidence ? 0.3 : 0.65,
+    fillColor: COLORS[s],
+    fillOpacity: s === "nodata" ? 0.25 : lowConfidence ? 0.3 : 0.6,
     weight: 1,
     color: "#fff",
     opacity: 0.6,
@@ -155,15 +162,6 @@ const Explore = () => {
 
     (async () => {
       try {
-        const legend = await fetchLegend();
-        colorsRef.current = Object.fromEntries(
-          Object.entries(legend).map(([k, v]) => [k, v.color]),
-        ) as Record<StatusKey, string>;
-      } catch {
-        /* yedek renkler kullanılır */
-      }
-
-      try {
         const geojson = await fetchGeojson();
         L.geoJSON(geojson, {
           style: () => styleFor("nodata"),
@@ -184,11 +182,11 @@ const Explore = () => {
               const area = p.neighborhood
                 ? tRef.current("map.neighborhoodLabel", { name: p.neighborhood })
                 : tRef.current("map.unknown");
-              let html = `<div style="font-weight:650">${area}</div>`;
-              html += `<div style="color:#6b7280;font-size:12px;margin-bottom:6px">${p.district || ""}</div>`;
-              html += `<div style="font-size:16px;font-weight:650">${price}</div>`;
+              let html = `<div class="font-display" style="font-size:17px;font-weight:600;line-height:1.2">${area}</div>`;
+              html += `<div style="color:hsl(var(--muted-foreground));font-size:12px;margin-bottom:8px">${p.district || ""}</div>`;
+              html += `<div style="font-size:15px;font-weight:600"><span class="marker">${price}</span></div>`;
               if (p.avg_price != null && p.listing_count != null && p.listing_count < 8) {
-                html += `<div style="color:#b48a00;font-size:11px;margin-top:4px">⚠️ ${tRef.current("map.fewListings", { count: p.listing_count })}</div>`;
+                html += `<div style="color:hsl(var(--muted-foreground));font-size:12px;margin-top:6px">${tRef.current("map.fewListings", { count: p.listing_count })}</div>`;
               }
               if (ALTERNATIVES_ENABLED && p.avg_price != null) {
                 html += `<button class="popup-alt" data-id="${p.id}" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:hsl(263 45% 45%);color:#fff;font-weight:600;cursor:pointer">${tRef.current("map.altButton")}</button>`;
@@ -213,56 +211,53 @@ const Explore = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="px-6 pt-4 pb-3 flex items-center gap-3">
+      <div className="px-4 h-16 flex items-center gap-2 border-b border-border">
         <button
           onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-muted transition-colors"
-          style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+          aria-label={t("common.back")}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="font-bold text-xl text-foreground">{t("map.title")}</h1>
-          <p className="text-xs text-muted-foreground">{t("map.sub")}</p>
-        </div>
+        <h1 className="font-display text-[1.35rem] font-semibold text-foreground">{t("map.title")}</h1>
       </div>
 
-      {/* Bütçe kontrolü */}
-      <div className="px-6 py-3 border-y border-border bg-card flex flex-wrap items-center gap-4">
-        <div className="text-lg font-bold tabular-nums whitespace-nowrap">
-          {fmtNum(budget)} ₺
+      {/* Bütçe kontrolü ve lejant */}
+      <div className="px-5 py-4 border-b border-border space-y-3">
+        <p className="text-[14px] text-muted-foreground">{t("map.sub")}</p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <label htmlFor="map-budget" className="flex items-baseline gap-2 whitespace-nowrap">
+            <span className="text-[13px] text-muted-foreground">{t("map.budgetLabel")}</span>
+            <span className="marker text-lg font-semibold">{fmtNum(budget)} ₺</span>
+          </label>
+          <input
+            id="map-budget"
+            type="range"
+            min={5000}
+            max={150000}
+            step={1000}
+            value={budget}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setBudget(v);
+              recolor(v);
+            }}
+            className="flex-1 min-w-[180px] accent-foreground"
+          />
         </div>
-        <input
-          type="range"
-          min={5000}
-          max={150000}
-          step={1000}
-          value={budget}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setBudget(v);
-            recolor(v);
-          }}
-          className="flex-1 min-w-[180px] accent-primary"
-          aria-label={t("map.budgetLabel")}
-        />
-        {summary && (
-          <div className="flex flex-wrap gap-3 text-xs">
-            {(["safe", "borderline", "expensive", "nodata"] as StatusKey[]).map((k) => (
-              <span key={k} className="flex items-center gap-1.5">
-                <i
-                  className="inline-block w-3 h-3 rounded-sm"
-                  style={{ background: colorsRef.current[k] ?? FALLBACK_COLORS[k] }}
-                />
-                {summary[k]}
-              </span>
-            ))}
-          </div>
-        )}
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+          {LEGEND.map(({ key, label }) => (
+            <li key={key} className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: COLORS[key] }} />
+              {t(label)}
+              {summary && <span className="font-semibold text-foreground">{summary[key]}</span>}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {status && status.length > 0 && (
-        <div className="px-6 py-2 text-xs text-muted-foreground">
+        <div className="px-5 py-2 text-[13px] text-muted-foreground" aria-live="polite">
           {status.map((part) => t(part.key, part.vars)).join("")}
         </div>
       )}
