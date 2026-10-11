@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Home, Mail, KeyRound } from "lucide-react";
+import { Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginWithPassword, requestOtp, verifyOtp } from "@/lib/api";
-import { BRAND } from "@/lib/brand";
 import PasswordInput from "@/components/PasswordInput";
-import ThemeToggle from "@/components/ThemeToggle";
-import LanguageToggle from "@/components/LanguageToggle";
+import SiteBar from "@/components/layout/SiteBar";
 import { useI18n } from "@/i18n";
 
 type Mode = "password" | "otp";
@@ -88,36 +86,19 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button onClick={() => navigate("/")} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-              <Home className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-extrabold text-lg text-foreground tracking-tight">{BRAND}</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
-          </div>
-        </div>
-      </nav>
+      <SiteBar />
 
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-sm space-y-8">
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto">
-              <Home className="w-7 h-7 text-primary-foreground" />
-            </div>
-            <h1 className="text-2xl font-extrabold text-foreground">{t("login.welcome")}</h1>
-            <p className="text-sm text-muted-foreground">
+      <div className="flex-1 flex items-start sm:items-center justify-center px-5 py-12 sm:py-16">
+        <div className="w-full max-w-sm space-y-7">
+          <div className="space-y-2">
+            <h1 className="text-[2.5rem] leading-[1.05] text-foreground">{t("login.welcome")}</h1>
+            <p className="text-muted-foreground">
               {t(mode === "password" ? "login.subPassword" : "login.subOtp")}
             </p>
           </div>
 
-          {/* Mod seçici */}
-          <div className="flex rounded-2xl border border-border overflow-hidden">
+          {/* Mod seçici: iki sekme, altı çizili olan açık */}
+          <div className="flex border-b border-border" role="tablist">
             {([
               { key: "password", label: t("login.tabPassword") },
               { key: "otp", label: t("login.tabOtp") },
@@ -125,14 +106,15 @@ const Login = () => {
               <button
                 key={m.key}
                 type="button"
+                role="tab"
+                aria-selected={mode === m.key}
                 onClick={() => switchMode(m.key)}
-                className={`flex-1 py-3 text-sm font-semibold transition-all ${
-                  mode === m.key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-foreground hover:bg-muted"
+                className={`relative flex-1 pb-3 text-[15px] font-semibold transition-colors ${
+                  mode === m.key ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {m.label}
+                {mode === m.key && <span className="absolute -bottom-px inset-x-0 h-[3px] bg-foreground" />}
               </button>
             ))}
           </div>
@@ -147,7 +129,8 @@ const Login = () => {
                 placeholder={t("login.emailPlaceholder")}
                 autoComplete="email"
                 disabled={mode === "otp" && codeSent}
-                className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all disabled:opacity-60"
+                aria-label={t("login.emailPlaceholder")}
+                className="w-full h-12 pl-12 pr-4 bg-card border border-input rounded-xl text-foreground placeholder:text-muted-foreground/80 outline-none hover:border-foreground/30 focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 transition-colors disabled:opacity-60"
               />
             </div>
 
@@ -157,7 +140,8 @@ const Login = () => {
                 onChange={e => setPassword(e.target.value)}
                 placeholder={t("login.passwordPlaceholder")}
                 autoComplete="current-password"
-                className="h-14 text-base rounded-2xl bg-card border-border"
+                aria-label={t("login.passwordPlaceholder")}
+                className="h-12 text-base"
               />
             )}
 
@@ -172,7 +156,8 @@ const Login = () => {
                   onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
                   placeholder={t("login.codePlaceholder")}
                   autoFocus
-                  className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-2xl text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-[0.3em] font-bold"
+                  aria-label={t("login.codePlaceholder")}
+                  className="w-full h-12 pl-12 pr-4 bg-card border border-input rounded-xl text-foreground placeholder:text-muted-foreground/80 placeholder:tracking-normal placeholder:font-normal outline-none focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 transition-colors tracking-[0.3em] font-bold"
                 />
               </div>
             )}
@@ -180,7 +165,8 @@ const Login = () => {
             <Button
               type="submit"
               disabled={submitDisabled}
-              className="w-full h-14 bg-primary text-primary-foreground rounded-2xl font-bold text-base disabled:opacity-50"
+              size="lg"
+              className="w-full h-12 text-base"
             >
               {submitLabel}
             </Button>
@@ -189,7 +175,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => { setCodeSent(false); setCode(""); }}
-                className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[13px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
               >
                 {t("login.resend")}
               </button>
@@ -198,17 +184,17 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => switchMode("otp")}
-                className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[13px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
               >
                 {t("login.forgot")}
               </button>
             )}
           </form>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="pt-2 border-t border-border">
+            <p className="pt-5 text-[15px] text-muted-foreground">
               {t("login.noAccount")}{" "}
-              <button onClick={() => navigate("/onboarding")} className="text-primary font-semibold hover:underline">
+              <button onClick={() => navigate("/onboarding")} className="text-secondary font-semibold underline-offset-4 hover:underline">
                 {t("login.signupLink")}
               </button>
             </p>

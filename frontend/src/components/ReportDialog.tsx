@@ -132,27 +132,25 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
             aria-modal="true"
             aria-labelledby={headingId}
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
+            className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Başlık */}
             <div className="flex items-start gap-3 px-6 py-4 border-b border-border">
-              <div className="w-9 h-9 rounded-2xl bg-destructive/10 flex items-center justify-center shrink-0">
-                <Flag className="w-4 h-4 text-destructive" />
-              </div>
+              <Flag className="w-5 h-5 mt-1 text-destructive shrink-0" />
               <div className="flex-1 min-w-0">
-                <h2 id={headingId} className="text-base font-bold text-foreground">
+                <h2 id={headingId} className="font-display text-xl font-semibold leading-tight text-foreground">
                   {t(titleKeys[targetType])}
                 </h2>
                 {targetLabel && (
-                  <p className="text-xs text-muted-foreground truncate">{targetLabel}</p>
+                  <p className="text-[13px] text-muted-foreground truncate">{targetLabel}</p>
                 )}
               </div>
               <button
                 ref={closeRef}
                 onClick={onClose}
                 aria-label={t("common.close")}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80 shrink-0"
+                className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -160,10 +158,10 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
 
             {/* İçerik */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-              <p className="text-xs text-muted-foreground">{t("report.sub")}</p>
+              <p className="text-[14px] text-muted-foreground leading-relaxed">{t("report.sub")}</p>
 
               <div>
-                <h3 className="text-sm font-bold text-foreground mb-3">{t("report.reasonLabel")}</h3>
+                <h3 className="text-[15px] font-semibold text-foreground mb-3">{t("report.reasonLabel")}</h3>
                 {isPending ? (
                   <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                 ) : isError || !reasons ? (
@@ -176,12 +174,12 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
                       return (
                         <label
                           key={value}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-2xl border-2 cursor-pointer transition-all ${
-                            active ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
+                            active ? "border-foreground bg-muted" : "border-input hover:border-foreground/40"
                           }`}
                         >
                           <RadioGroupItem value={value} />
-                          <span className="text-sm font-medium text-foreground">
+                          <span className="text-[14px] font-semibold text-foreground">
                             {labelKey ? t(labelKey) : value}
                           </span>
                         </label>
@@ -193,7 +191,7 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-foreground">{t("report.noteLabel")}</h3>
+                  <h3 className="text-[15px] font-semibold text-foreground">{t("report.noteLabel")}</h3>
                   <span className="text-[11px] text-muted-foreground tabular-nums">
                     {t("report.noteCounter", { count: note.length, max: NOTE_MAX })}
                   </span>
@@ -204,26 +202,26 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
                   onChange={e => setNote(e.target.value.slice(0, NOTE_MAX))}
                   maxLength={NOTE_MAX}
                   placeholder={t("report.notePlaceholder")}
-                  className="rounded-2xl min-h-[96px] resize-none"
+                  className="min-h-[96px] resize-none"
                 />
               </div>
 
               {error && (
-                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-                  <p className="text-xs text-destructive">{error}</p>
+                <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3">
+                  <p className="text-[13px] text-destructive">{error}</p>
                 </div>
               )}
             </div>
 
             {/* Alt çubuk */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-              <Button variant="ghost" onClick={onClose} className="rounded-full h-11 px-5 text-sm font-medium">
+              <Button variant="ghost" onClick={onClose} className="rounded-full h-11 px-5 text-sm">
                 {t("common.cancel")}
               </Button>
               <Button
                 onClick={submit}
                 disabled={!reason || sending}
-                className="rounded-full h-11 px-6 text-sm font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="rounded-full h-11 px-6 text-sm font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {sending ? t("report.submitting") : t("report.submit")}
               </Button>

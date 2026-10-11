@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
-import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,55 +37,48 @@ const Messages = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title={t("messages.title")} />
 
-      <div className="px-6 py-4 space-y-3">
-        {matches.map((match, i) => {
-          const other = match.other_user;
-          return (
-            <motion.button
-              key={match.id}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: i * 0.05 }}
-              onClick={() => navigate(`/chat/${match.id}`)}
-              className="w-full card-listing p-5 flex items-center gap-4 hover:shadow-lg transition-shadow"
-            >
-              <div className="relative flex-shrink-0">
-                <UserAvatar name={other.name} photo={other.photos[0]} className="w-14 h-14 text-lg" />
-                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-accent border-2 border-card" />
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-foreground">{other.name || t("messages.unnamed")}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {fmtTime(match.last_message_at ?? match.created_at, locale)}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground truncate mt-0.5">
-                  {match.last_message == null
-                    ? t("messages.firstMessage")
-                    : match.last_message === REMOVED_CONTENT
-                      ? t("chat.removed")
-                      : match.last_message === UNREADABLE_CONTENT
-                        ? t("chat.unreadable")
-                        : match.last_message}
-                </p>
-                {match.listing_title && (
-                  <span className="inline-block mt-2 text-[10px] px-2.5 py-1 rounded-full font-medium bg-lavender/50 text-foreground">
-                    🏠 {match.listing_title}
-                  </span>
-                )}
-              </div>
-            </motion.button>
-          );
-        })}
+      {/* Hinge'in sohbet listesi gibi: kart yok, ince çizgiyle ayrılmış satırlar */}
+      <div className="px-5">
+        <ul className="divide-y divide-border">
+          {matches.map(match => {
+            const other = match.other_user;
+            return (
+              <li key={match.id}>
+                <button
+                  onClick={() => navigate(`/chat/${match.id}`)}
+                  className="w-full py-4 flex items-center gap-4 text-left hover:bg-muted/60 -mx-2 px-2 rounded-xl transition-colors"
+                >
+                  <UserAvatar name={other.name} photo={other.photos[0]} className="w-14 h-14 text-lg shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="font-display text-lg leading-tight text-foreground truncate">{other.name || t("messages.unnamed")}</p>
+                      <span className="text-[12px] text-muted-foreground shrink-0">
+                        {fmtTime(match.last_message_at ?? match.created_at, locale)}
+                      </span>
+                    </div>
+                    <p className={`text-sm truncate mt-0.5 ${match.last_message == null ? "text-secondary font-medium" : "text-muted-foreground"}`}>
+                      {match.last_message == null
+                        ? t("messages.firstMessage")
+                        : match.last_message === REMOVED_CONTENT
+                          ? t("chat.removed")
+                          : match.last_message === UNREADABLE_CONTENT
+                            ? t("chat.unreadable")
+                            : match.last_message}
+                    </p>
+                    {match.listing_title && (
+                      <p className="mt-1 text-[12px] text-muted-foreground truncate">{match.listing_title}</p>
+                    )}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
 
         {!isLoading && matches.length === 0 && (
-          <div className="text-center py-20 animate-fade-in">
-            <div className="w-20 h-20 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">💬</span>
-            </div>
-            <p className="font-medium text-foreground">{t("messages.emptyTitle")}</p>
-            <p className="text-sm text-muted-foreground mt-1">{t("messages.emptyDesc")}</p>
+          <div className="py-16 space-y-3 animate-fade-in">
+            <h2 className="text-[2rem] leading-tight text-foreground">{t("messages.emptyTitle")}</h2>
+            <p className="text-muted-foreground leading-relaxed">{t("messages.emptyDesc")}</p>
           </div>
         )}
       </div>

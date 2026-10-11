@@ -20,7 +20,7 @@ const ThemeToggle = ({ className = "" }: { className?: string }) => {
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={label}
       title={label}
-      className={`w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center text-foreground hover:bg-muted transition-colors ${className}`}
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors ${className}`}
     >
       {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
     </button>

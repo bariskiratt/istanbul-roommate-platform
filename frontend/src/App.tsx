@@ -30,7 +30,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="dark">
+  <ThemeProvider attribute="class" defaultTheme="light">
   <I18nProvider>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>

@@ -161,15 +161,15 @@ Instead of naming a component and writing a rule for it, you compose the rule
 inline from single-purpose classes:
 
 ```tsx
-<h1 className="text-2xl font-bold text-foreground">
+<h1 className="text-3xl text-foreground">
 ```
-`src/pages/Listings.tsx:974`
+`src/pages/Listings.tsx:982`
 
 The payoff is that there is no stylesheet to grow, no dead CSS, and no naming
 debate. The cost is long `className` strings. Where a pattern repeats across
 screens it is promoted into a component class in `@layer components`
-(`src/index.css:133-229`) — `.card-listing`, `.message-sent`,
-`.bottom-nav-item`, `.glass-card` and friends. That layer is small on purpose:
+(`src/index.css:159-271`) — `.card-listing`, `.message-sent`, the paper
+materials described in §4.5 and friends. That layer is small on purpose:
 it holds the handful of patterns that would otherwise be copy-pasted twenty
 times.
 
@@ -182,15 +182,15 @@ conflict resolution, so `p-2` passed by a caller beats a component's default
 
 Tailwind is not configured with literal colors. Every semantic color is a CSS
 custom property holding **bare HSL channels**, defined twice — once for light
-under `:root` (`src/index.css:16-62`) and once for dark under `.dark`
-(`src/index.css:64-109`):
+under `:root` (`src/index.css:24-75`) and once for dark under `.dark`
+(`src/index.css:77-122`):
 
 ```css
-:root { --primary: 24 12% 12%; }   /* ink   */
-.dark { --primary: 36 26% 91%; }   /* cream */
+:root { --primary: 230 42% 14%; }  /* navy ink   */
+.dark { --primary: 60 12% 91%; }   /* chalk white */
 ```
 
-The Tailwind config wraps them (`frontend/tailwind.config.ts:19-78`):
+The Tailwind config wraps them (`frontend/tailwind.config.ts:22-75`):
 
 ```ts
 primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" }
@@ -201,37 +201,43 @@ Two consequences worth understanding:
 1. **The channels are stored without `hsl()` so that opacity modifiers work.**
    `bg-primary/10` compiles to `hsl(var(--primary) / 0.1)`. If the variable
    already contained a full `hsl(...)` string, that syntax would be invalid.
-   The same trick is used by hand in the stylesheet, e.g.
-   `box-shadow: 0 4px 16px hsl(var(--mint) / 0.3)` (`src/index.css:155`).
+   The same trick is used by hand in the stylesheet, e.g. the highlighter
+   gradient in `.marker` uses `hsl(var(--highlighter) / 0.9)`
+   (`src/index.css:230-249`).
 2. **Nothing in the components knows which theme is active.** A button says
-   `bg-primary text-primary-foreground`; whether that renders as dark-on-cream
-   or cream-on-dark is decided entirely by which variable block is in scope.
+   `bg-primary text-primary-foreground`; whether that renders as ink-on-paper
+   or chalk-on-blackboard is decided entirely by which variable block is in
+   scope.
 
-The radius token works the same way: `--radius: 0.8rem` (`src/index.css:46`)
-feeds `rounded-lg/md/sm` (`frontend/tailwind.config.ts:79-83`).
+The radius token works the same way: `--radius: 0.75rem` (`src/index.css:58`)
+feeds `rounded-lg/md/sm`.
 
-Beyond the standard shadcn token set there are five brand accents —
-`--lavender`, `--sand`, `--coral`, `--mint`, `--indigo` (`src/index.css:48-52`,
-dark values at `:95-99`), exposed as Tailwind colors at
-`frontend/tailwind.config.ts:53-70`.
+Beyond the standard shadcn token set there are four paper-and-pen tokens:
+`--highlighter`, `--rule`, `--redline` and `--grid` (`src/index.css:61-65`,
+dark values at `:108-112`), exposed as Tailwind colors at
+`frontend/tailwind.config.ts:56-62`. The shadcn names carry the pen colors:
+`--secondary` is ballpoint blue, `--accent` is the teacher's green,
+`--destructive` is the red pen.
 
 ### 4.3 The `:root` / `.dark` switch
 
 `darkMode: ["class"]` (`frontend/tailwind.config.ts:4`) tells Tailwind that
 `dark:` variants key off a `.dark` ancestor rather than the OS media query.
 `next-themes` is what puts that class on `<html>`, configured with
-`attribute="class"` and `defaultTheme="dark"` (`src/App.tsx:31`).
+`attribute="class"` and `defaultTheme="light"` (`src/App.tsx:33`). Light is
+the "notebook" theme (white paper, navy ink); dark is the "blackboard" theme
+(green-black board, chalk text).
 
 Two entry points drive it:
 
 - `ThemeToggle` — a two-state button in the app header
-  (`src/components/ThemeToggle.tsx:18-27`), mounted by `AppHeader` next to the
-  language switch (`src/components/layout/AppHeader.tsx:39-40`). It waits for a
+  (`src/components/ThemeToggle.tsx`), mounted by `AppHeader` next to the
+  language switch (`src/components/layout/AppHeader.tsx:46-47`). It waits for a
   `mounted` flag before trusting `resolvedTheme`
-  (`src/components/ThemeToggle.tsx:10-15`), because on the very first render
+  (`src/components/ThemeToggle.tsx:12-15`), because on the very first render
   next-themes has not yet read storage and the icon would otherwise flip.
 - `Settings` — a three-way light / dark / system segmented control
-  (`src/pages/Settings.tsx:15-19`, rendered at `:64-79`).
+  (`src/pages/Settings.tsx:16-20`, rendered at `:66-76`).
 
 Because the switch is a class and the values are variables, a theme change is a
 single class mutation on `<html>`. No component re-renders for color.
@@ -254,13 +260,36 @@ The trade-off is honest: you get components you can edit without fighting a
 library API, and in exchange nothing updates them for you and unused ones sit
 in the tree forever (see §11).
 
-### 4.5 Typography
+### 4.5 Typography and the paper materials
 
-Body text is Inter (`src/index.css:117-120`); `h1`–`h3` are Fraunces, a
-variable serif, for an editorial feel (`src/index.css:123-126`). `h4`–`h6` fall
-back to Inter deliberately (`:128-130`) so that small headings stay in the UI
-voice. Tailwind's default sans stack is also set to Inter
-(`frontend/tailwind.config.ts:16-18`).
+Body text is Schibsted Grotesk (`src/index.css:130-133`); `h1`–`h3` are
+Newsreader, a variable serif with an optical-size axis (`src/index.css:137-141`).
+`h4`–`h6` fall back to Schibsted Grotesk deliberately (`:143-145`) so that
+small headings stay in the UI voice. A third face, Kalam, is a handwriting font
+used only for margin notes (`.font-hand`). Tailwind's `font-sans`,
+`font-display` and `font-hand` map to the three
+(`frontend/tailwind.config.ts:17-21`). All three cover Turkish (latin-ext) and
+the two main ones include the ₺ sign.
+
+The design language is "Hinge's restraint, a campus's materials". Each
+material in `@layer components` has one meaning, documented at the top of
+`src/index.css` (lines 9-22), and is not used as decoration:
+
+| Class | Material | Means |
+|---|---|---|
+| `.paper-ruled` | Ruled notebook paper with a red margin line | Text a student wrote: listing descriptions, bios |
+| `.paper-grid` | Graph paper | Something the model computed: fair price, district medians |
+| `.marker` | Highlighter swipe | The one most important number on a screen (and the logo) |
+| `.stamp` / `.stamp-red` | Rubber stamp | Verification, match, and the swipe decision |
+
+The one memorable element is the student ID card
+(`src/components/campus/StudentCard.tsx`): every place that represents a
+person (profile, likes, the match moment, onboarding) shows the same card. Its
+"verified" stamp is printed only when the account has a university, which the
+server assigns from the `.edu.tr` email domain and the user cannot edit. Other
+shared pieces live next to it: `Wordmark`, `PriceRuler` (the fair-price ruler
+used on listing cards, in the listing form and on the landing page) and
+`MapSketch`.
 
 ### 4.6 The `@import` ordering trap (worth remembering)
 
@@ -814,11 +843,14 @@ while the price is typed.
 
 **`Explore` — budget heatmap** (`src/pages/Explore.tsx`).
 Leaflet map of neighbourhood polygons from `GET /api/geojson`, coloured by
-`GET /api/heatmap?budget=` with the palette from `GET /api/legend` (`:6-13`).
-Moving the slider only re-styles existing layers (`:79-99`); a sequence counter
-drops out-of-order responses (`:80,83`). Low-confidence neighbourhoods stay
+`GET /api/heatmap?budget=`. The status meanings match `GET /api/legend`, but
+the colors are the site's pens (`:21-37`): teacher green fits, highlighter
+yellow is borderline, red pen is over budget, the same three as the landing
+page's map sketch. `/api/legend` is no longer fetched by the client.
+Moving the slider only re-styles existing layers (`:86-106`); a sequence counter
+drops out-of-order responses (`:87,90`). Low-confidence neighbourhoods stay
 coloured but get a faded fill and a dashed outline rather than disappearing
-(`:67-76`). The transit-based alternative-neighbourhood suggestion is
+(`:74-83`). The transit-based alternative-neighbourhood suggestion is
 implemented but switched off behind a constant (`:17-20`).
 
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
@@ -1030,10 +1062,9 @@ Honest list, all verified against the current tree.
   standard, but `src/pages/CreateListing.tsx:11` uses the shadcn one.
 - Three different auth-guard styles coexist (§6.3). Each is defensible on its own
   screen, but there is no shared guard component.
-- Colors are tokenized, yet several shadows are written as raw `rgba()` — inline
-  styles that ignore the theme (`src/components/layout/BottomNav.tsx:32`,
-  `src/pages/SwipeScreen.tsx:282`, `src/pages/Listings.tsx:966`) and literals
-  inside `src/index.css` (`:137`, `:146`, `:213`, `:227`).
+- Colors are tokenized; the remaining raw `rgba()` values are the auth dialog's
+  shadow (`src/components/AuthGate.tsx:35`) and the Leaflet pin markup built as
+  an HTML string (`src/pages/Explore.tsx:116`).
 
 **Tooling**
 

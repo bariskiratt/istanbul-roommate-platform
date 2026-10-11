@@ -25,7 +25,7 @@ const UserAvatar = ({ name, photo, className, imageClassName }: UserAvatarProps)
       {photo && <AvatarImage src={photo} alt="" className={cn("object-cover", imageClassName)} />}
       {/* Fotoğraf varken baş harfler hemen basılmaz: hızlı yüklenen bir
           fotoğrafın önünde kısa bir harf titremesi görünmesin. */}
-      <AvatarFallback delayMs={photo ? 400 : undefined} className="bg-lavender/60 font-semibold text-foreground">
+      <AvatarFallback delayMs={photo ? 400 : undefined} className="bg-muted font-display font-semibold text-foreground">
         {text || <UserIcon className="w-1/2 h-1/2 text-muted-foreground" />}
       </AvatarFallback>
     </Avatar>

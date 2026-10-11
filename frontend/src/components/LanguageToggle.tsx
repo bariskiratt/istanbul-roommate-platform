@@ -10,7 +10,7 @@ const LanguageToggle = ({ className = "" }: { className?: string }) => {
       onClick={() => setLang(next)}
       aria-label={t("nav.language")}
       title={t("nav.language")}
-      className={`h-9 px-3 rounded-full bg-muted/60 flex items-center justify-center text-xs font-bold tracking-wide text-foreground hover:bg-muted transition-colors ${className}`}
+      className={`h-9 px-2.5 rounded-full flex items-center justify-center text-[13px] font-semibold text-foreground hover:bg-muted transition-colors ${className}`}
     >
       {lang.toUpperCase()}
     </button>
