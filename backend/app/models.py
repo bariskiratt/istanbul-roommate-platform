@@ -187,12 +187,40 @@ class Listing(Base):
     def owner_university(self) -> str | None:
         return self.owner.university if self.owner else None
 
+    @property
+    def owner_profile(self) -> dict | None:
+        """Destede ilan sahibinin "ev arkadaşı olarak" görünen kısmı.
+
+        Hinge tarzı kartta fotoğrafların arasına giren soru-cevaplar
+        (uyku düzeni, alışkanlıklar, bölüm) buradan üretilir. Bütçe, semt
+        tercihleri, bio ve fotoğrafların tamamı BİLEREK yok: ilan sahibi
+        bir ilan açtı, profilinin tamamını yayımlamadı. Girişsiz istemciye
+        hiç gitmez (bkz. listings._hide_owner).
+        """
+        if self.owner is None:
+            return None
+        o = self.owner
+        return {
+            "department": o.department,
+            "year": o.year,
+            "sleep_schedule": o.sleep_schedule,
+            "smoking": o.smoking,
+            "pets": o.pets,
+            "alcohol": o.alcohol,
+            "photo": (o.photos or [None])[0],
+        }
+
 
 class Swipe(Base):
     """Bir kullanıcının bir ilana verdiği karar (beğen/geç).
 
     Aynı ilana ikinci kez karar verilirse kayıt güncellenir (upsert).
     `responded`: ilan sahibi Beğeniler ekranında bu beğeniyi işledi mi.
+
+    Hinge tarzı beğeni: beğeni ilanın tamamına değil, belirli bir
+    fotoğrafına ya da kartına (soru-cevap) verilebilir ve yanına kısa bir
+    yorum yazılabilir. Hepsi isteğe bağlı; eski satırlarda NULL kalır ve
+    "ilanın tamamı, yorumsuz" demektir.
     """
 
     __tablename__ = "swipes"
@@ -203,6 +231,18 @@ class Swipe(Base):
     listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), index=True)
     direction: Mapped[str] = mapped_column(String(10))  # like | pass
     responded: Mapped[bool] = mapped_column(Boolean, default=False)
+    # "photo" | "prompt"; NULL = ilanın tamamı.
+    target_kind: Mapped[str | None] = mapped_column(String(10))
+    # photo: beğenildiği ANDAKİ fotoğraf adresi (sıra sonradan değişse de
+    # beğenilen kare kaybolmasın diye dizin değil adres saklanır).
+    # prompt: kart anahtarı (app.swipes.PROMPT_KEYS).
+    target_ref: Mapped[str | None] = mapped_column(String(500))
+    # Yorum, mesajlar gibi şifreli saklanır (app.crypto). Eşleşme olunca
+    # sohbetin ilk mesajına dönüşür; o andan sonra comment_delivered True.
+    comment: Mapped[str | None] = mapped_column(Text)
+    comment_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    comment_flag_reasons: Mapped[str | None] = mapped_column(Text)
+    comment_delivered: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     swiper: Mapped[User] = relationship()

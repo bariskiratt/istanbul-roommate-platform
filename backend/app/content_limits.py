@@ -31,6 +31,10 @@ LIMITS: dict[str, tuple[int, timedelta]] = {
     # Rapor: tekillik kısıtı zaten aynı hedefi tekrarlatmıyor; buradaki sınır
     # farklı hedefleri tarayarak kuyruk doldurmayı engeller.
     "report_create": (10, timedelta(hours=1)),
+    # Yorumlu beğeni: her biri bir yabancının Beğeniler kuyruğuna yazılan
+    # metin. Saatte 30, desteyi gerçekten okuyarak gezen birine fazlasıyla
+    # yeter; yorumsuz beğeni bu sınıra hiç girmez.
+    "like_comment": (30, timedelta(hours=1)),
     # Fotoğraf: ilan başına en çok 6, profilde en çok 6. Günde 100 yükleme
     # birkaç ilanı baştan kurmaya bile fazlasıyla yeter. Asıl sebep maliyet:
     # fotoğraflar kovada (R2) duruyor ve 10 GB'lık ücretsiz kotanın üstü
