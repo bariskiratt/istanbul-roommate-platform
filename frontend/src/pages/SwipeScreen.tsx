@@ -8,12 +8,17 @@ import {
   resetMyDeck,
   LISTING_FEATURES,
   type ApiListing,
+  type LikeTarget,
   type ListingFeature,
+  type SwipeResult,
 } from "@/lib/api";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, GraduationCap, ChevronDown, Home, Flag } from "lucide-react";
-import LifestyleTag from "@/components/LifestyleTag";
+import { SlidersHorizontal, RotateCcw, X, Heart, MapPin, Home, Flag } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
+import StudentCard from "@/components/campus/StudentCard";
+import ProfileTimeline, { LikeHeart } from "@/components/campus/ProfileTimeline";
+import LikeComposer, { type LikePreview } from "@/components/LikeComposer";
+import { interleave, isLikablePrompt, listingPrompts, type TimelineItem } from "@/lib/prompts";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -65,10 +70,20 @@ interface Listing {
   user: UserProfile;
 }
 
-// Deste kartı: kart tipine ek olarak gerçek ilanın ev özelliklerini taşır.
+// Deste kartı: kart tipine ek olarak gerçek ilanın ev özelliklerini ve
+// sunucudan gelen hâlini taşır (kartlar ve sahibin profili ondan üretilir).
 type DeckListing = Listing & {
   features?: Partial<Record<ListingFeature, boolean>>;
+  source: ApiListing;
 };
+
+/** Kalbe basılan şey: sunucuya giden hedef ve paneldeki önizleme. */
+interface LikeDraft {
+  listingId: number;
+  target: LikeTarget;
+  preview: LikePreview;
+  recipient: string;
+}
 
 const matchesFilters = (l: DeckListing, f: ListingFilters): boolean => {
   if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
@@ -177,7 +192,9 @@ const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
     ...anonUser,
     name: a.owner_name ?? ownerFallback,
     university: a.owner_university ?? "",
+    photos: a.owner_profile?.photo ? [a.owner_profile.photo] : [],
   },
+  source: a,
 });
 
 const SwipeScreen = () => {
@@ -186,7 +203,6 @@ const SwipeScreen = () => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [cards, setCards] = useState<DeckListing[]>([]);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -202,6 +218,14 @@ const SwipeScreen = () => {
   const openReport = (id: number, title: string) => {
     setReportTarget({ id, title });
     setReportOpen(true);
+  };
+
+  // Yorumlu beğeni paneli de aynı sebeple kartın dışında durur.
+  const [likeDraft, setLikeDraft] = useState<LikeDraft | null>(null);
+  const [likeOpen, setLikeOpen] = useState(false);
+  const openLike = (draft: LikeDraft) => {
+    setLikeDraft(draft);
+    setLikeOpen(true);
   };
 
   // Filtre state'te tutulur; liste yenilense de seçim kaybolmaz
@@ -249,28 +273,40 @@ const SwipeScreen = () => {
   const applyFilters = (f: ListingFilters) =>
     setActiveFilters(isDefaultFilters(f) ? null : f);
 
+  // Sunucu kararı kaydettikten sonra: önbellek ve eşleşme bildirimi.
+  const afterSwipe = useCallback((listingId: number, res: SwipeResult) => {
+    // Deste sorgusu YENİDEN ÇEKİLMEZ (çekilirse elde kalan kartlar
+    // sıfırlanır), ama önbellekteki kayıt da öylece bırakılamaz:
+    // başka sekmeye geçip dönünce bileşen yeniden kurulur ve desteyi
+    // bu önbellekten inşa eder — kaydırılan kartlar geri gelirdi.
+    // Bu yüzden karar verilen ilan önbellekten tek tek düşürülür.
+    queryClient.setQueriesData<ApiListing[]>(
+      { queryKey: ["listings", "deck"] },
+      old => old?.filter(l => l.id !== listingId),
+    );
+    queryClient.invalidateQueries({ queryKey: ["matches"] });
+    queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+    if (res.matched) {
+      toast.success(t("swipe.matched"), { description: t("swipe.matchedDesc") });
+    }
+  }, [queryClient, t]);
+
+  // Üstteki kartı mühürle birlikte desteden atar.
+  const dismissTop = useCallback((direction: "left" | "right") => {
+    setSwipeDirection(direction);
+    setTimeout(() => {
+      setCards(prev => prev.slice(0, -1));
+      setSwipeDirection(null);
+    }, 300);
+  }, []);
+
   const handleSwipe = useCallback((direction: "left" | "right") => {
     // Karar sunucuya yalnızca girişliyken ve sunucudaki bir ilan için yazılır.
     const card = cards[cards.length - 1];
     if (card && isLoggedIn && card.id.startsWith("api-")) {
       const listingId = Number(card.id.slice(4));
       postSwipe(listingId, direction === "right" ? "like" : "pass")
-        .then(res => {
-          // Deste sorgusu YENİDEN ÇEKİLMEZ (çekilirse elde kalan kartlar
-          // sıfırlanır), ama önbellekteki kayıt da öylece bırakılamaz:
-          // başka sekmeye geçip dönünce bileşen yeniden kurulur ve desteyi
-          // bu önbellekten inşa eder — kaydırılan kartlar geri gelirdi.
-          // Bu yüzden karar verilen ilan önbellekten tek tek düşürülür.
-          queryClient.setQueriesData<ApiListing[]>(
-            { queryKey: ["listings", "deck"] },
-            old => old?.filter(l => l.id !== listingId),
-          );
-          queryClient.invalidateQueries({ queryKey: ["matches"] });
-          queryClient.invalidateQueries({ queryKey: ["received-likes"] });
-          if (res.matched) {
-            toast.success(t("swipe.matched"), { description: t("swipe.matchedDesc") });
-          }
-        })
+        .then(res => afterSwipe(listingId, res))
         // Sunucu kaydırmayı reddedebilir: ilan sahibi askıya alındıysa ya da
         // ilan yayından kalktıysa 404 döner. Sessizce yutmak kullanıcıya
         // kararı kaydedilmiş gibi gösteriyordu; artık sebebini görüyor.
@@ -278,12 +314,22 @@ const SwipeScreen = () => {
           toast.error(err instanceof Error ? err.message : t("swipe.failed"));
         });
     }
-    setSwipeDirection(direction);
-    setTimeout(() => {
-      setCards(prev => prev.slice(0, -1));
-      setSwipeDirection(null);
-    }, 300);
-  }, [isLoggedIn, cards, queryClient, t]);
+    dismissTop(direction);
+  }, [isLoggedIn, cards, afterSwipe, dismissTop, t]);
+
+  // Fotoğrafa / karta yorumlu beğeni. Düz kaydırmanın aksine İYİMSER DEĞİL:
+  // kart ancak sunucu beğeniyi kabul edince gider. Yorum denetime takılırsa
+  // (422) hata fırlar, panel açık kalır ve yazılan metin kaybolmaz.
+  const sendLike = async (comment: string) => {
+    if (!likeDraft) return;
+    const res = await postSwipe(likeDraft.listingId, "like", {
+      target: likeDraft.target,
+      comment,
+    });
+    setLikeOpen(false);
+    afterSwipe(likeDraft.listingId, res);
+    dismissTop("right");
+  };
 
   // Kaydırma geçmişini siler: sunucudaki kararlar gidince deste baştan gelir.
   // Eşleşmeler ve sohbetler silinmez (sunucu yalnızca Swipe satırlarını siler),
@@ -380,10 +426,9 @@ const SwipeScreen = () => {
                   key={currentCard.id}
                   listing={currentCard}
                   onSwipe={handleSwipe}
-                  expanded={expandedCard === currentCard.id}
-                  onToggleExpand={() => setExpandedCard(e => e === currentCard.id ? null : currentCard.id)}
                   direction={swipeDirection}
                   onReport={openReport}
+                  onLike={isLoggedIn ? openLike : undefined}
                 />
               )}
             </AnimatePresence>
@@ -413,24 +458,76 @@ const SwipeScreen = () => {
           targetLabel={reportTarget.title}
         />
       )}
+      <LikeComposer
+        open={likeOpen}
+        onClose={() => setLikeOpen(false)}
+        recipient={likeDraft?.recipient ?? ""}
+        preview={likeDraft?.preview ?? null}
+        onSend={sendLike}
+      />
       <BottomNav />
     </div>
   );
 };
 
 /*
- * Kart: Hinge gibi fotoğraf üstte ve çerçeveli, metin altta kâğıdın üstünde.
- * Fotoğrafın üstüne yazı basılmaz; başlık ve fiyat her fotoğrafta okunur.
- * İlan sahibinin kendi yazdığı açıklama çizgili kâğıtta durur.
+ * Kart: Hinge'in profil düzeni. Kapak fotoğrafı, başlık ve fiyat ilk bakışta;
+ * kart aşağı kaydırıldıkça ilan yazısı, sonra kart, fotoğraf, kart, fotoğraf…
+ * ve en sonda ilan sahibinin öğrenci kartı. Fotoğrafın üstüne yazı basılmaz.
+ *
+ * Kartın içi dikey kayar, kartın kendisi yatay sürüklenir: iç kaydırıcıdaki
+ * `touch-pan-y` dikey hareketi tarayıcıya, yatayı framer-motion'a bırakır.
+ *
+ * `onLike` verilirse (girişli, üstteki kart) her fotoğrafta ve kartta bir kalp
+ * çıkar; kalp yorum panelini açar.
  */
-const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolean }) => {
+const SwipeCard = ({
+  listing,
+  isTop = true,
+  onLike,
+  onReport,
+}: {
+  listing: DeckListing;
+  isTop?: boolean;
+  onLike?: (draft: LikeDraft) => void;
+  onReport?: (listingId: number, title: string) => void;
+}) => {
   const isHouse = listing.type === "ev_ilani";
-  const { t, n } = useI18n();
+  const { t, n, locale } = useI18n();
   const apiId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
+  const src = listing.source;
+  const owner = src.owner_profile ?? null;
+  const ownerName = listing.user.name;
+
+  const prompts = listingPrompts(src, { t, n, locale });
+  const timeline = interleave(listing.photos.slice(1), prompts, 1);
+
+  // Kalp yalnızca gerçek ilanda ve üstteki kartta.
+  const like = apiId !== null && isTop ? onLike : undefined;
+  const likeItem = like
+    ? (item: TimelineItem) => {
+        if (item.kind === "photo") {
+          like({
+            listingId: apiId!,
+            target: { kind: "photo", photo_index: item.index },
+            preview: { kind: "photo", url: item.url },
+            recipient: ownerName,
+          });
+        } else if (isLikablePrompt(item.prompt.key)) {
+          // Bütçe/semt kartı destede hiç üretilmez; koşul yalnızca tür için.
+          like({
+            listingId: apiId!,
+            target: { kind: "prompt", prompt_key: item.prompt.key },
+            preview: { kind: "prompt", ...item.prompt },
+            recipient: ownerName,
+          });
+        }
+      }
+    : undefined;
 
   return (
-    <div className="card-listing h-full flex flex-col">
-      <div className="relative flex-[0_0_50%] m-2 mb-0 rounded-xl overflow-hidden bg-muted">
+    <div className="card-listing h-full overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
+      <div className="relative h-[36vh] m-2 mb-0 rounded-xl overflow-hidden bg-muted">
         {listing.photos[0] ? (
           <img src={listing.photos[0]} alt={isTop ? listing.title : ""} className="w-full h-full object-cover" draggable={false} />
         ) : (
@@ -442,11 +539,17 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
         <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[12px] font-semibold bg-card/95 text-foreground">
           {isHouse ? t("common.houseListing") : t("common.personalListing")}
         </span>
+        {likeItem && listing.photos[0] && (
+          <LikeHeart
+            onClick={() => likeItem({ kind: "photo", url: listing.photos[0], index: 0 })}
+            className="absolute bottom-3 right-3"
+          />
+        )}
       </div>
 
-      <div className="px-4 pt-3 pb-4 flex-1 min-h-0 flex flex-col gap-2.5">
+      <div className="px-4 pt-3 pb-5 space-y-3">
         <div>
-          <h3 className="font-display text-[1.45rem] leading-tight text-foreground line-clamp-1">{listing.title}</h3>
+          <h3 className="font-display text-[1.45rem] leading-tight text-foreground">{listing.title}</h3>
           <p className="mt-0.5 text-sm text-muted-foreground flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" />
             {listing.district}
@@ -467,37 +570,84 @@ const SwipeCard = ({ listing, isTop = true }: { listing: Listing; isTop?: boolea
           {isHouse && apiId !== null && isTop && <FairPriceBadge listingId={apiId} />}
         </div>
 
-        <p className="paper-ruled rounded-lg text-[14px] text-foreground flex-1 min-h-[3.5rem] overflow-hidden">
-          {listing.description}
-        </p>
-
-        <div className="flex items-center gap-2.5">
-          <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-7 h-7 text-[11px]" />
-          <p className="text-[13px] text-muted-foreground truncate">
-            <span className="font-semibold text-foreground">{listing.user.name}</span>
-            {listing.user.university && <>, {listing.user.university}</>}
+        {/* İlan sahibinin kendi yazdığı metin: çizgili kâğıtta, beğenilebilir */}
+        <div className="relative">
+          <p className={`paper-ruled rounded-lg text-[14px] text-foreground whitespace-pre-line ${likeItem ? "pb-14" : ""}`}>
+            {listing.description}
           </p>
+          {likeItem && (
+            <LikeHeart
+              onClick={() =>
+                like!({
+                  listingId: apiId!,
+                  target: { kind: "prompt", prompt_key: "description" },
+                  preview: { kind: "text", question: t("prompt.q.description"), text: listing.description },
+                  recipient: ownerName,
+                })
+              }
+              className="absolute bottom-3 right-3"
+            />
+          )}
         </div>
+
+        <ProfileTimeline items={timeline} onLike={likeItem} />
+
+        {isHouse && apiId !== null && isTop && <FairPriceBadge listingId={apiId} detailed />}
+
+        {/* İlan sahibi: her yerde aynı öğrenci kartı */}
+        {src.owner_id !== null && (
+          owner || src.owner_name ? (
+            <div className="pt-1 space-y-2">
+              <p className="text-[13px] font-semibold text-muted-foreground">{t("swipe.owner")}</p>
+              <StudentCard
+                name={ownerName}
+                photo={owner?.photo}
+                university={src.owner_university}
+                department={owner?.department}
+                year={owner?.year}
+                memberNo={src.owner_id}
+                verified={!!src.owner_university}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <UserAvatar name={ownerName} photo={listing.user.photos[0]} className="w-7 h-7 text-[11px]" />
+              <p className="text-[13px] text-muted-foreground truncate">{ownerName}</p>
+            </div>
+          )
+        )}
+
+        {/* Bildirme girişli kullanıcıya açıktır (sunucu 401 döner) */}
+        {onReport && apiId !== null && isTop && (
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              onReport(apiId, listing.title);
+            }}
+            className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Flag className="w-3.5 h-3.5" />
+            {t("report.reportListing")}
+          </button>
+        )}
       </div>
     </div>
   );
 };
 
 interface SwipeCardDraggableProps {
-  listing: Listing;
+  listing: DeckListing;
   onSwipe: (dir: "left" | "right") => void;
-  expanded: boolean;
-  onToggleExpand: () => void;
   direction: "left" | "right" | null;
-  /** Genişletilmiş karttaki "bu ilanı bildir" bağlantısı. */
+  /** Kartın altındaki "bu ilanı bildir" bağlantısı. */
   onReport: (listingId: number, title: string) => void;
+  /** Girişliyken: fotoğraftaki / karttaki kalp yorum panelini açar. */
+  onLike?: (draft: LikeDraft) => void;
 }
 
-const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direction, onReport }: SwipeCardDraggableProps) => {
+const SwipeCardDraggable = ({ listing, onSwipe, direction, onReport, onLike }: SwipeCardDraggableProps) => {
   const { t } = useI18n();
   const { isLoggedIn } = useAuth();
-  // Yalnızca sunucudaki ilanların id'si vardır ("api-<id>").
-  const apiListingId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
@@ -530,63 +680,7 @@ const SwipeCardDraggable = ({ listing, onSwipe, expanded, onToggleExpand, direct
         <span className="stamp stamp-red text-2xl px-4 py-1.5 bg-card/80">{t("swipe.pass")}</span>
       </motion.div>
 
-      <div className="h-full" onClick={onToggleExpand}>
-        <SwipeCard listing={listing} />
-      </div>
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ y: "100%" }} animate={{ y: "22%" }} exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="absolute inset-0 bg-card rounded-2xl border border-border overflow-y-auto z-20"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex justify-center pt-3 pb-3"><div className="w-10 h-1 rounded-full bg-border" /></div>
-            <div className="px-5 pb-[30%] space-y-5">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="font-display text-2xl leading-tight text-foreground">{listing.title}</h3>
-                <button onClick={onToggleExpand} aria-label={t("common.close")} className="w-9 h-9 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted">
-                  <ChevronDown className="w-5 h-5 text-foreground" />
-                </button>
-              </div>
-              <p className="paper-ruled rounded-lg text-[15px] text-foreground whitespace-pre-line">{listing.description}</p>
-              {listing.type === "ev_ilani" && apiListingId !== null && (
-                <FairPriceBadge listingId={apiListingId} detailed />
-              )}
-              {listing.user.id !== "anon" && (
-                <div className="flex flex-wrap gap-2">
-                  <LifestyleTag type="smoking" value={listing.user.smoking} />
-                  <LifestyleTag type="pets" value={listing.user.pets} />
-                  <LifestyleTag type="alcohol" value={listing.user.alcohol} />
-                  <LifestyleTag type="sleep" value={listing.user.sleepSchedule} />
-                </div>
-              )}
-              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <UserAvatar name={listing.user.name} photo={listing.user.photos[0]} className="w-12 h-12 text-base" />
-                <div className="min-w-0">
-                  <p className="font-display text-lg leading-tight text-foreground truncate">{listing.user.name}</p>
-                  {listing.user.university && (
-                    <p className="text-[13px] text-muted-foreground flex items-center gap-1 truncate">
-                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />{listing.user.university}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {/* Bildirme girişli kullanıcıya açıktır (sunucu 401 döner) */}
-              {isLoggedIn && apiListingId !== null && (
-                <button
-                  onClick={() => onReport(apiListingId, listing.title)}
-                  className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <Flag className="w-3.5 h-3.5" />
-                  {t("report.reportListing")}
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SwipeCard listing={listing} onLike={onLike} onReport={isLoggedIn ? onReport : undefined} />
     </motion.div>
   );
 };
