@@ -207,8 +207,8 @@ const Profile = () => {
                     <p className="text-[13px] text-muted-foreground">
                       {listing.district},{" "}
                       {listing.type === "ev_ilani"
-                        ? `${n(listing.rent ?? 0)} ₺`
-                        : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} ₺`}
+                        ? `${n(listing.rent ?? 0)} TL`
+                        : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} TL`}
                     </p>
                   </div>
                   <button
@@ -240,7 +240,7 @@ const Profile = () => {
                 { label: t("profile.fieldEmail"), value: me?.email ?? "—" },
                 { label: t("profile.fieldUniversity"), value: [me.university, me.department].filter(Boolean).join(", ") || "—" },
                 { label: t("profile.fieldDistrict"), value: user.preferredDistrict },
-                { label: t("profile.fieldBudget"), value: `${n(user.budgetMin)}–${n(user.budgetMax)} ₺${t("common.perMonth")}` },
+                { label: t("profile.fieldBudget"), value: `${n(user.budgetMin)}–${n(user.budgetMax)} TL${t("common.perMonth")}` },
                 { label: t("profile.fieldSmoking"), value: t(user.smoking ? "profile.smokes" : "profile.noSmoke") },
                 { label: t("profile.fieldPets"), value: t(user.pets ? "profile.petFriendly" : "profile.noPets") },
                 { label: t("profile.fieldAlcohol"), value: t(user.alcohol ? "profile.drinks" : "profile.noDrinks") },

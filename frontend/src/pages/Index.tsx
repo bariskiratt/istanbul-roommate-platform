@@ -123,10 +123,9 @@ const Index = () => {
               {t("landing.ctaBrowse")}
             </Button>
           </div>
+          {/* İlan sayısı bilerek yok: yayının ilk günlerinde küçük bir sayı
+              siteyi boş gösteriyordu. */}
           <p className="mt-8 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{listings.length > 0 ? fmtNum(listings.length) : "0"}</span>{" "}
-            {t("landing.statListings")}
-            <span className="mx-3 text-border" aria-hidden="true">|</span>
             <span className="font-semibold text-foreground">968</span> {t("landing.statNeighborhoods")}
             <span className="mx-3 text-border" aria-hidden="true">|</span>
             <span className="font-semibold text-foreground">{t("landing.statErrorValue")}</span> {t("landing.statError")}
@@ -183,7 +182,7 @@ const Index = () => {
                   </p>
                   {l.rent != null && (
                     <p className="mt-1.5 text-[15px]">
-                      <span className="marker font-semibold">{fmtNum(l.rent)} ₺</span>
+                      <span className="marker font-semibold">{fmtNum(l.rent)} TL</span>
                       <span className="text-muted-foreground text-sm">{t("common.roomShare")}</span>
                     </p>
                   )}
@@ -305,7 +304,7 @@ const Index = () => {
                       </td>
                       <td className="py-3 px-5 text-right tabular-nums text-foreground">{d.count}</td>
                       <td className="py-3 px-5 text-right tabular-nums text-foreground">
-                        {d.median != null ? `${fmtNum(d.median)} ₺` : "—"}
+                        {d.median != null ? `${fmtNum(d.median)} TL` : "—"}
                       </td>
                     </tr>
                   ))}

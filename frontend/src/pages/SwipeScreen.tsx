@@ -561,8 +561,8 @@ const SwipeCard = ({
           <p className="text-[15px]">
             <span className="marker font-semibold text-[17px]">
               {isHouse
-                ? `${n(listing.rent ?? 0)} ₺`
-                : `${n(listing.budgetMin ?? 0)}–${n(listing.budgetMax ?? 0)} ₺`}
+                ? `${n(listing.rent ?? 0)} TL`
+                : `${n(listing.budgetMin ?? 0)}–${n(listing.budgetMax ?? 0)} TL`}
             </span>
             {isHouse && <span className="text-muted-foreground text-[13px] ml-0.5">{t("common.roomShare")}</span>}
           </p>

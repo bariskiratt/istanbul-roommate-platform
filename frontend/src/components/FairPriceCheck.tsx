@@ -159,7 +159,7 @@ const FairPriceCheck = ({
           {/* Oda payı — ev arkadaşından istenecek adil kira */}
           <div className="pt-3">
             <p className="text-2xl font-semibold">
-              <span className="marker">{fmt(result.room_low)}–{fmt(result.room_high)} ₺</span>
+              <span className="marker">{fmt(result.room_low)}–{fmt(result.room_high)} TL</span>
             </p>
             <p className="text-[13px] text-muted-foreground mt-1">
               {t("fair.roomShareLabel", { mid: fmt(result.room_mid) })}
@@ -179,7 +179,7 @@ const FairPriceCheck = ({
           <p className="text-[13px] text-muted-foreground">
             {t("fair.wholeFlat")}{" "}
             <span className="font-semibold text-foreground">
-              {fmt(result.fair_low)}–{fmt(result.fair_high)} ₺
+              {fmt(result.fair_low)}–{fmt(result.fair_high)} TL
             </span>
           </p>
 

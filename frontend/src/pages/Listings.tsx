@@ -76,10 +76,10 @@ const isHouse = (l: AdminListing) => l.type === "ev_ilani";
  * bırakıyor, bkz. AdminListing) fiyat uydurmak yerine tire basılır.
  */
 const priceLabel = (l: AdminListing, n: (v: number) => string): string => {
-  if (isHouse(l)) return l.rent == null ? "—" : `${n(l.rent)} ₺`;
+  if (isHouse(l)) return l.rent == null ? "—" : `${n(l.rent)} TL`;
   if (l.type === "kisisel_ilan") {
     if (l.budget_min == null || l.budget_max == null) return "—";
-    return `${n(l.budget_min)}–${n(l.budget_max)} ₺`;
+    return `${n(l.budget_min)}–${n(l.budget_max)} TL`;
   }
   return "—";
 };
