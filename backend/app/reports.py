@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app import content_limits, models
 from app.auth import get_current_user
 from app.db import get_db
+from app.i18n import localized
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -55,7 +56,8 @@ def require_admin(user: models.User = Depends(get_current_user)) -> models.User:
     """Yalnız yönetici uçları için bağımlılık."""
     if not user.is_admin:
         raise HTTPException(
-            status_code=403, detail="Bu işlem için yönetici yetkisi gerekiyor."
+            status_code=403,
+            detail=localized("Bu işlem için yönetici yetkisi gerekiyor."),
         )
     return user
 
@@ -147,18 +149,22 @@ def create_report(
 ):
     """Rapor oluşturma giriş ister — anonim ihbar yağmuruna kapalı."""
     if payload.target_type == "user" and payload.target_id == user.id:
-        raise HTTPException(status_code=400, detail="Kendini raporlayamazsın.")
+        raise HTTPException(
+            status_code=400, detail=localized("Kendini raporlayamazsın.")
+        )
 
     # Farklı hedefleri hızla tarayıp kuyruğu doldurmaya karşı (bulgu H3).
     # Aynı hedefin tekrarı zaten tekillik kısıtıyla engelli.
     content_limits.check("report_create", user.id)
 
     if not _reportable(db, payload.target_type, payload.target_id, user):
-        raise HTTPException(status_code=404, detail="Raporlanacak içerik bulunamadı.")
+        raise HTTPException(
+            status_code=404, detail=localized("Raporlanacak içerik bulunamadı.")
+        )
 
     if _existing_report(db, user.id, payload.target_type, payload.target_id):
         raise HTTPException(
-            status_code=409, detail="Bu içeriği zaten raporladın."
+            status_code=409, detail=localized("Bu içeriği zaten raporladın.")
         )
 
     note = payload.note.strip() if payload.note else None
@@ -179,7 +185,7 @@ def create_report(
         # raporladın" durumudur; 500 yerine 409 döner.
         db.rollback()
         raise HTTPException(
-            status_code=409, detail="Bu içeriği zaten raporladın."
+            status_code=409, detail=localized("Bu içeriği zaten raporladın.")
         ) from None
     db.refresh(row)
     return row

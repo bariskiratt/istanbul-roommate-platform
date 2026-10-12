@@ -32,6 +32,7 @@ from app import config, models
 from app.db import get_db
 from app.departments import DEPARTMENT_GROUPS, is_valid as is_valid_department
 from app.emailer import send_otp_email
+from app.i18n import localized
 from app.universities import DOMAINS as UNIVERSITY_DOMAINS, university_from_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -115,10 +116,15 @@ def _prune_buckets(now: datetime) -> None:
 
 def _too_many(window: timedelta) -> HTTPException:
     minutes = max(1, int(window.total_seconds() // 60))
-    unit = f"{minutes // 60} saat" if minutes >= 60 else f"{minutes} dakika"
+    if minutes >= 60:
+        unit = localized("{n} saat", n=minutes // 60)
+    else:
+        unit = localized("{n} dakika", n=minutes)
     return HTTPException(
         status_code=429,
-        detail=f"Çok fazla deneme yapıldı. {unit} sonra tekrar dene.",
+        detail=localized(
+            "Çok fazla deneme yapıldı. {unit} sonra tekrar dene.", unit=unit
+        ),
     )
 
 
@@ -209,9 +215,12 @@ def _reject_if_suspended(user: models.User, *, include_reason: bool = False) -> 
     """
     if not user.is_suspended:
         return
-    detail = SUSPENDED_DETAIL
+    detail = localized(SUSPENDED_DETAIL)
     if include_reason and user.suspended_reason:
-        detail = f"{detail} Sebep: {user.suspended_reason}"
+        # Gerekçe yöneticinin serbest metnidir; çevrilmez, olduğu gibi eklenir.
+        detail = localized(
+            "{detail} Sebep: {reason}", detail=detail, reason=user.suspended_reason
+        )
     raise HTTPException(status_code=403, detail=detail)
 
 
@@ -362,9 +371,11 @@ def _deliver_otp(email: str, code: str) -> dict:
     if not sent and not _dev_otp_enabled():
         raise HTTPException(
             status_code=502,
-            detail="Doğrulama e-postası gönderilemedi. Az sonra tekrar dene.",
+            detail=localized(
+                "Doğrulama e-postası gönderilemedi. Az sonra tekrar dene."
+            ),
         )
-    response = {"detail": "Doğrulama kodu gönderildi."}
+    response = {"detail": localized("Doğrulama kodu gönderildi.")}
     if _dev_otp_enabled():
         response["dev_code"] = code
     return response
@@ -424,7 +435,7 @@ class EmailIn(BaseModel):
     def _normalize(cls, v: str) -> str:
         v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
-            raise ValueError("Geçerli bir e-posta adresi girin.")
+            raise ValueError(localized("Geçerli bir e-posta adresi girin."))
         return v
 
 
@@ -451,11 +462,11 @@ class StudentEmailIn(EmailIn):
         """
         v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
-            raise ValueError("Geçerli bir e-posta adresi girin.")
+            raise ValueError(localized("Geçerli bir e-posta adresi girin."))
         if v in config.ADMIN_EMAILS:
             return v
         if not is_student_email(v):
-            raise ValueError(STUDENT_EMAIL_ERROR)
+            raise ValueError(localized(STUDENT_EMAIL_ERROR))
         return v
 
 
@@ -546,7 +557,11 @@ class UserUpdate(BaseModel):
             return v
         year = datetime.now(timezone.utc).year
         if not (year - MAX_AGE <= v <= year - MIN_AGE):
-            raise ValueError(f"Yaş {MIN_AGE}-{MAX_AGE} aralığında olmalı.")
+            raise ValueError(
+                localized(
+                    "Yaş {min}-{max} aralığında olmalı.", min=MIN_AGE, max=MAX_AGE
+                )
+            )
         return v
 
     @field_validator("department")
@@ -554,7 +569,7 @@ class UserUpdate(BaseModel):
     def _known_department(cls, v: str | None) -> str | None:
         # Bölüm kapalı listeden seçilir (bkz. app/departments.py)
         if not is_valid_department(v):
-            raise ValueError("Bölüm listeden seçilmelidir.")
+            raise ValueError(localized("Bölüm listeden seçilmelidir."))
         return v
     year: int | None = Field(None, ge=1, le=10)
     budget_min: int | None = Field(None, gt=0, le=10_000_000)
@@ -623,7 +638,9 @@ def get_current_user(
     user: models.User | None = Depends(get_optional_user),
 ) -> models.User:
     if user is None:
-        raise HTTPException(status_code=401, detail="Giriş yapman gerekiyor.")
+        raise HTTPException(
+            status_code=401, detail=localized("Giriş yapman gerekiyor.")
+        )
     return user
 
 
@@ -660,7 +677,7 @@ def register(
         # pratikte işe yaramıyor. Gerçek numaralandırma kapısı olan
         # /request-otp'un 404'ü ise kaldırıldı (bkz. request_otp).
         raise HTTPException(
-            status_code=409, detail="Bu e-posta zaten kayıtlı. Giriş yap."
+            status_code=409, detail=localized("Bu e-posta zaten kayıtlı. Giriş yap.")
         )
 
     user = models.User(
@@ -706,7 +723,7 @@ def request_otp(payload: EmailIn, request: Request, db: Session = Depends(get_db
 
     user = db.scalar(select(models.User).where(models.User.email == payload.email))
     if user is None:
-        return {"detail": "Doğrulama kodu gönderildi."}
+        return {"detail": localized("Doğrulama kodu gönderildi.")}
     # Askıdaki hesaba kod göndermenin anlamı yok; verify-otp zaten reddedecek.
     # Gerekçe EKLENMEZ: bu uç hiçbir kimlik doğrulaması istemiyor.
     _reject_if_suspended(user)
@@ -756,11 +773,15 @@ def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
         or not user.password_hash
         or not _verify_password(payload.password, user.password_hash)
     ):
-        raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
+        raise HTTPException(
+            status_code=401, detail=localized("E-posta veya şifre hatalı.")
+        )
     if not user.verified:
         raise HTTPException(
             status_code=403,
-            detail="Hesabın henüz doğrulanmamış. 'Kodla gir' ile e-postanı doğrula.",
+            detail=localized(
+                "Hesabın henüz doğrulanmamış. 'Kodla gir' ile e-postanı doğrula."
+            ),
         )
     # Şifre DOĞRULANDIKTAN sonra: karşıdaki hesabın sahibi, gerekçeyi görebilir.
     _reject_if_suspended(user, include_reason=True)
@@ -793,15 +814,17 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     if user is not None:
         _reject_if_suspended(user)
     if user is None or user.otp_hash is None:
-        raise HTTPException(status_code=400, detail="Önce kod iste.")
+        raise HTTPException(status_code=400, detail=localized("Önce kod iste."))
 
     expires = user.otp_expires
     if expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)  # SQLite tz bilgisini düşürür
     if expires is None or expires < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Kodun süresi doldu. Yeni kod iste.")
+        raise HTTPException(
+            status_code=400, detail=localized("Kodun süresi doldu. Yeni kod iste.")
+        )
     if not _otp_matches(user.otp_hash, payload.code):
-        raise HTTPException(status_code=400, detail="Kod hatalı.")
+        raise HTTPException(status_code=400, detail=localized("Kod hatalı."))
 
     user.verified = True
     user.otp_hash = None
@@ -854,7 +877,7 @@ def _check_profile_photos(photos: list[str], current: list[str] | None) -> None:
         if url not in existing and not is_allowed_photo_url(url):
             raise HTTPException(
                 status_code=422,
-                detail=(
+                detail=localized(
                     "Fotoğraf adresi kabul edilmiyor: yalnızca uygulamaya "
                     "yüklenen fotoğraflar ve izin verilen barındırıcılar geçerli."
                 ),
@@ -875,7 +898,8 @@ def update_me(
     eff_max = updates.get("budget_max", user.budget_max)
     if eff_min is not None and eff_max is not None and eff_min > eff_max:
         raise HTTPException(
-            status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
+            status_code=422,
+            detail=localized("Bütçe alt sınırı üst sınırdan büyük olamaz."),
         )
     for key, value in updates.items():
         setattr(user, key, value)
@@ -895,10 +919,10 @@ def change_password(
     if not user.password_hash or not _verify_password(
         payload.current_password, user.password_hash
     ):
-        raise HTTPException(status_code=400, detail="Mevcut şifren hatalı.")
+        raise HTTPException(status_code=400, detail=localized("Mevcut şifren hatalı."))
     if payload.current_password == payload.new_password:
         raise HTTPException(
-            status_code=400, detail="Yeni şifre eskisiyle aynı olamaz."
+            status_code=400, detail=localized("Yeni şifre eskisiyle aynı olamaz.")
         )
 
     user.password_hash = _hash_password(payload.new_password)
@@ -1126,7 +1150,7 @@ def delete_account(
     if not user.password_hash or not _verify_password(
         payload.password, user.password_hash
     ):
-        raise HTTPException(status_code=400, detail="Şifren hatalı.")
+        raise HTTPException(status_code=400, detail=localized("Şifren hatalı."))
 
     purge_user(db, user)
     db.commit()

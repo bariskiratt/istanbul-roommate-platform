@@ -669,6 +669,22 @@ fallback error message. `translate()` is the escape hatch
 docstring at `src/i18n/index.tsx:33-36` says to use `useI18n().t` in
 components.
 
+### 7.7 Server messages
+
+Error text from the API (a wrong password, a listing rejected by moderation, a
+rate limit) is shown as the server wrote it, so the server has to write it in
+the user's language. Every request carries the selected language as
+`Accept-Language` (`langHeaders`, `src/lib/api.ts:32`), read through the same
+`detectLang()` as the UI rather than the browser's own header, because the
+language can be switched in the app. The backend keeps Turkish as the source
+and looks up the English text in `backend/app/i18n.py`; with no header it
+answers in Turkish.
+
+Pydantic prefixes a validator's message with `Value error, `; `describeApiError`
+drops that prefix (`src/lib/apiError.ts:61`). Pydantic's own built-in messages
+("Field required", "List should have at least 3 items…") are English in both
+modes; the forms validate those fields before sending, so they rarely surface.
+
 ---
 
 ## 8. The API layer (`src/lib/api.ts`)

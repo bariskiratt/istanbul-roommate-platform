@@ -6,7 +6,7 @@
  * VITE_API_URL ile ayarlanır (bkz. .env.example).
  */
 
-import { translate } from "@/i18n";
+import { detectLang, translate } from "@/i18n";
 import { describeApiError } from "@/lib/apiError";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
@@ -22,6 +22,15 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 function authHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Sunucu hata metinlerini arayüzün dilinde yazar (bkz. backend/app/i18n.py).
+ * Tarayıcının kendi Accept-Language'ı yerine seçili dil gönderilir: dil site
+ * içinden değiştirilebiliyor ve tarayıcınınkiyle aynı olmak zorunda değil.
+ */
+function langHeaders(): Record<string, string> {
+  return { "Accept-Language": detectLang() };
 }
 
 /**
@@ -66,6 +75,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...authHeaders(),
+      ...langHeaders(),
       ...init?.headers,
     },
   });
@@ -1079,7 +1089,7 @@ export const uploadPhoto = async (file: File): Promise<{ url: string }> => {
   // Content-Type elle verilmez; tarayıcı multipart sınırını kendisi ekler.
   const res = await fetch(`${BASE_URL}/api/uploads`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: { ...authHeaders(), ...langHeaders() },
     body: form,
   });
   const data = await res.json().catch(() => null);

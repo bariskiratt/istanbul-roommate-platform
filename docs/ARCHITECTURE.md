@@ -148,10 +148,14 @@ sequenceDiagram
 
 ### Step by step
 
-**1. Middleware, outermost first.** Two middlewares are installed: GZip
-(`backend/app/main.py:161`) and CORS (`backend/app/main.py:178`). Starlette
-wraps the most recently added middleware *outermost*, so CORS sees the request
-first. You can observe this: a preflight `OPTIONS /api/listings` returns `200`
+**1. Middleware, outermost first.** Five middlewares are installed
+(`backend/app/main.py:386-443`, where a comment explains the order). Starlette
+wraps the most recently added middleware *outermost*, so the chain runs
+Language → SecurityHeaders → CORS → BodySizeLimit → GZip → router. Language
+reads `Accept-Language` into a context variable so every error below it,
+including BodySizeLimit's 413, is written in the user's language
+(`backend/app/i18n.py`). CORS sits outside the routing, so it answers
+preflights itself. You can observe this: a preflight `OPTIONS /api/listings` returns `200`
 with `access-control-allow-origin` even though no route handles `OPTIONS` — if
 it reached the router it would be a `405`.
 
@@ -726,6 +730,7 @@ change.** The second file is `backend/app/migrate.py`.
 | `app/heatmap.py` | 169 | GeoJSON↔CSV join, budget colouring |
 | `app/transit.py` | 289 | rail graph, accessibility, alternative districts |
 | `app/locations.py` | 72 | district→neighbourhood list for the form |
+| `app/i18n.py` | 282 | Turkish/English server messages, chosen by `Accept-Language` |
 | `app/normalize.py` | 85 | Turkish text canonicalisation for place matching |
 | `app/universities.py` | 85 | e-mail domain → university |
 | `app/departments.py` | 250 | closed list of degree programmes |

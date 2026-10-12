@@ -47,6 +47,7 @@ from typing import Literal
 # yeniden yazılmaz. (app.crypto yalnızca standart kütüphaneye bağlıdır;
 # bu import modülün saflığını bozmaz ve döngü yaratmaz.)
 from app.crypto import UNREADABLE
+from app.i18n import localized
 
 Kind = Literal["listing", "message"]
 Action = Literal["allow", "flag", "block"]
@@ -842,10 +843,11 @@ def reason_codes(reasons: list[str]) -> list[str]:
 
 
 def describe(reasons: list[str], subject: str = "İçerikte") -> str:
-    """Sebep kodlarını kullanıcıya gösterilecek Türkçe cümleye çevirir.
+    """Sebep kodlarını kullanıcıya gösterilecek cümleye çevirir.
 
     `subject` cümlenin öznesini değiştirir ("Başlıkta", "Açıklamada"); ilan
-    uçları hangi ALANIN reddedildiğini böyle söyler. Metin her zaman sabit
+    uçları hangi ALANIN reddedildiğini böyle söyler. Özne Türkçe verilir,
+    cümle isteğin dilinde kurulur (bkz. app/i18n.py). Metin her zaman sabit
     sözlükten üretilir — kullanıcının yazdığı hiçbir şey buraya sızmaz.
     """
     labels: list[str] = []
@@ -854,5 +856,12 @@ def describe(reasons: list[str], subject: str = "İçerikte") -> str:
         if label and label not in labels:
             labels.append(label)
     if not labels:
-        return f"{subject} topluluk kurallarımıza uymayan bir ifade tespit edildi."
-    return f"{subject} " + ", ".join(labels) + " tespit edildi."
+        return localized(
+            "{subject} topluluk kurallarımıza uymayan bir ifade tespit edildi.",
+            subject=localized(subject),
+        )
+    return localized(
+        "{subject} {labels} tespit edildi.",
+        subject=localized(subject),
+        labels=", ".join(localized(label) for label in labels),
+    )

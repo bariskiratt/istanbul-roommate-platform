@@ -6,8 +6,12 @@ export type Lang = "tr" | "en";
 const STORAGE_KEY = "lang";
 const LOCALES: Record<Lang, string> = { tr: "tr-TR", en: "en-US" };
 
-/** Tarayıcı dili Türkçe değilse İngilizce açılır; seçim kalıcıdır. */
-const detectLang = (): Lang => {
+/**
+ * Seçili arayüz dili. Tarayıcı dili Türkçe değilse İngilizce açılır; seçim
+ * kalıcıdır. React ağacı dışından da okunur (ör. lib/api.ts sunucuya dili
+ * bildirirken).
+ */
+export const detectLang = (): Lang => {
   if (typeof window === "undefined") return "tr";
   const saved = window.localStorage.getItem(STORAGE_KEY);
   if (saved === "tr" || saved === "en") return saved;
