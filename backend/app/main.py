@@ -79,6 +79,7 @@ async def lifespan(_app: FastAPI):
     # Postgres var, veri kaybı olmadan).
     init_db()
     uploads.report_photo_storage()
+    uploads.start_orphan_sweeper()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 
