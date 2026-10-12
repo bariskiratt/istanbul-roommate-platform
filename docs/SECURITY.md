@@ -245,7 +245,9 @@ comes back.
   `render.yaml` generates, so the stored value is useless without it. Without
   `OTP_KEY`, or with one shorter than 32 characters, storage falls back to an
   unsalted SHA-256 and the process prints a warning once
-  (`backend/app/auth.py:289-311`).
+  (`backend/app/auth.py:289-311`) — but in production (`DATABASE_URL` set) the
+  app refuses to start in that state rather than run with the weak hash
+  (`backend/app/startup_checks.py`).
 - Compared with `hmac.compare_digest` (`_otp_matches`,
   `backend/app/auth.py:322-334`) — constant time, so no timing oracle on the
   code itself.
@@ -390,7 +392,7 @@ backend/app/models.py:83-87
 
 `ADMIN_EMAILS` comes only from an environment variable; there is no default in
 the code, and a production boot (`DATABASE_URL` set) with an empty list stops
-(`check_admin_emails`, `backend/app/config.py`). Enforcement is a single
+(`critical_problems`, `backend/app/startup_checks.py`). Enforcement is a single
 dependency, `require_admin` (`backend/app/reports.py:54`), attached to the
 `/api/admin` router itself and again to every route: 401 without a token, 403
 with a non-admin token. The router-level copy is a backstop so a future route
@@ -608,9 +610,13 @@ written in plaintext. The cost is that no entropy check is performed on the raw
 path — see **L5**.
 
 **The failure mode that matters:** if `MESSAGE_KEY` is absent or malformed,
-encryption silently disables itself and messages are stored as plaintext, with
-only a log warning (`backend/app/crypto.py:90-94`, `:115-119`). The app keeps
-working. `render.yaml` and `DEPLOY.md §1.1` both carry warnings about this.
+encryption cannot turn on. In production (`DATABASE_URL` set) the app now
+**refuses to start** instead of silently storing plaintext — a startup check
+(`backend/app/startup_checks.py`) raises, so a misconfigured deploy fails and
+the previous version keeps serving until the key is fixed. Locally (SQLite, no
+`DATABASE_URL`) it still falls back to plaintext with a log warning
+(`backend/app/crypto.py:90-94`, `:115-119`) so development is not blocked.
+`render.yaml` and `DEPLOY.md §1.1` carry the operational detail.
 
 **If the key is lost or rotated:** every message encrypted under the old key
 becomes permanently unreadable and renders as `[unreadable]`. There is no key
@@ -677,27 +683,29 @@ data at rest outside Turkey and are named in the privacy notice (`/privacy`,
 section 4). The R2 token in `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` is
 scoped to the one bucket; anyone holding it can read and delete every photo.
 
-### 8.4 What is not disclosed
+### 8.4 What was not disclosed
 
 A privacy notice exists (`/privacy`, `frontend/src/pages/Privacy.tsx`, route
 at `frontend/src/App.tsx:57`). It names Render, Neon, Cloudflare R2, Vercel and
 Brevo, says AI moderation is off, and says data goes to no one outside that
-list. Three things it leaves out (**L6**):
+list. Until 12 October 2026 it left out the three things below (**L6**). The
+notice now names Google Fonts and OpenStreetMap in section 4 and lists what
+the audit record keeps in section 6 (`privacy.shareGoogleFonts`,
+`privacy.shareOsm`, `privacy.retentionAudit` in
+`frontend/src/i18n/translations.ts`). Nothing about the data flows themselves
+changed; self-hosting the fonts would still remove the Google one.
 
 - **Google Fonts.** The stylesheet loads its fonts from `fonts.googleapis.com`
   (`frontend/src/index.css:3`), so every visitor's IP address reaches Google.
 - **OpenStreetMap tiles.** The explore map loads tiles from
   `tile.openstreetmap.org` (`frontend/src/pages/Explore.tsx:145`), which sends
   the visitor's IP address to the OpenStreetMap Foundation.
-- **What the audit trail keeps.** The notice says only the link to the user is
-  severed when an admin record outlives a deleted account
-  (`frontend/src/i18n/translations.ts:1943-1944`). In fact a user deletion
-  stores the deleted account's email, name and university in the record
-  (`backend/app/admin.py:1416-1422`), and a listing deletion stores the
+- **What the audit trail keeps.** The notice said only the link to the user
+  is severed when an admin record outlives a deleted account. In fact a user
+  deletion stores the deleted account's email, name and university in the
+  record (`backend/app/admin.py:1416-1422`), and a listing deletion stores the
   owner's name (`:1170-1177`).
 
-Self-hosting the fonts closes the first gap; the other two need a sentence in
-the notice, or a change to what the audit row keeps.
 
 ---
 
@@ -741,7 +749,7 @@ Three design decisions worth understanding:
 What is recorded on a user deletion includes the deleted account's email, name
 and university (`backend/app/admin.py:1416-1422`) — necessary to answer "which
 account did I delete", but it means an audit row outlives the erasure request
-that produced it (**L6**).
+that produced it (**L6**). The privacy notice says so (section 8.4).
 
 ---
 
@@ -765,7 +773,7 @@ with a **Now** note on what changed and what is left.
 | H3 | No rate limit on content endpoints | Fixed | Counters live in process memory (section 4.5) |
 | H4 | Report endpoint as id oracle and queue injection | Fixed | — |
 | H5 | `.edu.tr` checked only in the browser | Fixed | — |
-| H6 | Photos survive account deletion | Partly fixed | Photos removed by editing, or never attached, stay forever |
+| H6 | Photos survive account deletion | Fixed | Uploads never attached to anything wait 7 days for the sweep |
 | M1 | Lockout DoS | Partly fixed | Code sign-in still locks per email |
 | M2 | Hashes in error logs; OTP hash invertible | Fixed | — |
 | M3 | Email enumeration | Partly fixed | `register` 409, suspended 403, timing |
@@ -981,9 +989,20 @@ corrected instead.
 > only `purge_listing` made that check: account B could copy account A's photo
 > URL into its own profile, delete itself, and A's photo answered 404 from then
 > on. Tests cover both a profile and a listing still using the file
-> (`backend/tests/test_uploads.py:167-214`). **Left:** a photo removed from a
-> listing or profile by editing, or uploaded and never attached, is never
-> deleted. It stays public to anyone holding the URL.
+> (`backend/tests/test_uploads.py:167-214`).
+>
+> Since 12 October 2026 the two remaining gaps are closed. A photo removed
+> from a listing or profile by editing is deleted when the edit commits
+> (`backend/app/listings.py:585`, `backend/app/auth.py:888`), through the same
+> `delete_unused_photos`. A photo uploaded and never attached is deleted by a
+> background sweep once it is older than 7 days (`sweep_orphan_photos`,
+> `backend/app/uploads.py:562`; started at boot by `start_orphan_sweeper`,
+> `:610`, then daily). "In use" now also counts an unanswered like on a
+> photo (`swipes.target_ref`, `photo_names_in_use`, `:440`), because the
+> Likes screen shows the liked photo until the owner answers. The sweep refuses to run against a bucket
+> when `DATABASE_URL` is unset, and deletes nothing when no record uses any
+> photo, so a misconfigured deploy cannot read every file as unused. Tests:
+> `backend/tests/test_uploads.py:243-390` and `:610-658`.
 
 **Where:** `backend/app/auth.py:503` (`purge_user` touches only database rows),
 `backend/app/listings.py:136` (`purge_listing`, same), `backend/app/main.py:158`
@@ -1048,8 +1067,9 @@ login**; prefer exponential backoff over an email-keyed hard lockout.
 > **Now: fixed.** The engine is created with `hide_parameters=True`
 > (`backend/app/db.py:78`), and codes are stored as HMAC-SHA256 under
 > `OTP_KEY` (`backend/app/auth.py:314-319`), which `render.yaml` generates.
-> Without `OTP_KEY` storage falls back to plain SHA-256 with a warning
-> (section 4.2).
+> Without `OTP_KEY` storage falls back to plain SHA-256 with a warning — now
+> only locally; in production (`DATABASE_URL` set) the app refuses to start
+> instead (`backend/app/startup_checks.py`, section 4.2).
 
 **Where:** `backend/app/db.py:44` — `create_engine(...)` is called without
 `hide_parameters=True`.
@@ -1162,10 +1182,12 @@ middleware that sets `X-Content-Type-Options: nosniff` and
 #### M5 — No security headers on either the API or the frontend
 
 > **Now: fixed.** The API adds `X-Content-Type-Options`, `Referrer-Policy`,
-> `X-Frame-Options`, `Permissions-Policy` and, over HTTPS, HSTS to every
-> response (`SecurityHeadersMiddleware`, `backend/app/main.py:161-232`; tests
-> in `backend/tests/test_security_headers.py`). `frontend/vercel.json:74-104`
-> gives the site a CSP and the same set of headers. Not checked against
+> `X-Frame-Options`, `Permissions-Policy`, a strict `Content-Security-Policy`
+> (`default-src 'none'; frame-ancestors 'none'; base-uri 'none'`, skipped only
+> on the `API_DOCS` pages so Swagger still loads) and, over HTTPS, HSTS to every
+> response (`SecurityHeadersMiddleware` in `backend/app/main.py`; tests in
+> `backend/tests/test_security_headers.py`). `frontend/vercel.json:74-104`
+> gives the site its own CSP and the same set of headers. Not checked against
 > production (section 11).
 
 **Where:** `backend/app/main.py:161-187` — the only middleware is GZip and CORS;
@@ -1308,10 +1330,10 @@ an entropy threshold on the raw path.
 | scrypt N=2¹⁴ | `backend/app/auth.py:40` | Below OWASP's N=2¹⁷; `password_hash` is `String(200)`, which accommodates an upgrade | Raise N, re-hash on next successful login | **Open.** `backend/app/auth.py:47` |
 | AES-GCM used without AAD | `backend/app/crypto.py:153`, `:175` | Ciphertext is not bound to its row, so a DB-write attacker could move messages between rows. Requires database write access — this is defence-in-depth, not a primary control | Pass `message.id` / `match_id` as associated data | **Open.** |
 | Container runs as root | `backend/Dockerfile` (no `USER` directive) | — | Add a non-root `USER` | **Fixed.** The server runs as an unprivileged `app` user (`backend/Dockerfile:41-51`). Code and the trained model stay owned by root, so it can read them but not change them; only `data/` is writable. Checked by running the API as that user with the image's file layout; no image was built here |
-| No KVKK privacy notice; Brevo/Render transfers undisclosed | no `/privacy` route exists | Anthropic *is* disclosed honestly (`translations.ts:1534`); Brevo and Render appear nowhere | Write the notice, add the route | **Fixed, with gaps.** `/privacy` exists and names Render, Neon, Cloudflare R2, Vercel and Brevo; Google Fonts, OpenStreetMap tiles and what the audit trail keeps are left out (section 8.4) |
+| No KVKK privacy notice; Brevo/Render transfers undisclosed | no `/privacy` route exists | Anthropic *is* disclosed honestly (`translations.ts:1534`); Brevo and Render appear nowhere | Write the notice, add the route | **Fixed.** `/privacy` exists and names Render, Neon, Cloudflare R2, Vercel, Brevo, Google Fonts and OpenStreetMap, and says what the audit trail keeps (section 8.4) |
 | `react-router-dom@6.30.1` | `frontend/package.json` | `@remix-run/router` open-redirect XSS advisory (fixed in 6.30.4+). **No concrete path from untrusted input to navigation was found in this codebase** — vulnerable version only, exploitability not demonstrated | `npm audit fix` | **Fixed.** `frontend/package-lock.json` resolves 6.30.6, the last 6.x release. Two newer advisories are fixed only in 7.18: an open redirect through a backslash in a `<Link>` or `navigate()` path (GHSA-wrjc-x8rr-h8h6), and one in server-side rendering, which this app does not do (GHSA-337j-9hxr-rhxg). Every navigation target in `frontend/src` is a constant, `-1` or `/chat/<numeric id>`, so no user input reaches the first. React Router 7 closes both |
 | Python dependencies pinned with `>=` | `backend/requirements.txt` | Non-reproducible builds; no known critical CVE in the currently installed versions | Pin exact versions, add a lockfile | **Fixed.** `backend/requirements.txt` is now a lock generated from `backend/requirements.in`: every package, dependencies of dependencies included, at an exact version. `pytest` and `httpx` are pinned in `requirements-test.txt`. `pip-audit` found no known vulnerability in the pinned versions on 10 October 2026. Nothing refreshes the lock on its own; `requirements.in` has the command |
-| Deleted account's email survives in the audit trail | `backend/app/admin.py:1416-1422` (`detail`), `backend/app/admin.py:1202-1225` (search-prefix narrowing can reconstruct an email letter by letter) | Only relevant against a curious-admin model | Store a hash or a redacted form; drop email search | **Open.** The privacy notice says only the link to the user is severed (section 8.4) |
+| Deleted account's email survives in the audit trail | `backend/app/admin.py:1416-1422` (`detail`), `backend/app/admin.py:1202-1225` (search-prefix narrowing can reconstruct an email letter by letter) | Only relevant against a curious-admin model | Store a hash or a redacted form; drop email search | **Open, disclosed.** The privacy notice lists what the record keeps (section 8.4) |
 
 ---
 
@@ -1419,8 +1441,9 @@ are findings; they are the boundaries of the current design.
    `backend/app/uploads.py:524-527`). Account deletion and admin listing
    deletion remove the files from whichever store is in use, unless another
    listing or profile still uses them; a user's own listing "delete" is a
-   deactivation and keeps them (item 7). Photos removed by editing, or
-   uploaded and never attached, are never deleted (H6).
+   deactivation and keeps them (item 7). Photos removed by editing are
+   deleted when the edit is saved; photos uploaded and never attached are
+   deleted by a daily sweep once they are a week old (H6).
 7. **Listing deletion is deactivation, not deletion.** `DELETE
    /api/listings/{id}` sets `is_active=False` and the row stays
    (`backend/app/listings.py:592`). The Safety copy says this explicitly
@@ -1432,8 +1455,9 @@ are findings; they are the boundaries of the current design.
    `backend/app/listings.py:568-585`.
 9. **No user-level block or mute.** The only remedies are report and admin
    suspension.
-10. **The privacy notice has gaps.** Google Fonts, OpenStreetMap tiles and
-    what the audit trail keeps are not disclosed (section 8.4).
+10. **Visitors' IP addresses reach Google and OpenStreetMap.** Fonts load
+    from Google Fonts and map tiles from OpenStreetMap. The privacy notice
+    discloses both (section 8.4); self-hosting the fonts would remove one.
 11. **Moderation is intentionally lenient.** `block` is reserved for
     unambiguous violations; fraud heuristics can never block on their own
     (`backend/app/moderation.py:70-72`). Scam listings *will* get published and
@@ -1481,11 +1505,11 @@ listed here does not exist.
   `backend/app/auth.py:1101`; `purge_listing`,
   `backend/app/listings.py:210-214`), and the response's `cleanup.photos`
   says how many. A file that another listing or profile still uses stays.
-- ⚠️ Photos the person removed by editing, or uploaded and never attached, are
-  not tracked anywhere and stay in the bucket.
+- Photos the person removed by editing are already gone. Photos they
+  uploaded and never attached stay until the sweep deletes them, at most
+  about 8 days after upload (H6).
 - ⚠️ The audit entry keeps the deleted account's email, name and university
-  (`backend/app/admin.py:1416-1422`), which the privacy notice does not say
-  (section 8.4).
+  (`backend/app/admin.py:1416-1422`). The privacy notice says so (section 8.4).
 
 ### D. A session is believed to be compromised
 
@@ -1527,6 +1551,10 @@ counters reset when the container restarts. When that is not enough:
    redeploy. Because `is_admin` is computed per request from that set
    (`backend/app/models.py:83`), authority disappears on the next request — no
    database change needed. This is the fastest kill switch in the system.
+   **If it is the only address, replace it instead of emptying the variable**
+   (for example with `yok@invalid`): an empty list stops a production boot
+   (`backend/app/startup_checks.py`), Render then keeps serving the previous
+   deploy, and the compromised address would stay admin.
 2. **An admin cannot suspend or delete another admin** — this is intentional
    (`backend/app/admin.py:1226`). Step 1 is the mechanism; there is no in-app
    alternative.

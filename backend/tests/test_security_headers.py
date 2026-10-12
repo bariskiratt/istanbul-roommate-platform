@@ -153,6 +153,47 @@ def test_gzip_still_applies(client):
     assert res.headers["x-content-type-options"] == "nosniff"
 
 
+_CSP_EXPECTED = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+
+
+def test_csp_on_json_endpoint(client):
+    """JSON yanıtlarında en katı CSP: API hiçbir kaynak yüklemeyen veri döner."""
+    res = client.get("/api/legend")
+    assert res.headers["content-security-policy"] == _CSP_EXPECTED
+
+
+def test_csp_on_error_response(client):
+    """Hata yanıtları da CSP almalı (404 gövdesi de tarayıcıya gider)."""
+    res = client.get("/api/bilinmeyen-uc")
+    assert res.status_code == 404
+    assert res.headers["content-security-policy"] == _CSP_EXPECTED
+
+
+def test_csp_absent_on_docs_paths(client):
+    """Belge (Swagger/ReDoc) yolları CSP'den muaf: kendi betiğini CDN'den yükler.
+
+    API_DOCS kapalıyken bu yollar 404 döner; muafiyet yola göre olduğu için
+    404'te de CSP eklenmez (zararsız) ve API_DOCS=1 iken sayfa bozulmaz.
+    """
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        res = client.get(path)
+        assert "content-security-policy" not in res.headers, path
+
+
+def test_csp_present_on_uploaded_file(client):
+    """Resim yanıtlarına da CSP eklenir (zararsız, derinlemesine savunma)."""
+    headers = {"Authorization": f"Bearer {_token(client)}"}
+    url = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.png", PNG_BYTES, "image/png")},
+    ).json()["url"]
+    name = url.rsplit("/", 1)[-1]
+    res = client.get(f"/uploads/{name}")
+    assert res.status_code == 200
+    assert res.headers["content-security-policy"] == _CSP_EXPECTED
+
+
 # --------------------------------------------------------------------------
 # M4 — /uploads/ statik yanıtları
 # --------------------------------------------------------------------------

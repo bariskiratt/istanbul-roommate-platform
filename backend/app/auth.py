@@ -991,10 +991,16 @@ def update_me(
             status_code=422,
             detail=localized("Bütçe alt sınırı üst sınırdan büyük olamaz."),
         )
+    old_photos = list(user.photos or [])
     for key, value in updates.items():
         setattr(user, key, value)
     db.add(user)
     db.commit()
+    # Profilden çıkarılan fotoğrafın dosyası da silinir (bkz.
+    # listings.update_listing): commit'ten sonra, yalnızca artık hiçbir
+    # kayıtta geçmiyorsa.
+    removed = [url for url in old_photos if url not in (user.photos or [])]
+    _delete_photo_files(db, removed)
     db.refresh(user)
     return user
 

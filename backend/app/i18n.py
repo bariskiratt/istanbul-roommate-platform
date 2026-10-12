@@ -109,10 +109,6 @@ EN: dict[str, str | tuple[str, str]] = {
     "çalıştır.":
         "Transit data isn't loaded. Run 'python -m scripts.fetch_transit' first.",
     "Mahalle bulunamadı.": "Neighborhood not found.",
-    "Bu mahalle raylı sisteme yürüme mesafesinde değil; ulaşım tabanlı öneri "
-    "üretilemiyor.":
-        "This neighborhood isn't within walking distance of the rail network, "
-        "so no transit-based suggestions can be made.",
 
     # ---- beğeni / eşleşme / sohbet ----
     "Fotoğraf beğenisinde photo_index zorunlu.":

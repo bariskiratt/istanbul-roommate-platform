@@ -56,9 +56,12 @@ server; it is **not end-to-end encryption**, because the server holds the key.
 
 `MESSAGE_KEY` is what makes that encryption work:
 
-- **If it is missing or malformed, encryption silently turns itself off** and
-  messages are stored as plain text. The app keeps running and only prints a
-  warning in the logs — there is no error, so this is easy to miss.
+- **If it is missing or malformed, encryption cannot turn on.** In production
+  (`DATABASE_URL` set) the API now **refuses to start** instead of silently
+  storing plain text — the boot log's `🔒 Güvenlik yapılandırması` block names
+  the problem and the previous deploy keeps serving until it is fixed. Locally
+  (SQLite, no `DATABASE_URL`) it falls back to plain text with a warning so
+  development is not blocked.
 - **Two accepted formats:**
   1. Standard base64 of exactly **32 bytes** (a 44-character string ending in
      `=`) — used directly as the AES key. This is what `--genkey` produces and
@@ -81,18 +84,17 @@ deploys. That generated value is a random alphanumeric string rather than
 base64-encoded 32 bytes, which is exactly why format 2 above is supported.
 Verify once that encryption is actually on:
 
-**Verification (required, once, after the first deploy).** Open Render Shell on
-`roommatch-api` and run:
+**Verification (required, once, after the first deploy).** The Render free plan
+has no Shell, so read the **startup log** (`roommatch-api` → Logs). Every boot
+prints a `🔒 Güvenlik yapılandırması` block:
 
-```bash
-python -c "from app import crypto; print(crypto.key_available())"
-```
-
-- `True` → encryption is active. Nothing else to do.
-- `False` → the key is missing or in the wrong format. Generate one yourself
-  (`python -m app.crypto --genkey`), paste it into Render →
-  `roommatch-api` → Environment → `MESSAGE_KEY`, save (this redeploys the
-  service) and run the check again.
+- `✅ Mesaj şifreleme açık (MESSAGE_KEY geçerli)` → encryption is active.
+  Nothing else to do.
+- `❌ MESSAGE_KEY yok/geçersiz` → the key is missing or in the wrong format. In
+  production the deploy will have failed to start on purpose (the previous
+  version keeps serving). Generate one yourself (`python -m app.crypto
+  --genkey`), paste it into Render → `roommatch-api` → Environment →
+  `MESSAGE_KEY`, save (this redeploys the service) and check the log again.
 
 **Back up the key.** After the first deploy, copy the value from Render →
 Environment → `MESSAGE_KEY` into a password manager.
@@ -140,6 +142,12 @@ pins `DEV_OTP` to `"0"` explicitly instead of leaving it to be filled in from
 the dashboard, so a clean blueprint deploy starts closed whatever the code
 default is. Do not weaken that back to a dashboard-managed value.
 
+As a backstop, the API now **refuses to start in production** (`DATABASE_URL`
+set) while `DEV_OTP=1`: the boot log's `🔒 Güvenlik yapılandırması` block flags
+it and the previous deploy keeps serving, so the open-admin state never reaches
+users. The `curl` check below still matters — it is how you confirm the running
+deploy is actually closed.
+
 Two consequences of `DEV_OTP=0` to expect:
 
 - Sign-up and code sign-in **need working email**. With no `BREVO_API_KEY` /
@@ -165,7 +173,7 @@ curl -s -X POST https://YOUR-API/auth/request-otp \
 
 While you are there, confirm `ADMIN_EMAILS` is set to your own addresses. It
 has no default: unset means nobody is an admin, and in production the API
-refuses to start (the boot log names the variable).
+refuses to start (the `🔒` block in the boot log names the variable).
 
 ### 1.4) Admin moderation panel
 
@@ -318,6 +326,26 @@ Deploy**, and check the photo still loads.
 already gone; listings that point at them show broken images until their owners
 upload new ones.
 
+**Cleanup.** A photo removed from a listing or profile is deleted from the
+bucket when the edit is saved, unless another listing, a profile or an
+unanswered like on that photo still uses it. Photos uploaded but never saved anywhere (an
+abandoned sign-up or listing form) are swept up by a background job: about a
+minute after every startup, and then once a day while the process stays up,
+the API lists the bucket and deletes every photo that no record uses and that
+is older than **7 days**. The log line is `🧹 N sahipsiz fotoğraf depodan
+silindi.` Safeguards:
+
+- The sweep does not start when `S3_BUCKET` is set but `DATABASE_URL` is not:
+  the app would be reading an empty local SQLite file, and every photo in the
+  bucket would look unused. This matters on a developer machine that has the
+  production bucket keys in its `.env`.
+- It deletes nothing when no record uses a single photo, for the same reason.
+- `PHOTO_SWEEP=0` turns it off without a code change.
+
+The first sweep after this was added also removes photos left over from
+before a database reset, since no record points at them any more. Each sweep
+costs one list request (Class A) per 1,000 photos; deletes are free.
+
 **Cost.** R2 has no spending cap: usage beyond the free tier is charged to the
 card on file. Beyond the free tier the prices are $0.015 per GB-month of
 storage, $4.50 per million uploads (Class A) and $0.36 per million photo reads
@@ -391,7 +419,14 @@ choice.
       unless `API_DOCS=1` is set
 - [ ] The budget heatmap loads on the Vercel address (means CORS is correct)
 - [ ] Sign-up flow works (in dev mode the OTP appears in a toast)
-- [ ] `crypto.key_available()` returns `True` in Render Shell (section 1.1)
+- [ ] The startup log prints a `🔒 Güvenlik yapılandırması` block with
+      `✅ Mesaj şifreleme açık`, `✅ OTP kodları HMAC ile saklanıyor` and
+      `✅ Yönetici (ADMIN_EMAILS): N adres tanımlı` — the Render free plan has
+      no Shell, so the boot log is where you verify this (sections 1.1, 1.3
+      and 1.4). A production deploy with `MESSAGE_KEY`/`OTP_KEY` missing,
+      `DEV_OTP=1` or `ADMIN_EMAILS` empty **fails to start on purpose**; the
+      previous version keeps serving and the `🔒` block names the offending
+      variable
 - [ ] `MESSAGE_KEY` is backed up outside Render
 - [ ] **`DEV_OTP=0` verified** — `/auth/request-otp` returns no `dev_code`
       field on the deployed API (section 1.3)
@@ -466,8 +501,9 @@ already delivering 10% of the requested schedule.
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection — the Neon connection string (section 1.6), entered by hand. Unset → a SQLite file inside the container, which is wiped on redeploy and sleep. |
 | `CORS_ORIGINS` | localhost list | Comma-separated allowed origins. Unset → only localhost may call the API, so the deployed frontend gets CORS errors. |
-| `DEV_OTP` | `0` (also pinned by `render.yaml`) | `1`: the sign-in code is returned in the API response (`dev_code`) — local development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. Unset is safe. See section 1.3. |
-| `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → **messages are stored in plain text** and only a log warning is printed. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
+| `DEV_OTP` | `0` (also pinned by `render.yaml`) | `1`: the sign-in code is returned in the API response (`dev_code`) — local development only. In production it must be `0`: while it is `1`, anyone can sign in to any student's account without a password (admin accounts additionally ask for the password, section 1.4). **In production (`DATABASE_URL` set) the API refuses to start while it is `1`** — see section 1.3. Unset is safe. |
+| `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → messages would be stored in plain text, so **in production (`DATABASE_URL` set) the API refuses to start** and the previous deploy keeps serving; locally it falls back to plain text with a log warning. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
+| `OTP_KEY` | — | ≥32-char random string; sign-in codes are then stored as HMAC-SHA256 rather than unsalted SHA-256. Unset → codes are hashed with plain SHA-256 (a 10⁶ space that a database reader can reverse to take over an account), so **in production the API refuses to start**; locally it falls back with a log warning. `render.yaml` sets it via `generateValue`. |
 | `ANTHROPIC_API_KEY` | — | Enables the optional AI moderation layer. Unset → rule-based moderation only (still fully functional). Set → the full text of every listing and message is sent to `api.anthropic.com`, which must be disclosed to users. |
 | `BREVO_API_KEY` | — | Brevo API key (real OTP emails). Unset → no email is sent; only dev-mode OTP works. |
 | `EMAIL_FROM` | — | Sender address verified in Brevo. Email sending requires both this and `BREVO_API_KEY`. |
@@ -482,3 +518,4 @@ already delivering 10% of the requested schedule.
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
 | `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
+| `PHOTO_SWEEP` | `1` | `0` stops the background job that deletes uploaded photos no record uses (section 1.5). It never runs when `S3_BUCKET` is set and `DATABASE_URL` is not. |

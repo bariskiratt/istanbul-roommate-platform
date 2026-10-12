@@ -1,7 +1,8 @@
 """Fotoğraf yükleme, servis ve silme testleri."""
 
 import io
-from datetime import timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -23,7 +24,7 @@ PNG_BYTES = bytes.fromhex(
 
 
 @pytest.fixture()
-def client(tmp_path, monkeypatch):
+def session_factory(tmp_path, monkeypatch):
     # Testler gerçek uploads klasörüne yazmasın
     monkeypatch.setattr(uploads_module, "UPLOADS_DIR", tmp_path)
 
@@ -33,10 +34,13 @@ def client(tmp_path, monkeypatch):
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
+
+@pytest.fixture()
+def client(session_factory):
     def override_get_db():
-        db = TestSession()
+        db = session_factory()
         try:
             yield db
         finally:
@@ -214,6 +218,177 @@ def test_account_deletion_keeps_a_photo_used_by_another_listing(client):
     assert client.get(f"/uploads/{name}").status_code == 200
 
 
+def _name(url: str) -> str:
+    return url.rsplit("/", 1)[-1]
+
+
+def _create_listing(client, headers, photos) -> int:
+    res = client.post(
+        "/api/listings",
+        headers=headers,
+        json={
+            "type": "ev_ilani",
+            "title": "Kadıköy'de 2+1",
+            "description": "Moda'ya 5 dakika.",
+            "district": "Kadıköy",
+            "photos": photos,
+            "rent": 18000,
+            "room_count": "2+1",
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+def test_photo_removed_from_profile_is_deleted(client, tmp_path):
+    ayse = _auth_headers(client, "ayse@uni.edu.tr")
+    kept, dropped = _upload(client, ayse), _upload(client, ayse)
+    res = client.patch("/api/auth/me", headers=ayse, json={"photos": [kept, dropped]})
+    assert res.status_code == 200, res.text
+
+    res = client.patch("/api/auth/me", headers=ayse, json={"photos": [kept]})
+    assert res.status_code == 200, res.text
+
+    assert (tmp_path / _name(kept)).exists()
+    assert not (tmp_path / _name(dropped)).exists()
+
+
+def test_photo_removed_from_listing_is_deleted_unless_used_elsewhere(client, tmp_path):
+    ayse = _auth_headers(client, "ayse@uni.edu.tr")
+    photos = [_upload(client, ayse) for _ in range(5)]
+    listing = _create_listing(client, ayse, photos[:3])
+    # photos[1] profilde de duruyor: ilandan çıkması dosyayı silmemeli.
+    res = client.patch("/api/auth/me", headers=ayse, json={"photos": [photos[1]]})
+    assert res.status_code == 200, res.text
+
+    # photos[0] ve photos[1] çıkıyor, photos[3] ve photos[4] giriyor.
+    res = client.patch(
+        f"/api/listings/{listing}", headers=ayse, json={"photos": photos[2:]}
+    )
+    assert res.status_code == 200, res.text
+
+    assert not (tmp_path / _name(photos[0])).exists()
+    for kept in photos[1:]:
+        assert (tmp_path / _name(kept)).exists()
+
+
+def test_liked_photo_outlives_its_removal_until_the_like_is_answered(
+    client, session_factory, tmp_path
+):
+    """Beğeniler ekranı yanıt verilene kadar beğenilen kareyi gösterir; ilan
+    sahibi o fotoğrafı bu arada ilandan çıkarsa bile dosya silinmez."""
+    ayse = _auth_headers(client, "ayse@uni.edu.tr")
+    ali = _auth_headers(client, "ali@uni.edu.tr")
+    photos = [_upload(client, ayse) for _ in range(4)]
+    listing = _create_listing(client, ayse, photos[:3])
+    res = client.post(
+        "/api/swipes",
+        headers=ali,
+        json={
+            "listing_id": listing,
+            "direction": "like",
+            "target": {"kind": "photo", "photo_index": 0},
+        },
+    )
+    assert res.status_code == 200, res.text
+
+    res = client.patch(
+        f"/api/listings/{listing}", headers=ayse, json={"photos": photos[1:]}
+    )
+    assert res.status_code == 200, res.text
+    assert (tmp_path / _name(photos[0])).exists()
+    _age(tmp_path / _name(photos[0]))
+    assert _sweep(session_factory) == 0
+
+    # Yanıtlanan beğeni artık hiçbir ekranda görünmüyor: süpürme dosyayı toplar.
+    [like] = client.get("/api/swipes/received", headers=ayse).json()
+    res = client.post(
+        f"/api/swipes/{like['swipe_id']}/respond", headers=ayse, json={"accept": False}
+    )
+    assert res.status_code == 200, res.text
+    assert _sweep(session_factory) == 1
+    assert not (tmp_path / _name(photos[0])).exists()
+
+
+# --------------------------------------------------------------------------
+# Hiç bağlanmamış dosyaların süpürülmesi (sweep_orphan_photos)
+# --------------------------------------------------------------------------
+
+
+def _age(path, days=8):
+    """Dosyayı ORPHAN_GRACE'ten eski göster."""
+    old = (datetime.now(timezone.utc) - timedelta(days=days)).timestamp()
+    os.utime(path, (old, old))
+
+
+def _sweep(session_factory) -> int:
+    db = session_factory()
+    try:
+        return uploads_module.sweep_orphan_photos(db)
+    finally:
+        db.close()
+
+
+def test_sweep_deletes_old_unattached_photos_only(client, session_factory, tmp_path):
+    ayse = _auth_headers(client)
+    attached = _upload(client, ayse)
+    res = client.patch("/api/auth/me", headers=ayse, json={"photos": [attached]})
+    assert res.status_code == 200, res.text
+    abandoned = _upload(client, ayse)
+    fresh = _upload(client, ayse)
+    (tmp_path / "notes.txt").write_text("bizim dosyamız değil")
+    for url in (attached, abandoned):
+        _age(tmp_path / _name(url))
+    _age(tmp_path / "notes.txt")
+
+    assert _sweep(session_factory) == 1
+
+    assert (tmp_path / _name(attached)).exists()
+    assert not (tmp_path / _name(abandoned)).exists()
+    # Yeni yüklenmiş dosya hâlâ bir formda bekliyor olabilir.
+    assert (tmp_path / _name(fresh)).exists()
+    assert (tmp_path / "notes.txt").exists()
+
+
+def test_sweep_does_nothing_when_no_record_uses_a_photo(client, session_factory, tmp_path):
+    """Boş (ya da yanlış) veritabanında her dosya sahipsiz görünür: silinmez."""
+    url = _upload(client, _auth_headers(client))
+    _age(tmp_path / _name(url))
+
+    assert _sweep(session_factory) == 0
+    assert (tmp_path / _name(url)).exists()
+
+
+class _NoThread:
+    started: list[str] = []
+
+    def __init__(self, target, name, daemon):
+        self.name = name
+
+    def start(self):
+        _NoThread.started.append(self.name)
+
+
+@pytest.fixture()
+def no_thread(monkeypatch):
+    _NoThread.started = []
+    monkeypatch.setattr(uploads_module.threading, "Thread", _NoThread)
+    return _NoThread
+
+
+def test_sweeper_starts_by_default(no_thread, monkeypatch):
+    monkeypatch.delenv("PHOTO_SWEEP", raising=False)
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+    uploads_module.start_orphan_sweeper()
+    assert no_thread.started == ["photo-orphan-sweep"]
+
+
+def test_sweeper_can_be_switched_off(no_thread, monkeypatch):
+    monkeypatch.setenv("PHOTO_SWEEP", "0")
+    uploads_module.start_orphan_sweeper()
+    assert no_thread.started == []
+
+
 # --------------------------------------------------------------------------
 # Fotoğraf adresi politikası (is_allowed_photo_url)
 # --------------------------------------------------------------------------
@@ -243,11 +418,14 @@ def test_extra_photo_hosts_are_the_only_outside_hosts(monkeypatch):
 
 
 class FakeS3:
-    """boto3 S3 istemcisinin bu modülün kullandığı dört çağrısı."""
+    """boto3 S3 istemcisinin bu modülün kullandığı beş çağrısı."""
 
     def __init__(self):
         self.objects: dict[tuple[str, str], dict] = {}
         self.fail_with: Exception | None = None
+        # Gerçek kova sayfa başına 1000 anahtar döner; testler sayfalamayı
+        # sınamak için küçültür.
+        self.page_size = 1000
 
     def _check(self):
         if self.fail_with is not None:
@@ -255,7 +433,27 @@ class FakeS3:
 
     def put_object(self, Bucket, Key, Body, **kwargs):
         self._check()
-        self.objects[(Bucket, Key)] = {"Body": Body, **kwargs}
+        self.objects[(Bucket, Key)] = {
+            "Body": Body,
+            "LastModified": datetime.now(timezone.utc),
+            **kwargs,
+        }
+
+    def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
+        self._check()
+        keys = sorted(k for b, k in self.objects if b == Bucket and k.startswith(Prefix))
+        start = int(ContinuationToken or 0)
+        page = keys[start:start + self.page_size]
+        result = {
+            "Contents": [
+                {"Key": k, "LastModified": self.objects[(Bucket, k)]["LastModified"]}
+                for k in page
+            ],
+            "IsTruncated": start + self.page_size < len(keys),
+        }
+        if result["IsTruncated"]:
+            result["NextContinuationToken"] = str(start + self.page_size)
+        return result
 
     def get_object(self, Bucket, Key):
         self._check()
@@ -402,3 +600,59 @@ def test_rejected_file_does_not_use_quota(client, monkeypatch):
     )
     assert res.status_code == 415
     _upload(client, headers)
+
+
+# --------------------------------------------------------------------------
+# Sahipsiz dosya süpürmesi — kova
+# --------------------------------------------------------------------------
+
+
+def test_sweep_pages_through_the_bucket(client, bucket, session_factory):
+    bucket.page_size = 2
+    headers = _auth_headers(client)
+    attached = _upload(client, headers)
+    res = client.patch("/api/auth/me", headers=headers, json={"photos": [attached]})
+    assert res.status_code == 200, res.text
+    abandoned = [_upload(client, headers) for _ in range(4)]
+    fresh = _upload(client, headers)
+    # Desene uymayan nesneye (ör. kova sınaması) hiç dokunulmaz.
+    bucket.put_object(Bucket="roommatch-photos", Key="uploads/_deploy-check", Body=b"ok")
+    old = datetime.now(timezone.utc) - timedelta(days=8)
+    for (b, key), obj in bucket.objects.items():
+        if not key.endswith(_name(fresh)):
+            obj["LastModified"] = old
+
+    assert _sweep(session_factory) == 4
+
+    left = {key for _, key in bucket.objects}
+    assert left == {
+        f"uploads/{_name(attached)}",
+        f"uploads/{_name(fresh)}",
+        "uploads/_deploy-check",
+    }
+
+
+def test_sweep_survives_a_bucket_outage(client, bucket, session_factory):
+    _upload(client, _auth_headers(client))
+    bucket.fail_with = EndpointConnectionError(endpoint_url="https://r2.invalid")
+    with pytest.raises(EndpointConnectionError):
+        _sweep(session_factory)
+    # Arka plandaki döngü bu hatayı yakalayıp loga yazar ve ertesi gün dener;
+    # liste alınamadığı için hiçbir şey silinmemiştir.
+    bucket.fail_with = None
+    assert len(bucket.objects) == 1
+
+
+def test_sweeper_never_runs_against_a_bucket_without_the_real_database(
+    bucket, no_thread, monkeypatch
+):
+    """Yerel .env'e yayın kovasının anahtarlarını koyan bir geliştirici, boş
+    SQLite'a bakan bir süpürmeyle yayındaki her fotoğrafı sildirmesin."""
+    monkeypatch.delenv("PHOTO_SWEEP", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    uploads_module.start_orphan_sweeper()
+    assert no_thread.started == []
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://neon.example/db")
+    uploads_module.start_orphan_sweeper()
+    assert no_thread.started == ["photo-orphan-sweep"]

@@ -70,9 +70,9 @@ DB_PATH = DATA_DIR / "app.db"
 #      Eskiden burada işletmecinin iki adresi varsayılan olarak yazılıydı;
 #      repo herkese açık olduğu için saldırgan hangi hesabı hedefleyeceğini
 #      kaynağı okuyarak öğreniyordu. Artık tanımsızsa liste BOŞTUR (kimse
-#      yönetici değildir) ve üretimde uygulama hiç açılmaz — bkz.
-#      check_admin_emails. Render'da: roommatch-api → Environment →
-#      ADMIN_EMAILS (virgülle ayrılmış adresler).
+#      yönetici değildir) ve üretimde uygulama hiç açılmaz; Render önceki
+#      sürümü sunmaya devam eder (app/startup_checks.py). Render'da:
+#      roommatch-api → Environment → ADMIN_EMAILS (virgülle ayrılmış adresler).
 #   3. DEV_OTP üretimde 0 olmalı. 1 iken /auth/request-otp doğrulama kodunu
 #      API yanıtında döndürür; buradaki bir adres için kod isteyip
 #      /auth/verify-otp'a vermek yeterlidir. Ayrıntı: DEPLOY.md.
@@ -81,29 +81,6 @@ ADMIN_EMAILS = {
     for e in os.getenv("ADMIN_EMAILS", "").split(",")
     if e.strip()
 }
-
-
-def check_admin_emails() -> None:
-    """ADMIN_EMAILS boşsa uyarır; ÜRETİMDE boşsa açılışı durdurur.
-
-    Liste boşken uygulama çalışır ama moderasyon paneline kimse giremez:
-    bildirim kuyruğu ve işaretli içerik sahipsiz kalır. Üretimde (DATABASE_URL
-    tanımlı) bu sessiz bir arıza olurdu, bu yüzden açılış durur. Render
-    başarısız dağıtımda bir ÖNCEKİ sürümü sunmaya devam eder; yani değişken
-    unutulduğunda yönetici paneli kaybolmaz, yalnızca yeni sürüm yayına
-    çıkmaz ve günlükte sebebi yazar. Yerelde ve CI'da (SQLite) yalnızca
-    uyarı basılır.
-    """
-    if ADMIN_EMAILS:
-        return
-    message = (
-        "ADMIN_EMAILS tanımlı değil — hiçbir hesap yönetici değil. Render'da "
-        "roommatch-api → Environment → ADMIN_EMAILS değişkenine yönetici "
-        "adreslerini virgülle ayırarak yaz."
-    )
-    if os.getenv("DATABASE_URL", "").strip():
-        raise RuntimeError(f"Açılış durduruldu: {message}")
-    print(f"⚠️  {message}", flush=True)
 
 
 # ÖĞRENCİ E-POSTASI ZORUNLULUĞU — ADMIN_EMAILS'İN İKİNCİ İŞLEVİ

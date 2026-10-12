@@ -173,18 +173,39 @@ export interface AltPlace {
   name: string;
   district: string;
   price: number | null;
-  walk_km: number;
+  /** Fiyat az ilana dayanıyor (haritada soluk çizilen mahalleler). */
+  low_confidence: boolean;
   lat: number;
   lon: number;
-  network_cost?: number;
-  saving?: number | null;
+}
+
+export interface AltCandidate extends AltPlace {
+  price: number;
+  /** Kapıdan kapıya tahmini süre (dk): iki uçta yürüme + durak + aktarma. */
+  minutes: number;
+  stops: number;
+  transfers: number;
+  /** Adayın kendi istasyonuna tahmini yürüme süresi (dk). */
+  walk_minutes: number;
+  /** Haritadaki renkle aynı anlam: bütçeye uyuyor, sınırda ya da aşıyor. */
+  status: Exclude<StatusKey, "nodata">;
+  saving: number | null;
+  /** Yalnızca `cheapest` öğelerinde: bütçeyi kaç TL aştığı. */
+  over_budget?: number;
 }
 
 export interface AlternativesResponse {
-  target: AltPlace & { message?: string };
+  target: AltPlace;
   reachable: boolean;
-  budget?: number;
-  recommendations: AltPlace[];
+  /** reachable=false ise neden; şimdilik tek sebep var. */
+  reason?: "not_near_rail";
+  budget: number;
+  /** "Yakın" sayılan en uzun kapıdan kapıya süre (dk); panel kuralı bununla anlatır. */
+  max_minutes: number;
+  /** Hedeften ucuz, bütçeye uyan (ya da sınırda) yakın mahalleler. */
+  recommendations: AltCandidate[];
+  /** recommendations boşsa: bütçeyi aşan en ucuz yakın seçenekler. */
+  cheapest: AltCandidate[];
 }
 
 export const fetchAlternatives = (neighborhoodId: number, budget: number) =>

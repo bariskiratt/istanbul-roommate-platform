@@ -3,8 +3,8 @@
 Kapsam:
   - Yönetici girişi İKİ ADIMLI: şifre + e-posta kodu birlikte (app/auth.py)
   - Normal hesabın girişi DEĞİŞMEDİ (şifre ya da kod, biri yeter)
-  - ADMIN_EMAILS yalnızca ortam değişkeninden gelir, varsayılanı yok;
-    üretimde boşsa açılış durur (app/config.py::check_admin_emails)
+  - ADMIN_EMAILS yalnızca ortam değişkeninden gelir, varsayılanı yok
+    (üretimde boşsa açılışın durması tests/test_startup_checks.py'de)
   - Hesabın e-postası değiştirilemez: is_admin e-postaya bağlı olduğu için
     e-posta değişebilseydi herkes kendini yönetici yapabilirdi
   - /api/admin/* uçlarının HEPSİ require_admin'den geçer (router katmanı)
@@ -23,7 +23,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import auth, config
+from app import auth
 from app.config import ADMIN_EMAILS
 from app.db import Base, get_db
 from app.main import app
@@ -291,26 +291,6 @@ def test_admin_emails_have_no_default():
         check=True,
     )
     assert out.stdout.strip() == "[]"
-
-
-def test_empty_admin_emails_stop_a_production_boot(monkeypatch):
-    monkeypatch.setattr(config, "ADMIN_EMAILS", set())
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host/db")
-    with pytest.raises(RuntimeError, match="ADMIN_EMAILS"):
-        config.check_admin_emails()
-
-
-def test_empty_admin_emails_only_warn_locally(monkeypatch, capsys):
-    monkeypatch.setattr(config, "ADMIN_EMAILS", set())
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    config.check_admin_emails()
-    assert "ADMIN_EMAILS" in capsys.readouterr().out
-
-
-def test_set_admin_emails_pass_the_boot_check(monkeypatch, capsys):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host/db")
-    config.check_admin_emails()
-    assert capsys.readouterr().out == ""
 
 
 def test_admin_address_is_exempt_from_the_student_rule(client):

@@ -21,11 +21,11 @@ from app.config import (
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
-    check_admin_emails,
 )
 from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.db import get_db, init_db
+from app.startup_checks import check_startup_config
 from app.heatmap import (
     STATUS_STYLES,
     annotate_features,
@@ -74,15 +74,17 @@ STATE: dict = {}
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Ağır veriyi süreç başına bir kez yükler ve indeksler."""
+    # Güvenlik yapılandırmasını EN ÖNCE denetle: üretimde kritik bir sır
+    # eksikse ağır veriyi yüklemeden dur (bkz. app/startup_checks.py). Yerelde
+    # yalnızca özet basılır, uygulama durmaz.
+    check_startup_config()
     print("🚀 Veriler yükleniyor...")
     # Yeni tablolar create_all ile doğar; var olan tablolara eksik sütunlar
     # init_db içinden çağrılan run_migrations ile eklenir (üretimde canlı
     # Postgres var, veri kaybı olmadan).
     init_db()
     uploads.report_photo_storage()
-    # Yönetici listesi artık yalnızca ortam değişkeninden gelir; üretimde boşsa
-    # açılış durur ve Render önceki sürümü sunmaya devam eder (bkz. config).
-    check_admin_emails()
+    uploads.start_orphan_sweeper()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 
@@ -138,10 +140,8 @@ async def lifespan(_app: FastAPI):
         STATE["access"] = AccessibilityIndex(
             network, geojson.get("features", []), prices_by_id
         )
-        walkable = sum(
-            1 for p in STATE["access"].places.values() if p["walk_km"] <= 1.2
-        )
-        print(f"✅ Toplu taşıma ağı yüklendi ({len(network.stations)} istasyon; "
+        walkable = sum(1 for p in STATE["access"].places.values() if p["stations"])
+        print(f"✅ Toplu taşıma ağı yüklendi ({len(network.served)} istasyon; "
               f"{walkable} mahalle yürüme mesafesinde).")
     else:
         print(f"⚠️  Toplu taşıma verisi yok ({TRANSIT_PATH.name}) — "
@@ -186,6 +186,27 @@ _SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
 # süren bir taahhüttür ve alan adının TÜM alt alanlarını kapsar.
 _HSTS = (b"strict-transport-security", b"max-age=63072000; includeSubDomains")
 
+# İçerik Güvenliği Politikası (CSP). Bu API yalnızca JSON ve /uploads/ altında
+# resim döndürür; hiçbir yanıt tarayıcıda BELGE olarak çalıştırılacak HTML
+# içermez (gerçek arayüz ayrı origin'deki Vercel SPA'sıdır). Bu yüzden en katı
+# politika uygulanır: hiçbir kaynak yüklenemez, sayfa çerçevelenemez, taban URL
+# yazılamaz. nosniff + X-Frame-Options zaten var; CSP bunu derinlemesine
+# savunmayla pekiştirir ve olası bir içerik-tipi karışıklığında gömülü betiğin
+# çalışmasını da engeller. SPA'nın API'yi fetch ile çağırmasına etkisi yok:
+# CSP yanıtın KENDİ yükleyebileceklerini kısıtlar, JSON bir belge değildir.
+_CSP = (
+    b"content-security-policy",
+    b"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+)
+
+# TEK İSTİSNA: API_DOCS=1 iken açılan Swagger/ReDoc sayfaları (yalnız yerel
+# geliştirme) betik ve stillerini bir CDN'den yükler; katı CSP onları bozardı.
+# Bu yollara CSP eklenmez. API_DOCS kapalıyken üçü de 404 döner ve 404'ün CSP
+# almaması zararsızdır.
+_DOCS_PATHS = frozenset(
+    {"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}
+)
+
 # /uploads/ altındaki kullanıcı dosyalarına eklenen ek başlıklar (M4).
 # Content-Disposition: attachment, yüklenen bir dosyanın API kaynağında
 # BELGE olarak açılmasını engeller (saklı XSS). <img src> ile gösterime
@@ -226,6 +247,9 @@ class SecurityHeadersMiddleware:
             extra.append(_HSTS)
         if scope.get("path", "").startswith("/uploads/"):
             extra += _UPLOAD_HEADERS
+        # CSP, API_DOCS=1 ile açılan belge sayfaları DIŞINDA her yanıta eklenir.
+        if scope.get("path", "") not in _DOCS_PATHS:
+            extra.append(_CSP)
 
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
@@ -658,11 +682,11 @@ async def alternatives(
             ),
         )
     result = access.recommend(neighborhood_id, budget)
-    # transit.py metinleri Türkçe üretir; isteğin diline burada çevrilir.
+    # transit.py metni Türkçe üretir; isteğin diline burada çevrilir. Hedef
+    # raylı sisteme uzaksa yanıt metin değil `reason` kodu taşır, cümleyi
+    # istemci kendi dilinde kurar.
     if "error" in result:
         raise HTTPException(status_code=404, detail=localized(result["error"]))
-    if "message" in result:
-        result["message"] = localized(result["message"])
     return result
 
 

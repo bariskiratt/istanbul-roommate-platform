@@ -72,7 +72,7 @@ const tr = {
   "landing.signupFree": "Ücretsiz kaydol",
   "landing.signupNote": "Ücretsiz, kredi kartı gerekmez. Kayıt için .edu.tr adresi gerekir.",
   "landing.districtsTitle": "İstanbul'da ev ara",
-  "landing.districtsSub": "En çok ilan olan semtler ve medyan oda payları",
+  "landing.districtsSub": "İlan olan semtler ve medyan oda payları",
   "landing.footerListings": "İlanlar",
   "landing.districtPrices": "Semt kiraları",
 
@@ -527,18 +527,29 @@ const tr = {
   "map.neighborhoodLabel": "{name} Mah.",
   "map.fewListings": "Yalnızca {count} ilana dayanıyor, temsil gücü düşük.",
   "map.geoFailed": "Harita verisi yüklenemedi: {error}",
-  // Alternatif semt paneli — Explore.tsx'te ALTERNATIVES_ENABLED bayrağıyla kapalı.
-  "map.altButton": "Yakın uygun alternatifler",
+  // Alternatif semt paneli (harita balonundaki düğme ve sağ üstteki liste).
+  "map.altButton": "Yakında daha ucuzu",
   "map.altCalculating": "Alternatifler hesaplanıyor…",
   "map.altFailed": "Alternatifler alınamadı: {error}",
   "map.altTarget": "{name} (hedef)",
-  "map.altPanelTitle": "{name} Mah. yakını",
-  "map.altUnreachable": "Bu mahalle için ulaşım tabanlı öneri üretilemedi.",
-  "map.altNone": "Bu bütçeyle ağ üzerinde uygun alternatif bulunamadı. Bütçeyi artırmayı dene.",
-  "map.altSummary": "Bütçe {budget} TL · raylı sistemle ulaşılabilir {count} uygun mahalle",
+  "map.altPanelTitle": "{name} Mah. yakınında",
+  "map.altTargetPrice": "{name} ortalaması {price} TL.",
+  "map.altTargetLowConfidence": "Bu fiyat az ilana dayanıyor, kıyası kaba bir fikir olarak oku.",
+  "map.altRule": "Raylı sistemle kapıdan kapıya ~{max} dk içinde, daha ucuz ve {budget} TL bütçene uyan mahalleler:",
+  "map.altItem": "{name} Mah.",
+  "map.altMinutes": "~{count} dk",
   "map.altStops": "{count} durak",
-  "map.altItem": "{index}. {name} Mah.",
-  "map.altCheaper": "{amount} TL ucuz",
+  "map.altSameStation": "aynı istasyon",
+  "map.altTransfers": "{count} aktarma",
+  "map.altDirect": "aktarmasız",
+  "map.altWalk": "istasyona {count} dk yürüme",
+  "map.altBorderline": "sınırda",
+  "map.altLowConfidence": "az ilan",
+  "map.altNoneInBudget": "Bu bütçeye uyan yakın mahalle yok. Raylı sistemle yakın en ucuz seçenekler:",
+  "map.altOverBudget": "bütçeni {amount} TL aşıyor",
+  "map.altNone": "Raylı sistemle ~{max} dk içinde daha ucuz bir mahalle yok.",
+  "map.altUnreachable": "Bu mahalle raylı sisteme yürüme mesafesinde değil, bu yüzden ulaşıma dayalı öneri çıkaramıyoruz.",
+  "map.altFootnote": "Süreler tahmini: durak başı ~2 dk, aktarma ~10 dk, yürüme kuş uçuşu mesafeden. Yokuş hesaba katılmaz.",
 
   // ---- bildirimler ----
   "notif.title": "Bildirimler",
@@ -904,7 +915,7 @@ const tr = {
   // hiç olmamasından kötüdür.
   "landing.privacy": "Gizlilik",
   "privacy.title": "Gizlilik ve KVKK aydınlatma metni",
-  "privacy.updated": "Son güncelleme: 9 Ekim 2026",
+  "privacy.updated": "Son güncelleme: 12 Ekim 2026",
   "privacy.intro":
     "Bu metin, evdes.tr'yi kullandığında hangi kişisel verilerinin işlendiğini, neden işlendiğini ve bunlar üzerinde hangi haklara sahip olduğunu anlatır. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında hazırlanmıştır.",
 
@@ -943,6 +954,10 @@ const tr = {
     "Vercel — arayüzün dağıtımı. Sitenin sayfalarını buradan indirirsin.",
   "privacy.shareBrevo":
     "Brevo — e-posta gönderimi. Giriş kodu göndermek için e-posta adresin buraya iletilir.",
+  "privacy.shareGoogleFonts":
+    "Google Fonts — yazı tipleri. Bir sayfayı açtığında tarayıcın sitenin yazı tiplerini Google'ın sunucularından indirir; bu sırada IP adresin ve tarayıcının her istekte gönderdiği standart bilgiler (ör. tarayıcı sürümü) Google'a ulaşır. Hesabınla ilgili başka hiçbir veri gönderilmez.",
+  "privacy.shareOsm":
+    "OpenStreetMap — harita. Harita sayfasındaki harita görselleri OpenStreetMap Vakfı'nın sunucularından yüklenir; bu sırada IP adresin ve haritada baktığın bölge bu sunuculara ulaşır. Harita sayfasını açmadığın sürece bu istek yapılmaz.",
   "privacy.shareNoAi":
     "Yapay zekâ tabanlı içerik denetimi şu anda kapalıdır; yazdıkların herhangi bir yapay zekâ sağlayıcısına gönderilmez. Kural tabanlı süzgeç tamamen kendi sunucumuzda çalışır.",
   "privacy.shareNoSale":
@@ -958,7 +973,9 @@ const tr = {
   "privacy.retentionBody":
     "Verilerin hesabın açık kaldığı sürece saklanır. Hesabını Ayarlar > Hesap Ayarları üzerinden kendin silebilirsin; silme kalıcıdır ve şu kayıtları geri dönüşsüz kaldırır: profilin, ilanların, kaydırmaların, eşleşmelerin, eşleşmelerindeki mesajlar (karşı tarafın yazdıkları dahil), açtığın ve hakkında açılan şikâyetler, oturum anahtarların ve depolanan fotoğraf dosyaların.",
   "privacy.retentionAudit":
-    "Tek istisna yönetici denetim kaydıdır. Bir yönetici kalıcı silme veya düzenleme yaptığında bu işlem gerekçesiyle birlikte kaydedilir ve hesabın silinse bile bu kayıt durur; yalnızca kullanıcı bağlantısı koparılır. Bir ilanın metni yönetici tarafından düzenlendiyse, düzenleme öncesindeki metin bu kayıtta kalabilir. Amaç, kimin neyi neden kaldırdığının sonradan denetlenebilmesidir.",
+    "Tek istisna yönetici denetim kaydıdır. Bir yönetici bir hesabı ya da ilanı kalıcı olarak sildiğinde veya bir ilanın metnini düzenlediğinde, bu işlem gerekçesiyle birlikte kaydedilir ve hesabın silinse bile bu kayıt durur. Kayıtta şunlar kalır: silinen bir hesabın e-posta adresi, adı, üniversitesi, açılış tarihi ve askıda olup olmadığı; silinen bir ilanın başlığı, ilçesi, türü, açılış tarihi ile sahibinin adı ve hesap numarası; yönetici bir ilanın metnini düzenlediyse düzenleme öncesindeki başlık ve açıklama. Bu kaydı yalnızca yöneticiler görebilir. Amaç, kimin neyi neden kaldırdığının sonradan denetlenebilmesidir.",
+  "privacy.retentionPhotos":
+    "Profilinden ya da ilanından çıkardığın bir fotoğrafın dosyası da silinir. O fotoğrafa gelmiş, henüz yanıtlamadığın bir beğeni varsa dosya, beğeniyi yanıtlayana kadar Beğeniler ekranında görünsün diye saklanır, sonra silinir. Yükleyip hiçbir yere kaydetmediğin fotoğraflar bir hafta sonra silinir.",
 
   "privacy.rightsTitle": "7. Hakların",
   "privacy.rightsBody":
@@ -996,7 +1013,6 @@ const tr = {
   "landing.exampleCaption": "İstenen {asking} TL, adil aralık {low}–{high} TL. Bu oda payı piyasanın üstünde.",
   "landing.mapCta": "Bütçe haritasını aç",
   "landing.colDistrict": "Semt",
-  "landing.colListings": "İlan",
   "landing.colMedian": "Medyan oda payı",
   "landing.mapSketchAlt": "Bütçe haritasının krokisi: boğazın iki yakasında bütçeye göre renklenmiş mahalleler",
   "landing.mapFits": "bütçene uyar",
@@ -1126,7 +1142,7 @@ const en: Record<TranslationKey, string> = {
   "landing.signupFree": "Sign up free",
   "landing.signupNote": "Free, no credit card. Sign-up needs a .edu.tr address.",
   "landing.districtsTitle": "Search across Istanbul",
-  "landing.districtsSub": "Districts with the most listings and their median room shares",
+  "landing.districtsSub": "Districts with listings and their median room shares",
   "landing.footerListings": "Listings",
   "landing.districtPrices": "District rents",
 
@@ -1580,18 +1596,29 @@ const en: Record<TranslationKey, string> = {
   "map.neighborhoodLabel": "{name}",
   "map.fewListings": "Based on only {count} listings, so treat it as a weak signal.",
   "map.geoFailed": "Couldn't load map data: {error}",
-  // Alternative-neighbourhood panel — disabled via ALTERNATIVES_ENABLED in Explore.tsx.
-  "map.altButton": "Affordable options nearby",
+  // Alternative-neighborhood panel (popup button and the list at the top right).
+  "map.altButton": "Cheaper nearby",
   "map.altCalculating": "Working out alternatives…",
   "map.altFailed": "Couldn't fetch alternatives: {error}",
   "map.altTarget": "{name} (target)",
   "map.altPanelTitle": "Near {name}",
-  "map.altUnreachable": "No transit-based suggestion could be produced for this neighbourhood.",
-  "map.altNone": "No affordable option on the network at this budget. Try raising it.",
-  "map.altSummary": "Budget {budget} TL · {count} affordable neighbourhoods reachable by rail",
+  "map.altTargetPrice": "{name} averages {price} TL.",
+  "map.altTargetLowConfidence": "That price rests on few listings, so treat the comparison as rough.",
+  "map.altRule": "Cheaper neighborhoods within ~{max} min door to door by rail that fit your {budget} TL budget:",
+  "map.altItem": "{name}",
+  "map.altMinutes": "~{count} min",
   "map.altStops": "{count} stops",
-  "map.altItem": "{index}. {name}",
-  "map.altCheaper": "{amount} TL cheaper",
+  "map.altSameStation": "same station",
+  "map.altTransfers": "{count}× change",
+  "map.altDirect": "no change",
+  "map.altWalk": "{count} min walk to the station",
+  "map.altBorderline": "borderline",
+  "map.altLowConfidence": "few listings",
+  "map.altNoneInBudget": "Nothing nearby fits this budget. The cheapest options close by rail:",
+  "map.altOverBudget": "{amount} TL over budget",
+  "map.altNone": "No cheaper neighborhood within ~{max} min by rail.",
+  "map.altUnreachable": "This neighborhood isn't within walking distance of rail, so there's no transit-based suggestion.",
+  "map.altFootnote": "Times are estimates: ~2 min per stop, ~10 min per change, walking from straight-line distance. Hills aren't counted.",
 
   // ---- notifications ----
   "notif.title": "Notifications",
@@ -1937,7 +1964,7 @@ const en: Record<TranslationKey, string> = {
   // ---- privacy / KVKK ----
   "landing.privacy": "Privacy",
   "privacy.title": "Privacy and data protection notice",
-  "privacy.updated": "Last updated: 9 October 2026",
+  "privacy.updated": "Last updated: 12 October 2026",
   "privacy.intro":
     "This notice explains which of your personal data evdes.tr processes when you use it, why, and what rights you have over it. It is written under Turkish data protection law (KVKK, law no. 6698).",
 
@@ -1976,6 +2003,10 @@ const en: Record<TranslationKey, string> = {
     "Vercel — interface delivery. You download the site's pages from here.",
   "privacy.shareBrevo":
     "Brevo — email delivery. Your email address is passed here to send sign-in codes.",
+  "privacy.shareGoogleFonts":
+    "Google Fonts — typefaces. When you open a page, your browser downloads the site's fonts from Google's servers; in doing so your IP address and the standard details your browser sends with every request (such as its version) reach Google. No other data about your account is sent.",
+  "privacy.shareOsm":
+    "OpenStreetMap — map. The map images on the Map page are loaded from the OpenStreetMap Foundation's servers; in doing so your IP address and the area you are looking at reach those servers. No such request is made unless you open the Map page.",
   "privacy.shareNoAi":
     "AI-based content moderation is currently switched off; what you write is not sent to any AI provider. The rule-based filter runs entirely on our own server.",
   "privacy.shareNoSale":
@@ -1991,7 +2022,9 @@ const en: Record<TranslationKey, string> = {
   "privacy.retentionBody":
     "Your data is kept for as long as your account exists. You can delete the account yourself under Settings > Account settings; deletion is permanent and irreversibly removes your profile, your listings, your swipes, your matches, the messages in those matches (including those written by the other person), reports you filed and reports filed about you, your session tokens and your stored photo files.",
   "privacy.retentionAudit":
-    "The one exception is the administrator audit log. When an administrator permanently deletes or edits something, that action is recorded with its reason, and the record survives even if your account is deleted; only the link to the user is severed. If an administrator edited a listing's text, the text as it stood before the edit may remain in that record. The purpose is to keep who removed what, and why, auditable afterwards.",
+    "The one exception is the administrator audit log. When an administrator permanently deletes an account or a listing, or edits a listing's text, the action is recorded with its reason, and the record survives even if your account is deleted. It keeps: for a deleted account, its email address, name, university, creation date and whether it was suspended; for a deleted listing, its title, district, type and creation date, and the owner's name and account number; for an edited listing, the title and description as they stood before the edit. Only administrators can see this log. The purpose is to keep who removed what, and why, auditable afterwards.",
+  "privacy.retentionPhotos":
+    "When you remove a photo from your profile or a listing, its file is deleted too. If that photo has a like you have not answered yet, the file is kept so the Likes screen can show it until you answer, and is deleted after that. Photos you upload but never save anywhere are deleted after a week.",
 
   "privacy.rightsTitle": "7. Your rights",
   "privacy.rightsBody":
@@ -2029,7 +2062,6 @@ const en: Record<TranslationKey, string> = {
   "landing.exampleCaption": "Asking {asking} TL against a fair range of {low}–{high} TL. This share is above market.",
   "landing.mapCta": "Open the budget map",
   "landing.colDistrict": "District",
-  "landing.colListings": "Listings",
   "landing.colMedian": "Median room share",
   "landing.mapSketchAlt": "Sketch of the budget map: neighbourhoods on both sides of the Bosphorus, coloured by budget",
   "landing.mapFits": "fits your budget",
