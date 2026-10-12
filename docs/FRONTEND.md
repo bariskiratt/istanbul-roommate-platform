@@ -268,8 +268,9 @@ Newsreader, a variable serif with an optical-size axis (`src/index.css:137-141`)
 small headings stay in the UI voice. A third face, Kalam, is a handwriting font
 used only for margin notes (`.font-hand`). Tailwind's `font-sans`,
 `font-display` and `font-hand` map to the three
-(`frontend/tailwind.config.ts:17-21`). All three cover Turkish (latin-ext) and
-the two main ones include the ₺ sign.
+(`frontend/tailwind.config.ts:17-21`). All three cover Turkish (latin-ext).
+Prices are written with "TL", never the ₺ sign: Schibsted Grotesk draws ₺ with
+two bars across a pound-like curve, and users read it as € or £.
 
 The design language is "Hinge's restraint, a campus's materials". Each
 material in `@layer components` has one meaning, documented at the top of

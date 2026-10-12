@@ -241,11 +241,11 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                 <div className="flex justify-between">
                   <div className="border border-border rounded-xl px-4 py-2.5">
                     <div className="text-[12px] text-muted-foreground">{t("filter.min")}</div>
-                    <div className="text-sm font-semibold text-foreground">{n(priceRange[0])} ₺</div>
+                    <div className="text-sm font-semibold text-foreground">{n(priceRange[0])} TL</div>
                   </div>
                   <div className="border border-border rounded-xl px-4 py-2.5 text-right">
                     <div className="text-[12px] text-muted-foreground">{t("filter.max")}</div>
-                    <div className="text-sm font-semibold text-foreground">{n(priceRange[1])} ₺</div>
+                    <div className="text-sm font-semibold text-foreground">{n(priceRange[1])} TL</div>
                   </div>
                 </div>
               </div>

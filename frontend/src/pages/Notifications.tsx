@@ -219,7 +219,7 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
         <p className="text-[13px] text-muted-foreground truncate">{user.university}</p>
         <LikeContext like={notification.raw} compact />
         <p className="text-[13px] mt-1">
-          <span className="marker font-semibold">{n(user.budgetMin)}–{n(user.budgetMax)} ₺</span>
+          <span className="marker font-semibold">{n(user.budgetMin)}–{n(user.budgetMax)} TL</span>
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
           <LifestyleTag type="smoking" value={user.smoking} compact />

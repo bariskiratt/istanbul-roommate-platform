@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BRAND } from "@/lib/brand";
 import { useQuery } from "@tanstack/react-query";
@@ -7,11 +7,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock } from "lucide-react";
+import { ArrowLeft, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, fetchLocations, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
 import { filterByQuery } from "@/lib/search";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
+import {
+  clearOnboardingDraft,
+  loadOnboardingDraft,
+  profileIncomplete,
+  saveOnboardingDraft,
+} from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -21,27 +27,37 @@ import Wordmark from "@/components/campus/Wordmark";
 import StudentCard from "@/components/campus/StudentCard";
 
 const STEP_COUNT = 7;
+/** Kod doğrulanınca oturum açılır; buradan geriye (e-posta, kod) dönülmez. */
+const FIRST_PROFILE_STEP = 2;
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { login, setUser } = useAuth();
+  const { isLoggedIn, user, login, setUser } = useAuth();
   const { t, n } = useI18n();
-  const [currentStep, setCurrentStep] = useState(0);
+  // Yenilemeden önce girilenler (bkz. lib/onboardingDraft.ts).
+  const [draft] = useState(loadOnboardingDraft);
+  const [currentStep, setCurrentStep] = useState(() => {
+    // Oturum açıksa kod zaten doğrulanmıştır: kaldığı profil adımından sürer.
+    if (isLoggedIn) return Math.max(draft.step, FIRST_PROFILE_STEP);
+    // Hesap açılmış ama kod girilmemişse kod adımına dönülür; e-postaya
+    // gelen kod hâlâ geçerli, gerekirse "tekrar gönder" de orada.
+    if (draft.registeredEmail && draft.email === draft.registeredEmail) return 1;
+    return 0;
+  });
   const [busy, setBusy] = useState(false);
-  const [registered, setRegistered] = useState(false);
-  const [email, setEmail] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState(draft.registeredEmail);
+  const [email, setEmail] = useState(draft.email);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [name, setName] = useState("");
-  const [gender, setGender] = useState("");
-  const [birthYear, setBirthYear] = useState("");
-  const [university, setUniversity] = useState("");
-  const [department, setDepartment] = useState("");
-  const [year, setYear] = useState("");
-  const [budget, setBudget] = useState([4000, 8000]);
-  const [district, setDistrict] = useState<string[]>([]);
+  const [name, setName] = useState(draft.name);
+  const [gender, setGender] = useState(draft.gender);
+  const [birthYear, setBirthYear] = useState(draft.birthYear);
+  const [department, setDepartment] = useState(draft.department);
+  const [year, setYear] = useState(draft.year);
+  const [budget, setBudget] = useState(draft.budget);
+  const [district, setDistrict] = useState<string[]>(draft.district);
   const [districtSearch, setDistrictSearch] = useState("");
-  const [lifestyle, setLifestyle] = useState({ smoking: false, alcohol: false, pets: false, sleep: "esnek" });
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [lifestyle, setLifestyle] = useState(draft.lifestyle);
+  const [photos, setPhotos] = useState<string[]>(draft.photos);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -54,6 +70,31 @@ const Onboarding = () => {
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   const progress = ((currentStep + 1) / STEP_COUNT) * 100;
+  // Üniversite e-posta alan adından atanır; oturumdaki kullanıcıdan okunur ki
+  // yenilemeden sonra da kartta görünsün.
+  const university = user?.university ?? "";
+  const firstStep = isLoggedIn ? FIRST_PROFILE_STEP : 0;
+
+  useEffect(() => {
+    saveOnboardingDraft({
+      step: currentStep, email, registeredEmail, name, gender, birthYear,
+      department, year, budget, district, lifestyle, photos,
+    });
+  }, [currentStep, email, registeredEmail, name, gender, birthYear, department, year, budget, district, lifestyle, photos]);
+
+  useEffect(() => {
+    // Kaydı çoktan bitmiş hesabın burada işi yok; formu doldurup profilini
+    // ezmesin.
+    if (user && !profileIncomplete(user)) navigate("/swipe", { replace: true });
+  }, [user, navigate]);
+
+  useEffect(() => {
+    // Oturum düştüyse (süresi dolmuş token) profil kaydedilemez: yeni kodla
+    // tekrar doğrulansın, girilenler taslakta kalır.
+    if (!isLoggedIn && currentStep >= FIRST_PROFILE_STEP) {
+      setCurrentStep(registeredEmail && email === registeredEmail ? 1 : 0);
+    }
+  }, [isLoggedIn, currentStep, email, registeredEmail]);
 
   // Tercih edilen semtler: liste sabit değil, /api/locations'tan gelir.
   // Aynı queryKey konum seçicide de kullanılıyor; istek bir kez atılır.
@@ -140,11 +181,12 @@ const Onboarding = () => {
       setBusy(true);
 
       // Adım 0 → 1: hesabı oluştur, doğrulama kodunu iste.
-      // Geri dönüp tekrar ilerlenirse ikinci kez register çağrılmaz
-      // ("zaten kayıtlı" hatasıyla formu kaybettirmesin).
-      if (currentStep === 0 && !registered) {
+      // Geri dönüp aynı adresle tekrar ilerlenirse ikinci kez register
+      // çağrılmaz ("zaten kayıtlı" hatasıyla formu kaybettirmesin); adres
+      // düzeltildiyse yeni adres için hesap açılır.
+      if (currentStep === 0 && email !== registeredEmail) {
         const res = await registerUser(email, password);
-        setRegistered(true);
+        setRegisteredEmail(email);
         if (res.dev_code) {
           toast.info(t("ob.verifyCode", { code: res.dev_code }), { duration: 30000 });
         } else {
@@ -159,10 +201,6 @@ const Onboarding = () => {
       if (currentStep === 1) {
         const { token, user } = await verifyOtp(email, otp.join(""));
         login(token, user);
-        // Üniversite e-posta alan adından tespit edildiyse formu önceden doldur
-        if (user.university && !university) {
-          setUniversity(user.university);
-        }
       }
 
       // Son adım: profili kaydet
@@ -183,6 +221,7 @@ const Onboarding = () => {
           photos,
         });
         setUser(me);
+        clearOnboardingDraft();
         toast.success(t("ob.profileReady"));
         navigate("/swipe");
         return;
@@ -201,7 +240,7 @@ const Onboarding = () => {
   };
 
   const back = () => {
-    if (currentStep > 0) setCurrentStep(s => s - 1);
+    if (currentStep > firstStep) setCurrentStep(s => s - 1);
   };
 
   const stepTitles = [
@@ -222,7 +261,7 @@ const Onboarding = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Üst çubuk: geri, adım sayacı, dil ve tema */}
       <div className="px-4 h-16 flex items-center gap-2 border-b border-border">
-        {currentStep > 0 ? (
+        {currentStep > firstStep ? (
           <button
             onClick={back}
             aria-label={t("common.back")}
@@ -456,7 +495,7 @@ const Onboarding = () => {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1.5">{t("ob.budgetLabel")}</p>
                   <p className="text-2xl font-semibold">
-                    <span className="marker">{n(budget[0])}–{n(budget[1])} ₺</span>
+                    <span className="marker">{n(budget[0])}–{n(budget[1])} TL</span>
                   </p>
                 </div>
                 <Slider
@@ -468,8 +507,8 @@ const Onboarding = () => {
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{n(1000)} ₺</span>
-                  <span>{n(20000)} ₺</span>
+                  <span>{n(1000)} TL</span>
+                  <span>{n(20000)} TL</span>
                 </div>
               </div>
               <div className="space-y-3">
@@ -596,9 +635,15 @@ const Onboarding = () => {
               {photos.map((photo, i) => (
                 <div key={i} className="aspect-[3/4] rounded-xl overflow-hidden border border-border relative">
                   <img src={photo} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                    <Check className="w-4 h-4 text-accent-foreground" />
-                  </div>
+                  {/* Dokunmatik ekranda üzerine gelme yok: kaldır düğmesi hep görünür */}
+                  <button
+                    onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                    aria-label={t("pedit.removePhoto")}
+                    title={t("pedit.removePhoto")}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-background/90 text-foreground flex items-center justify-center hover:bg-background transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
               {photos.length < 6 && (

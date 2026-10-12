@@ -7,6 +7,7 @@ import {
   logoutApi,
   setToken,
 } from "@/lib/api";
+import { clearOnboardingDraft } from "@/lib/onboardingDraft";
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -56,6 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     logoutApi().catch(() => {}); // sunucuya ulaşılamasa da yerelde çıkış yap
     clearToken();
+    // Yarım kayıt taslağı bu hesabındı; aynı sekmede kaydolacak bir sonraki
+    // kişinin formuna taşınmasın.
+    clearOnboardingDraft();
     setUserState(null);
     setIsLoggedIn(false);
   };

@@ -535,7 +535,7 @@ const CreateListing = () => {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1.5">{t("create.budgetLabel")}</p>
                   <p className="text-2xl font-semibold">
-                    <span className="marker">{n(budget[0])}–{n(budget[1])} ₺</span>
+                    <span className="marker">{n(budget[0])}–{n(budget[1])} TL</span>
                   </p>
                 </div>
                 <Slider
@@ -547,8 +547,8 @@ const CreateListing = () => {
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{n(1000)} ₺</span>
-                  <span>{n(20000)} ₺</span>
+                  <span>{n(1000)} TL</span>
+                  <span>{n(20000)} TL</span>
                 </div>
               </div>
             </div>

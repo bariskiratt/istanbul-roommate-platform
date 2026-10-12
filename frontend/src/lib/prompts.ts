@@ -135,7 +135,7 @@ export const personPrompts = (p: PersonFields, ctx: PromptContext): Prompt[] => 
     prompts.push({
       key: "budget",
       question: t("prompt.q.budget"),
-      answer: `${n(p.budget_min)}–${n(p.budget_max)} ₺${t("common.perMonth")}`,
+      answer: `${n(p.budget_min)}–${n(p.budget_max)} TL${t("common.perMonth")}`,
       marker: true,
     });
   }

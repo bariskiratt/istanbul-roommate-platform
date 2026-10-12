@@ -9,45 +9,56 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import StudentCard from "@/components/campus/StudentCard";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateMe } from "@/lib/api";
+import { type ApiUser, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import DepartmentPicker from "@/components/DepartmentPicker";
 import { useI18n } from "@/i18n";
 
 const DISTRICTS = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Bakırköy", "Beyoğlu", "Sarıyer", "Fatih", "Eyüpsultan", "Maltepe", "Ataşehir", "Pendik", "Kartal", "Bahçelievler", "Zeytinburnu", "Küçükçekmece", "Başakşehir"];
 
+/**
+ * Form, kullanıcı yüklendikten SONRA kurulur. Eskiden alanlar ilk render'da
+ * `me`den başlatılıyordu; sayfa yenilenince `me` henüz gelmemiş oluyor, form
+ * boş açılıyor ve kaydetmek fotoğrafları, bütçeyi ve semtleri siliyordu.
+ */
 const ProfileEdit = () => {
+  const { isLoggedIn, user: me } = useAuth();
+  const { t } = useI18n();
+
+  if (!me) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">{t(isLoggedIn ? "common.loading" : "pedit.loginRequired")}</p>
+      </div>
+    );
+  }
+  return <ProfileEditForm me={me} />;
+};
+
+const ProfileEditForm = ({ me }: { me: ApiUser }) => {
   const navigate = useNavigate();
-  const { user: me, setUser } = useAuth();
+  const { setUser } = useAuth();
   const { t, n } = useI18n();
 
-  const [name, setName] = useState(me?.name ?? "");
-  const [department, setDepartment] = useState(me?.department ?? "");
-  const [year, setYear] = useState(me?.year ?? 1);
+  const [name, setName] = useState(me.name ?? "");
+  const [department, setDepartment] = useState(me.department ?? "");
+  const [year, setYear] = useState(me.year ?? 1);
   const [budget, setBudget] = useState<number[]>([
-    me?.budget_min ?? 4000,
-    me?.budget_max ?? 8000,
+    me.budget_min ?? 4000,
+    me.budget_max ?? 8000,
   ]);
-  const [districts, setDistricts] = useState<string[]>(me?.preferred_districts ?? []);
-  const [smoking, setSmoking] = useState(me?.smoking ?? false);
-  const [alcohol, setAlcohol] = useState(me?.alcohol ?? false);
-  const [pets, setPets] = useState(me?.pets ?? false);
-  const [sleep, setSleep] = useState(me?.sleep_schedule ?? "esnek");
-  const [bio, setBio] = useState(me?.bio ?? "");
-  const [photos, setPhotos] = useState<string[]>(me?.photos ?? []);
+  const [districts, setDistricts] = useState<string[]>(me.preferred_districts ?? []);
+  const [smoking, setSmoking] = useState(me.smoking ?? false);
+  const [alcohol, setAlcohol] = useState(me.alcohol ?? false);
+  const [pets, setPets] = useState(me.pets ?? false);
+  const [sleep, setSleep] = useState(me.sleep_schedule ?? "esnek");
+  const [bio, setBio] = useState(me.bio ?? "");
+  const [photos, setPhotos] = useState<string[]>(me.photos ?? []);
   const [saving, setSaving] = useState(false);
 
   const { pick: pickPhoto, uploading } = usePhotoUpload(url =>
     setPhotos(prev => (prev.length < 6 ? [...prev, url] : prev)),
   );
-
-  if (!me) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">{t("pedit.loginRequired")}</p>
-      </div>
-    );
-  }
 
   const save = async () => {
     setSaving(true);
@@ -166,7 +177,7 @@ const ProfileEdit = () => {
         <section className="space-y-4">
           <h2 className="text-xl text-foreground">{t("pedit.budget")}</h2>
           <p className="text-2xl font-semibold">
-            <span className="marker">{n(budget[0])}–{n(budget[1])} ₺</span>
+            <span className="marker">{n(budget[0])}–{n(budget[1])} TL</span>
           </p>
           <Slider value={budget} onValueChange={setBudget} min={1000} max={50000} step={500} />
         </section>

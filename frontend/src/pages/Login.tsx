@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginWithPassword, requestOtp, verifyOtp } from "@/lib/api";
+import { profileIncomplete } from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
 import SiteBar from "@/components/layout/SiteBar";
 import { useI18n } from "@/i18n";
@@ -27,7 +28,9 @@ const Login = () => {
   const finish = (token: string, user: Parameters<typeof login>[1]) => {
     login(token, user);
     toast.success(t("login.greet", { name: user.name ? `, ${user.name}` : "" }));
-    navigate("/swipe");
+    // Kaydı yarıda kalan hesap (ör. kod doğrulandıktan sonra sekme kapandı)
+    // boş profille uygulamaya değil, kaydın profil adımlarına döner.
+    navigate(profileIncomplete(user) ? "/onboarding" : "/swipe");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -84,7 +84,7 @@ function breadcrumbs(steps) {
 }
 
 const nf = new Intl.NumberFormat("tr-TR");
-const money = v => `${nf.format(Math.round(v))} ₺`;
+const money = v => `${nf.format(Math.round(v))} TL`;
 
 /**
  * İlan sayısıyla AĞIRLIKLI medyan.

@@ -183,7 +183,7 @@ const Index = () => {
                   </p>
                   {l.rent != null && (
                     <p className="mt-1.5 text-[15px]">
-                      <span className="marker font-semibold">{fmtNum(l.rent)} ₺</span>
+                      <span className="marker font-semibold">{fmtNum(l.rent)} TL</span>
                       <span className="text-muted-foreground text-sm">{t("common.roomShare")}</span>
                     </p>
                   )}
@@ -305,7 +305,7 @@ const Index = () => {
                       </td>
                       <td className="py-3 px-5 text-right tabular-nums text-foreground">{d.count}</td>
                       <td className="py-3 px-5 text-right tabular-nums text-foreground">
-                        {d.median != null ? `${fmtNum(d.median)} ₺` : "—"}
+                        {d.median != null ? `${fmtNum(d.median)} TL` : "—"}
                       </td>
                     </tr>
                   ))}

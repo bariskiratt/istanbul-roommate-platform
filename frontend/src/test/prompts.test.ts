@@ -85,7 +85,7 @@ describe("personPrompts", () => {
       tr,
     );
     expect(prompts).toEqual([
-      { key: "budget", question: "Kiraya ayırabileceğim", answer: "8.000–12.000 ₺/ay", marker: true },
+      { key: "budget", question: "Kiraya ayırabileceğim", answer: "8.000–12.000 TL/ay", marker: true },
       { key: "districts", question: "Oturmak istediğim semtler", answer: "Kadıköy, Beşiktaş" },
     ]);
   });

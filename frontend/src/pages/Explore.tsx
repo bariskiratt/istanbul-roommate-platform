@@ -228,7 +228,7 @@ const Explore = () => {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <label htmlFor="map-budget" className="flex items-baseline gap-2 whitespace-nowrap">
             <span className="text-[13px] text-muted-foreground">{t("map.budgetLabel")}</span>
-            <span className="marker text-lg font-semibold">{fmtNum(budget)} ₺</span>
+            <span className="marker text-lg font-semibold">{fmtNum(budget)} TL</span>
           </label>
           <input
             id="map-budget"
