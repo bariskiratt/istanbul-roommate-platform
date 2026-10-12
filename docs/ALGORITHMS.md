@@ -19,8 +19,7 @@ algorithms sit in the request path, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 Every claim below carries a `file:line` reference. Numbers labelled **measured**
 were reproduced by running this repository's own code against the committed
 dataset. Where a number could not be reproduced, this document says so instead
-of repeating it. Section 6 lists what these algorithms do *not* do, including
-two places where a docstring currently promises more than the code delivers.
+of repeating it. Section 6 lists what these algorithms do *not* do.
 
 ---
 
@@ -155,6 +154,14 @@ The 154 `by_name` matches are also worth understanding: 372 of the 968 polygons
 carry no district field at all (measured), which is why the district-less
 fallback is not a rare edge case but a third of the map.
 
+Those 154 also get their **district label from the matched CSV row**
+(`heatmap.py:89-99`). This is not a guess: `by_name` only holds names that
+occur in a single district, and the entry carries that district alongside the
+price. Before this, every one of them showed an empty district on the map
+popup and in the alternatives panel ("Rumeli Hisarı, "). After it, no priced
+polygon is without a district; 218 unpriced ones still are (measured), and
+nothing labels them because nothing shows them.
+
 ### 1.4 Classification: four states and one ratio
 
 Once every polygon has a price (or `None`), classification is trivial —
@@ -217,9 +224,9 @@ Three options were available:
 The code takes option 3. The response carries a parallel boolean array
 (`heatmap.py:134-137`) and a count in the summary (`heatmap.py:146`), and the
 client renders those polygons at `fillOpacity: 0.3` instead of `0.65` with a
-dashed `3 3` border (`frontend/src/pages/Explore.tsx:69-76`), plus a popup
+dashed `3 3` border (`frontend/src/pages/Explore.tsx:78-87`), plus a popup
 warning naming the actual listing count
-(`frontend/src/pages/Explore.tsx:190-191`).
+(`frontend/src/pages/Explore.tsx:232-233`).
 
 The general principle worth taking away: *the threshold does not change the
 estimate, it changes how loudly the estimate is stated.* The same principle
@@ -272,7 +279,7 @@ The split:
   just `statuses`, `low_confidence` and `summary`, as arrays *positionally
   aligned with the feature order* (`heatmap.py:142-147`). The client zips them
   against the geometry it already holds
-  (`frontend/src/pages/Explore.tsx:85-87`).
+  (`frontend/src/pages/Explore.tsx:95-99`).
 
 Measured at `budget = 25000`: **15,796 bytes raw, 731 bytes gzipped.**
 `GZipMiddleware` is installed at `main.py:161` with a 1 KB floor, so in
@@ -288,10 +295,6 @@ process generation as the status array it is being zipped against.
 ---
 
 ## 2. Alternative-neighbourhood suggestion
-
-> This feature is **switched off in the UI**. The endpoint, the graph and the
-> data pipeline all work; the flag at `frontend/src/pages/Explore.tsx:20` is
-> `false`. Section 2.6 explains why, with the measured output that motivated it.
 
 ### 2.1 The problem: straight-line distance lies in Istanbul
 
@@ -331,156 +334,208 @@ The committed `data/raw/transit_stations.json` contains **261 stations and 42
 line objects covering 18 distinct line refs** (measured) — 42 rather than 18
 because OSM models each direction of travel as its own relation.
 
-`TransitNetwork._build_adjacency()` (`transit.py:105-120`) turns that into an
-adjacency map of shape `{station: {neighbour: {line_ref, …}}}`. Two decisions
-here:
+**Not every relation is a running line.** Two of the 42 objects, refs
+`Üsküdar-Cevizli` and `Cevizli-Üsküdar`, are the Üsküdar–Kadıköy–Maltepe tram,
+which OSM already maps but which is still under construction. Left in, its 33
+stops put a non-existent line along Kadıköy's shore and the recommender
+happily routed people over it. Every operating line in Istanbul carries a line
+code (M1A, T4, F3; Marmaray is `B1` in OSM), and the unbuilt tram is the only
+relation without one, so `TransitNetwork` keeps only refs matching
+`LINE_CODE_RE` (`transit.py:60`, applied at `:128`). What remains is **234
+served stations on 40 relations and 16 line refs** (measured); the 27 stations
+that only the tram served are never attached to a neighbourhood. The filter
+runs at load time, so a re-fetch with the unchanged script stays clean.
 
-- Edges come **only from consecutive pairs in a line's station sequence**
-  (`transit.py:117`). Membership in the same line is not enough; Kadıköy and
-  Tavşantepe are both on M4 but are not adjacent.
-- The **line ref is stored on the edge**, not just the fact of adjacency
-  (`transit.py:118-119`). Section 2.3 explains why that is the only way to
-  price a transfer correctly.
+The committed file is also missing lines that do run: there is no T1
+(Kabataş–Bağcılar), T3, F1 or F2, and Marmaray has no Sirkeci stop. Why the
+Overpass query missed them is not known; re-running `fetch_transit` from a
+network that can reach Overpass is the first thing to try.
 
-Measured: all 261 stations have at least one edge, so there are no orphan nodes.
+`TransitNetwork._build_adjacency()` (`transit.py:139-154`) turns the kept
+lines into an adjacency map of shape `{station: {neighbour: {line_ref, …}}}`.
+Two decisions here:
+
+- Edges come **only from consecutive pairs in a line's station sequence**.
+  Membership in the same line is not enough; Kadıköy and Tavşantepe are both on
+  M4 but are not adjacent.
+- The **line ref is stored on the edge**, not just the fact of adjacency.
+  Section 2.3 explains why that is the only way to price a transfer correctly.
+
+Measured: all 234 served stations have at least one edge, so there are no
+orphan nodes.
 
 ### 2.3 Edge weights: 1 per stop, 5 per transfer
 
 ```python
-# backend/app/transit.py:150
-step = 1 + (TRANSFER_COST if via_line and ref != via_line else 0)
+# backend/app/transit.py:187-188
+change = 1 if via_line and ref != via_line else 0
+new_cost = cost + 1 + TRANSFER_COST * change
 ```
 
-`TRANSFER_COST = 5` (`transit.py:31`), `MAX_HOPS = 12` (`transit.py:27`).
+`TRANSFER_COST = 5` (`transit.py:34`), `MAX_HOPS = 12` (`transit.py:30`).
 
-The units are **stops**, not minutes. The claim being encoded is: *changing
-lines costs about as much as riding five extra stops.* That is a rider's
-intuition rather than a measurement — a transfer means walking a connecting
-passage and then waiting an unknown fraction of a headway, and both are worse
-than staying seated. Nobody timed Istanbul's interchanges to produce the 5.
+The units are **stops**. The claim being encoded is: *changing lines costs
+about as much as riding five extra stops.* That is a rider's intuition rather
+than a measurement — a transfer means walking a connecting passage and then
+waiting an unknown fraction of a headway, and both are worse than staying
+seated. Nobody timed Istanbul's interchanges to produce the 5.
 
 What matters is that the ordering it produces is defensible: a candidate three
 stops away behind two changes scores 3 + 10 = 13, while one five stops away
 with no change scores 5. The second wins, and a rider would agree.
 
-**These two constants interact, and the interaction is not documented in the
-code.** The cheapest possible route with *t* transfers costs at least
-`(t+1) + 5t`. Evaluated: 0 transfers → 1, one transfer → 7, two transfers → 13.
-Since `MAX_HOPS = 12` is the cost ceiling (`transit.py:151-152`, and a state at
-exactly 12 is still admitted), **a route with two or more transfers can never be
-returned** (verified by computation). The effective policy is "same line, up to
-12 stops; or one change, up to 7 stops total" — which is a reasonable policy,
-but it is an emergent consequence of two numbers rather than a stated rule.
-Neither constant can be nudged safely: raising `TRANSFER_COST` to 6 cuts the
-one-change budget from 7 stops to 6 and changes the reachable set of **216 of
-the 261 stations** (verified by computation), and any value ≥ 11 forbids
-transfers outright, because 2 stops + 11 already exceeds `MAX_HOPS`.
+**These two constants interact.** The cheapest possible route with *t*
+transfers costs at least `(t+1) + 5t`. Evaluated: 0 transfers → 1, one
+transfer → 7, two transfers → 13. Since `MAX_HOPS = 12` is the cost ceiling (a
+state at exactly 12 is still admitted), **a route with two or more transfers
+can never be returned** (verified by computation). The effective reach policy
+is "same line, up to 12 stops; or one change, up to 7 stops total" — a
+reasonable policy, but an emergent consequence of two numbers rather than a
+stated rule, now spelled out in `recommend()`'s docstring. Neither constant
+can be nudged safely: raising `TRANSFER_COST` to 6 cuts the one-change budget
+from 7 stops to 6 and changes the reachable set of **175 of the 234 stations**
+(verified by computation), and any value ≥ 11 forbids transfers outright,
+because 2 stops + 11 already exceeds `MAX_HOPS`.
 
-The search itself (`easy_reach`, `transit.py:122-159`) is Dijkstra over the
-state space **(station, line you arrived on)** rather than over stations
-(`transit.py:130-133`). Line has to be part of the state because arriving at
-Yenikapı on M1 and arriving on M2 imply different onward costs; collapsing them
-to one node per station would make the transfer penalty depend on visit order.
-The frontier is a plain list re-sorted on each pop (`transit.py:138`) — O(n² log n)
-in the worst case, acceptable at 261 nodes, and not something to copy.
+The search itself (`easy_reach`, `transit.py:156-198`) is Dijkstra on a binary
+heap over the state space **(station, line you arrived on)** rather than over
+stations. Line has to be part of the state because arriving at Yenikapı on M1
+and arriving on M2 imply different onward costs; collapsing them to one node
+per station would make the transfer penalty depend on visit order. Each state
+also carries its **stop and transfer counts**, because the network cost alone
+cannot be shown to a person: the old panel printed a cost of 8 as "8 stops"
+when it meant three stops and one change.
 
-Measured over all 261 stations: between **11 and 80** other stations qualify as
-"easily reachable" (median 24).
+Measured over all 234 served stations: between **11 and 72** other stations
+qualify as "easily reachable" (median 23).
 
 ### 2.4 Walking distance and the neighbourhood↔station join
 
 Neighbourhoods are polygons; stations are points. The bridge is built once, in
-`AccessibilityIndex.__init__` (`transit.py:180-208`):
+`AccessibilityIndex.__init__` (`transit.py:240-273`):
 
-1. **Centroid.** `polygon_centroid()` (`transit.py:45-84`) computes the
+1. **Centroid.** `polygon_centroid()` (`transit.py:74-113`) computes the
    *area-weighted* centroid via the shoelace formula, handling `MultiPolygon`
    by summing signed ring areas. A naive mean of vertices was rejected because
    it drifts toward whichever edge the source digitised with more points — and
    coastline is always the densest edge in this dataset. Degenerate zero-area
-   rings fall back to the vertex mean (`transit.py:81-84`).
-2. **Nearest station.** `nearest_station()` (`transit.py:161-168`) is a linear
-   scan of all 261 stations using `haversine_km()` (`transit.py:34-42`).
-   968 × 261 ≈ 253k great-circle computations at startup; no spatial index.
-3. **Threshold.** `WALK_KM = 1.2` (`transit.py:21-23`). A neighbourhood whose
-   centroid is within 1.2 km of a station is attached to it
-   (`transit.py:207-208`); otherwise it is kept in `places` but never enters
-   `_by_station` and so can neither be a target nor a suggestion.
+   rings fall back to the vertex mean.
+2. **Every station in walking range, not just the nearest.**
+   `stations_near()` (`transit.py:200-209`) returns all served stations
+   within `WALK_KM = 1.2` km (`transit.py:26`) of the centroid, and the
+   neighbourhood is attached to each of them. Attaching only the nearest one
+   was wrong for any neighbourhood between two lines: 400 m from Marmaray and
+   900 m from M4, it could only be reached via Marmaray, so a target on M4
+   looked one change further away than it is. 314 of the 453 walkable
+   neighbourhoods have more than one station in range (measured).
+3. **Walking time.** Straight-line kilometres become minutes at
+   `WALK_MINUTES_PER_KM = 15` (`transit.py:45`): 5 km/h, plus 25% for streets
+   not running straight. A neighbourhood at the 1.2 km limit is therefore
+   ~18 minutes from its station, which is about the most anyone calls
+   "walking distance".
 
-Measured: **455 of 968 neighbourhoods are within the walking threshold, and only
-297 of those also have a price.** The candidate pool for the entire feature is
-therefore under a third of the map — a fact that section 2.6 returns to.
+The model still does not know about hills. Bebek's centroid is 0.66 km from
+Etiler station, which is true on a map and a stiff climb on foot. There is no
+elevation data in the repository, so the panel says it outright ("Yokuş hesaba
+katılmaz") rather than pretending.
 
-### 2.5 Ranking
+Measured: **453 of 968 neighbourhoods are within walking range of a served
+station, and 296 of those also have a price.**
 
-`recommend()` (`transit.py:230-276`):
+### 2.5 What counts as an alternative, and the ranking
 
-1. Reject unknown ids (`:237-239`); refuse politely if the target itself is not
-   near rail (`:240-247`).
-2. Expand the target's station into the set of reachable *neighbourhoods*
-   (`_reachable_places`, `transit.py:210-228`): every station within the cost
-   budget, mapped through `_by_station` to the neighbourhoods attached to it,
-   keeping the cheapest cost when several stations lead to the same place
-   (`transit.py:225`). Cost 0 is assigned to the target's own station
-   (`transit.py:219`), so same-station neighbours rank first.
-3. Filter: drop the target itself, drop anything with no price, drop anything
-   over budget (`transit.py:254-259`).
-4. Sort by `(network_cost, price)` (`transit.py:269`) and return the first six
-   (`transit.py:275`), each annotated with `saving = target_price - price`
-   (`transit.py:261`).
+`recommend()` (`transit.py:305-374`) answers "where could I live instead of X".
+A neighbourhood qualifies when all three hold:
+
+1. **Close by rail.** Its door-to-door estimate to X is at most
+   `MAX_MINUTES = 45` (`transit.py:48`), within the reach policy of §2.3. The
+   estimate (`_routes_from`, `transit.py:280-303`) is walk at X's end + walk at
+   the candidate's end + 2 min per stop (`MINUTES_PER_STOP`; M2 runs its 16
+   stations in about 32 minutes) + 10 min per change (`MINUTES_PER_TRANSFER`,
+   tied to `TRANSFER_COST` so the two scales cannot drift apart). Because both
+   ends can have several stations, the shortest combination wins.
+2. **Cheaper than X** (`transit.py:345`). An "alternative" that costs more than
+   what you were priced out of is not one; the old code filtered only on the
+   budget, so `saving` could come back negative.
+3. **Within budget, or borderline.** The same three-way `classify()` as the
+   heatmap (§1.4), so a candidate up to 20% over budget is offered and marked
+   "sınırda", exactly as the map paints it yellow.
+
+Candidates are sorted by estimated minutes, then price (`transit.py:358`), and
+the first six are returned. Walking now moves a candidate down the list: in the
+Bebek example below, Telsizler is only three stops away but its centre is a
+17-minute walk from the station, so it ranks below places five stops away.
+
+If nothing qualifies on budget, the response does **not** come back empty. It
+carries `cheapest`: the three cheapest neighbourhoods that pass rules 1 and 2,
+each with `over_budget` (`transit.py:361-366`). The panel then says "nothing
+nearby fits this budget, these are the cheapest" and how far over each one is.
+Only when nothing nearby is cheaper than X at all does the list stay empty, and
+the panel says that in so many words.
+
+Every place in the response carries `low_confidence` (fewer than
+`MIN_LISTINGS` listings, §1.5), and the panel marks those rows "az ilan" and
+warns when X's own price is weak. Districts come from §1.3's backfill, so no
+row has a blank district any more.
 
 The endpoint is `GET /api/alternatives?neighborhood_id=&budget=`
-(`backend/app/main.py:349-368`). It returns 503 rather than 404 when transit
-data was never downloaded (`main.py:358-364`), and the whole subsystem is
-optional at startup (`main.py:124-141`).
+(`backend/app/main.py:636-660`). It returns 503 rather than 404 when transit
+data was never downloaded, and the whole subsystem is optional at startup
+(`main.py:127-143`). A target with no station in walking range comes back
+`reachable: false, reason: "not_near_rail"` rather than a sentence; the client
+words it in the viewer's language.
 
-### 2.6 Why it is disabled in the UI
+### 2.6 Why it was switched off, and what changed
 
-`const ALTERNATIVES_ENABLED = false;` — `frontend/src/pages/Explore.tsx:20`,
-with the comment "inactive until output quality is sorted out". Every call site
-is gated on it (`Explore.tsx:153`, `:193`, `:274`) and the translation strings
-are kept but marked dead (`frontend/src/i18n/translations.ts:544`, `:1418`).
-
-Running the real recommender against the real data shows what "output quality"
-means. Target: **Bebek** (Beşiktaş), budget 120.000 ₺ (measured):
+Until October 2026 the panel was hidden behind `ALTERNATIVES_ENABLED = false`
+in `Explore.tsx`, "inactive until output quality is sorted out". Running the
+recommender then against the committed data showed what that meant. Target
+**Bebek**, budget 120.000 TL:
 
 ```
-Rumeli Hisarı   (district: "")   91.080 ₺   cost 1
-Beşiktaş / Kültür               107.640 ₺   cost 1
-Kağıthane / Ortabayır            41.400 ₺   cost 2
-Kağıthane / Telsizler            29.808 ₺   cost 8
-(district: "") Çeliktepe          41.400 ₺   cost 8
-Kağıthane / Sultan Selim         33.120 ₺   cost 9
+Rumeli Hisarı   (district: "")   91.080 TL   cost 1
+Beşiktaş / Kültür               107.640 TL   cost 1
+Kağıthane / Ortabayır            41.400 TL   cost 2
+Kağıthane / Telsizler            29.808 TL   cost 8
+(district: "") Çeliktepe          41.400 TL   cost 8
+Kağıthane / Sultan Selim         33.120 TL   cost 9
 ```
 
-Four separate problems are visible in six rows:
+and at a student budget of 20.000 TL, nothing. Each problem, and the fix:
 
-1. **Blank districts.** Two of six results have `district: ""`, because 372 of
-   968 polygons carry no district field (§1.3). "Rumeli Hisarı, " is not a
-   shippable label.
-2. **The centroid is not the door.** Bebek is recorded as 0.66 km from *Etiler*
-   station (measured). Geometrically true; as a walk it is a climb of roughly
-   150 m of elevation from the shore. Haversine from a centroid models neither
-   terrain nor the street network, and Istanbul has a great deal of both.
-3. **Walk distance is invisible in the ranking.** The sort key is
-   `(network_cost, price)` (`transit.py:269`). A neighbourhood 1.19 km from its
-   station ranks identically to one 0.05 km away — yet the extra kilometre is
-   more than the transfer the model charges 5 stops for. `walk_km` is returned
-   to the client (`transit.py:286`) but never influences the order.
-4. **Thin, lopsided candidate pool.** With only 297 priced *and* walkable
-   neighbourhoods, and a target at the top of Istanbul's price distribution, at
-   a realistic student budget of 20.000 ₺ the same query returns **zero
-   recommendations** (measured). A feature that silently returns nothing for
-   its most likely user is worse than a missing feature.
+| Problem | Fix |
+|---|---|
+| Two of six rows had `district: ""` (372 polygons carry none) | Districts backfilled from the matched CSV row (§1.3); 0 priced polygons are left without one |
+| Walk distance was returned but never ranked | Ranked by door-to-door minutes that include both walks (§2.5) |
+| Centroid ≠ door, terrain ignored | Every station in range is used (§2.4); hills still are not modelled, and the panel says so |
+| Empty at realistic budgets (282 of 296 targets at 20.000 TL) | Borderline band included; `cheapest` fallback when nothing fits |
+| "cost 8" shown as "8 stops" | Stops and changes returned and shown separately |
+| `saving` could be negative | Candidates must be cheaper than the target |
+| An unbuilt tram was in the graph | Uncoded relations dropped (§2.2) |
 
-Two smaller correctness notes in the same code: `saving` can come back negative,
-because candidates are filtered against the *budget* and not against the
-target's price (`transit.py:258-261`), and the target price it is measured
-against may itself be a low-confidence median (§1.5) with no such warning
-attached on this path.
+The same Bebek query now (measured, 30.000 TL):
 
-None of these are hard to fix — carry `walk_km` into the sort key, backfill
-districts, widen the walk radius or fall back to district-level prices. They
-were simply not fixed, and the flag is the honest way to say so.
+```
+Kağıthane / Yeşilce       33.120 TL  sınırda   ~34 dk  4 durak · 1 aktarma · 6 dk yürüme
+Kağıthane / Sultan Selim  33.120 TL  sınırda   ~39 dk  4 durak · 1 aktarma · 11 dk yürüme
+Beyoğlu / Bülbül          33.120 TL  sınırda   ~39 dk  6 durak · 1 aktarma · 7 dk yürüme
+Beyoğlu / Çukur           22.273 TL  az ilan   ~41 dk  6 durak · 1 aktarma · 9 dk yürüme
+Kağıthane / Telsizler     29.808 TL            ~43 dk  3 durak · 1 aktarma · 17 dk yürüme
+Sarıyer / Pınar           33.120 TL  sınırda   ~43 dk  6 durak · 1 aktarma · 12 dk yürüme
+```
+
+Over every priced, walkable target that is above the budget (measured):
+
+| Budget | Targets | Old: empty list | New: no fit | New: nothing at all |
+|---|---|---|---|---|
+| 20.000 TL | 295 | 282 (95%) | 128 (43%) | 14 (5%) |
+| 25.000 TL | 282 | 78 (28%) | 46 (16%) | 8 (3%) |
+| 30.000 TL | 259 | 51 (20%) | 18 (7%) | 5 (2%) |
+
+"No fit" targets get the `cheapest` list instead; "nothing at all" means no
+neighbourhood within 45 minutes by rail is cheaper than the target, which is a
+true answer rather than a gap. `backend/tests/test_transit.py` runs the rules
+over every committed target so the old failure modes cannot return quietly.
 
 ---
 
@@ -869,15 +924,20 @@ Every tunable in this document, in one place:
 | `MIN_LISTINGS` (CSV build) | 3 | `backend/scripts/build_market_values.py:20` | 1.3 |
 | `MIN_RENT` / `MAX_RENT` | 3.000 / 500.000 ₺ | `backend/scripts/build_market_values.py:16-17` | 1.5 |
 | `ANCHOR_FACTOR` | 1.656 | `backend/app/indexing.py:63` | 1.6 |
-| `WALK_KM` | 1.2 km | `backend/app/transit.py:23` | 2.4 |
-| `MAX_HOPS` | 12 | `backend/app/transit.py:27` | 2.3 |
-| `TRANSFER_COST` | 5 | `backend/app/transit.py:31` | 2.3 |
+| `WALK_KM` | 1.2 km | `backend/app/transit.py:26` | 2.4 |
+| `MAX_HOPS` | 12 | `backend/app/transit.py:30` | 2.3 |
+| `TRANSFER_COST` | 5 | `backend/app/transit.py:34` | 2.3 |
+| `MINUTES_PER_STOP` | 2 min | `backend/app/transit.py:43` | 2.5 |
+| `MINUTES_PER_TRANSFER` | 10 min (`TRANSFER_COST` × 2) | `backend/app/transit.py:44` | 2.5 |
+| `WALK_MINUTES_PER_KM` | 15 min | `backend/app/transit.py:45` | 2.4 |
+| `MAX_MINUTES` | 45 min | `backend/app/transit.py:48` | 2.5 |
+| `CHEAPEST_FALLBACK` | 3 | `backend/app/transit.py:53` | 2.5 |
+| `LINE_CODE_RE` | `^[MTFB]\d+[A-Z]?$` | `backend/app/transit.py:60` | 2.2 |
 | `BLOCK_THRESHOLD` | 1.0 | `backend/app/moderation.py:67` | 3.5 |
 | `FLAG_THRESHOLD` | 0.4 | `backend/app/moderation.py:68` | 3.5 |
 | `_SCAM_MAX` | 0.9 | `backend/app/moderation.py:72` | 3.5 |
 | `MAX_SCAN_LENGTH` | 8000 chars | `backend/app/moderation.py:75` | 3.4 |
 | AI timeout | 5 s | `backend/app/moderation_ai.py:42` | 3.6 |
-| `ALTERNATIVES_ENABLED` | `false` | `frontend/src/pages/Explore.tsx:20` | 2.6 |
 
 ---
 
@@ -893,7 +953,7 @@ Every tunable in this document, in one place:
    fall under `MIN_LISTINGS` (measured). They are drawn faded and dashed, which
    is a weaker signal than the number deserves.
 3. **`MIN_LISTINGS` is duplicated in the frontend.** `heatmap.py:24` says 8;
-   `frontend/src/pages/Explore.tsx:190` hardcodes `< 8` for the popup warning.
+   `frontend/src/pages/Explore.tsx:232` hardcodes `< 8` for the popup warning.
    Changing one does not change the other.
 4. **`classify()` has a dead parameter.** `listing_count` is accepted
    (`heatmap.py:106`) and never read; the caller never passes it
@@ -901,10 +961,12 @@ Every tunable in this document, in one place:
 5. **The status array is positional and unversioned.** A client holding
    geometry cached from an older process generation would zip it against a new
    status array with no error (§1.7).
-6. **`by_name` disambiguation compares price entries, not identity.** Two
-   different neighbourhoods sharing a name *and* an identical
-   `(price, count)` pair would not be detected as ambiguous
-   (`heatmap.py:57-58`). Unlikely, not impossible.
+6. **`by_name` trusts the CSV's district.** Ambiguity is now detected on
+   `(price, count, district)` (`heatmap.py:60-61`), so a name that occurs in
+   two districts is always dropped. A name that occurs in one district of the
+   CSV but is spelled identically somewhere else in Istanbul with no listings
+   would still be matched to the wrong polygon, price and district label
+   together.
 7. **`avg_price` is a median of asking rents.** Not transacted rents, not
    negotiated rents, and — per `MODEL.md` — from a dataset whose price column
    required aggressive cleaning.
@@ -915,29 +977,30 @@ Every tunable in this document, in one place:
 
 ### Alternative neighbourhoods
 
-9. **Shipped disabled** (`Explore.tsx:20`), for the four measured reasons in
-   §2.6: blank districts, centroid-based walking distance that ignores terrain,
-   a ranking that ignores `walk_km` entirely, and an empty result set at
-   realistic student budgets.
+9. **Data gaps in the rail graph.** T1, T3, F1, F2 and Marmaray's Sirkeci
+   stop are missing from the committed OSM extract (§2.2), so neighbourhoods
+   along them are either "not near rail" (central Beşiktaş, for instance) or
+   attached to a farther station.
 10. **Rail only.** Buses, minibuses (*dolmuş*) and ferries are not in the graph
     — and ferries are precisely what makes the Bosphorus crossable, which is the
     problem the feature exists to solve.
 11. **Two transfers are structurally unreachable.** `MAX_HOPS = 12` with
     `TRANSFER_COST = 5` caps routes at one line change (verified by
-    computation, §2.3). Nothing in the code says so.
-12. **Cost is in stops, not minutes.** Line frequency, dwell time and actual
-    interchange walking distance are all absent. `TRANSFER_COST = 5` is an
-    intuition, not a measurement.
-13. **A docstring overstates the code.** `AccessibilityIndex`'s class docstring
-    claims reachable-station sets are "precomputed at server startup"
-    (`transit.py:174-178`), but `_reach_cache` is filled lazily on first request
-    per station (`transit.py:216-227`). Startup does precompute centroids and
-    nearest stations; reachability it does not.
-14. **`saving` can be negative** (`transit.py:258-261`), and the target price it
-    is computed against may itself be a low-confidence median with no warning on
-    this path.
-15. **`nearest_station` is a linear scan** — 968 × 261 haversine calls at
-    startup (`transit.py:161-168`). Fine at this size; it does not scale.
+    computation, §2.3). `recommend()`'s docstring states it; the constants do
+    not.
+12. **Minutes are averages, not timetables.** 2 min per stop, 10 per change and
+    15 per straight-line kilometre on foot (§2.4, §2.5). Line frequency, dwell
+    time, real interchange walks and hills are all absent; the panel calls the
+    numbers estimates.
+13. **The target price can be weak.** "Cheaper than X" is measured against X's
+    median, which may rest on fewer than eight listings. The panel says so when
+    it does, but the filter still trusts the number.
+14. **Linear scans at startup.** `stations_near` checks every served station
+    for every neighbourhood — 968 × 234 haversine calls. Fine at this size; it
+    does not scale.
+15. **Reachability is lazy.** `_reach_cache` fills on the first request per
+    station (`transit.py:275-278`), so the first query near a station pays for
+    one Dijkstra. Measured cost is negligible at 234 stations.
 
 ### Moderation
 

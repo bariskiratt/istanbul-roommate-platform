@@ -71,7 +71,7 @@ tracking pointer events by hand.
 **Leaflet instead of a React map wrapper.** `Explore` is the only map screen
 and it needs imperative control: it creates the map once, keeps the polygon
 layers in a ref array, and re-styles them in place when the budget slider moves
-(`src/pages/Explore.tsx:39-45`, `:79-99`). Re-rendering all 968 polygons through
+(`src/pages/Explore.tsx:44-53`, `:90-111`). Re-rendering all 968 polygons through
 React on every slider tick would be slower and no clearer.
 
 **next-themes instead of a hand-written theme context.** It handles the parts
@@ -643,15 +643,15 @@ and is used everywhere a server timestamp is displayed.
 language it was produced in and the UI goes bilingual after a toggle.
 
 `Explore` demonstrates the fix: its status bar state holds `{ key, vars }`
-pairs, translated during render (`src/pages/Explore.tsx:31-34`, `:49-51`, built
-at `:92-95`).
+pairs, translated during render (`src/pages/Explore.tsx:36-39`, `:57-59`, built
+at `:103-106`).
 
 Leaflet needs a variant of the same discipline. The map is created once, so
 popup builders would capture the `t` and `n` of the first render forever; they
 read through refs that are updated on every render instead
-(`src/pages/Explore.tsx:54-59`). The same file uses the same trick for a
+(`src/pages/Explore.tsx:65-70`). The same file uses the same trick for a
 non-i18n reason — the map click handler would otherwise close over a stale
-`budget` (`:61-65`).
+`budget` (`:72-76`).
 
 A third variant: **the stored value and the visible label must be different
 things.** Filter chips keep a stable Turkish `value` used for matching and a
@@ -898,14 +898,22 @@ while the price is typed.
 **`Explore` — budget heatmap** (`src/pages/Explore.tsx`).
 Leaflet map of neighbourhood polygons from `GET /api/geojson`, coloured by
 `GET /api/heatmap?budget=`. The status meanings match `GET /api/legend`, but
-the colors are the site's pens (`:21-37`): teacher green fits, highlighter
+the colors are the site's pens (`:18-34`): teacher green fits, highlighter
 yellow is borderline, red pen is over budget, the same three as the landing
 page's map sketch. `/api/legend` is no longer fetched by the client.
-Moving the slider only re-styles existing layers (`:86-106`); a sequence counter
-drops out-of-order responses (`:87,90`). Low-confidence neighbourhoods stay
+Moving the slider only re-styles existing layers (`:90-111`); a sequence counter
+drops out-of-order responses (`:91,94`). Low-confidence neighbourhoods stay
 coloured but get a faded fill and a dashed outline rather than disappearing
-(`:74-83`). The transit-based alternative-neighbourhood suggestion is
-implemented but switched off behind a constant (`:17-20`).
+(`:78-87`). A priced neighbourhood's popup has a "Yakında daha ucuzu" button
+that calls `GET /api/alternatives` and opens `AlternativesPanel`
+(`src/components/AlternativesPanel.tsx`): a card at the top right on wide
+screens, a bottom sheet on phones, numbered to match the pins drawn on the map.
+Which of its four states to show (fits, over budget with the cheapest nearby,
+nothing cheaper, not near rail) and the "4 durak · 1 aktarma · 6 dk yürüme"
+line are pure functions in `src/lib/alternatives.ts`, tested in
+`src/test/alternatives.test.ts`. Moving the slider while the panel is open
+re-asks for the same target, with its own sequence counter. The rules behind
+the list are in [`ALGORITHMS.md`](ALGORITHMS.md) §2.
 
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
 `src/pages/ProfileEdit.tsx`).
@@ -979,6 +987,7 @@ untested:
 | `parseActionDetail` | `src/pages/Admin.tsx:134` | Decode the audit-log `detail` JSON |
 | `normalizeText` / `matchesQuery` / `filterByQuery` | `src/lib/search.ts:36`, `:51`, `:59` | Does this text match this query? |
 | `describeApiError` | `src/lib/apiError.ts:94` | What do we tell the user? |
+| `altPanelState` / `altListed` / `routeParts` | `src/lib/alternatives.ts:22`, `:30`, `:40` | Which alternatives state and list; how a route reads |
 
 Why this is worth the small awkwardness of exporting from a page module:
 
@@ -1091,9 +1100,6 @@ Honest list, all verified against the current tree.
 - **There is no public listing browser.** `/listings` is admin-only
   (`src/pages/Listings.tsx:943`); ordinary users can only see listings one card
   at a time in the deck.
-- The transit-based alternative-neighbourhood recommendation is **disabled**
-  behind `ALTERNATIVES_ENABLED = false` (`src/pages/Explore.tsx:20`); the backend
-  endpoint and the client code both still exist.
 - `/notifications` duplicates `/matches` and is unreachable from the UI
   (`src/components/layout/BottomNav.tsx:7-8`).
 
@@ -1124,7 +1130,7 @@ Honest list, all verified against the current tree.
   screen, but there is no shared guard component.
 - Colors are tokenized; the remaining raw `rgba()` values are the auth dialog's
   shadow (`src/components/AuthGate.tsx:35`) and the Leaflet pin markup built as
-  an HTML string (`src/pages/Explore.tsx:116`).
+  an HTML string (`src/pages/Explore.tsx:123`, `:130`).
 
 **Tooling**
 

@@ -49,8 +49,11 @@ def build_price_index(df):
         if not neighborhood:
             continue
 
-        # (fiyat, ilan sayısı) — sayı, medyanın güvenilirliğini işaretlemek için
-        entry = (float(row.avg_price), int(row.total_listings))
+        # (fiyat, ilan sayısı, ilçe) — sayı medyanın güvenilirliğini
+        # işaretlemek için; ilçe, GeoJSON'da ilçesi olmayan mahalleye
+        # etiket olarak yazılmak için (bkz. annotate_features).
+        entry = (float(row.avg_price), int(row.total_listings),
+                 display_name(row.district))
         exact[(district, neighborhood)] = entry
         squashed[(district, squash(row.neighborhood))] = entry
 
@@ -83,12 +86,17 @@ def annotate_features(geojson_data, df):
             # İlçe bilgisi yok: yalnızca tekil mahalle adlarına güveniyoruz.
             entry = by_name.get(neighborhood)
 
-        price, listing_count = entry if entry is not None else (None, None)
+        price, listing_count, csv_district = (
+            entry if entry is not None else (None, None, "")
+        )
 
         props["id"] = index
         # Etiketlerde Türkçe karakterler korunur; eşleştirme normalize biçimle yapıldı.
         props["neighborhood"] = display_name(raw_neighborhood)
-        props["district"] = display_name(raw_district)
+        # 968 poligonun 372'sinde ilçe alanı yok. Ad ile eşleşenler için ilçe
+        # CSV satırından gelir: by_name yalnızca tek bir ilçede geçen adları
+        # tuttuğu için bu ilçe tahmin değil, fiyatın geldiği satırın ilçesi.
+        props["district"] = display_name(raw_district) or csv_district
         props["avg_price"] = price
         props["listing_count"] = listing_count
 
