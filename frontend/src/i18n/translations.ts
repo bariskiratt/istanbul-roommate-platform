@@ -221,6 +221,7 @@ const tr = {
   "login.devCode": "Giriş kodun: {code}",
   "login.codeSent": "Giriş kodu e-postana gönderildi!",
   "login.codeSentDesc": "Gelmesi 1-2 dakikayı bulabilir; spam klasörünü de kontrol et.",
+  "login.codeSentLoginDesc": "Bu adresle bir hesap varsa kod 1-2 dakika içinde gelir; spam klasörünü de kontrol et. Hesabın yoksa önce kayıt ol.",
 
   // ---- mesajlar / sohbet ----
   "messages.title": "Mesajlar",
@@ -1273,6 +1274,7 @@ const en: Record<TranslationKey, string> = {
   "login.devCode": "Your login code: {code}",
   "login.codeSent": "Login code sent to your email!",
   "login.codeSentDesc": "It can take a minute or two; check your spam folder too.",
+  "login.codeSentLoginDesc": "If an account uses this address, the code arrives within a minute or two; check your spam folder too. No account yet? Sign up first.",
 
   // ---- messages / chat ----
   "messages.title": "Messages",

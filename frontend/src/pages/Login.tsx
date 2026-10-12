@@ -48,8 +48,10 @@ const Login = () => {
         if (res.dev_code) {
           toast.info(t("login.devCode", { code: res.dev_code }), { duration: 20000 });
         } else {
+          // API, adres kayıtlı olmasa da aynı yanıtı verir (üyelik sızmasın
+          // diye) ve o durumda kod göndermez; açıklama bu yüzden koşullu.
           toast.success(t("login.codeSent"), {
-            description: t("login.codeSentDesc"),
+            description: t("login.codeSentLoginDesc"),
             duration: 8000,
           });
         }
