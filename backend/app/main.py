@@ -21,6 +21,7 @@ from app.config import (
     MARKET_VALUES_CSV,
     MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
+    check_admin_emails,
 )
 from app.admin import router as admin_router
 from app.auth import router as auth_router
@@ -78,6 +79,9 @@ async def lifespan(_app: FastAPI):
     # Postgres var, veri kaybı olmadan).
     init_db()
     uploads.report_photo_storage()
+    # Yönetici listesi artık yalnızca ortam değişkeninden gelir; üretimde boşsa
+    # açılış durur ve Render önceki sürümü sunmaya devam eder (bkz. config).
+    check_admin_emails()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 

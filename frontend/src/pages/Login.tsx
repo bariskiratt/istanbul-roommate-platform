@@ -4,7 +4,7 @@ import { Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { loginWithPassword, requestOtp, verifyOtp } from "@/lib/api";
+import { ApiError, loginWithPassword, needsSecondFactor, requestOtp, verifyOtp } from "@/lib/api";
 import { profileIncomplete } from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
 import SiteBar from "@/components/layout/SiteBar";
@@ -21,6 +21,11 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  // Yönetici hesabı iki adımlıdır: şifre VE e-posta kodu birlikte istenir.
+  // Şifre sekmesinde şifre kabul edilince kod alanı açılır (adminStep); kod
+  // sekmesinde sunucu şifreyi isteyince şifre alanı açılır (needPassword).
+  const [adminStep, setAdminStep] = useState(false);
+  const [needPassword, setNeedPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const emailValid = email.includes("@");
@@ -41,9 +46,24 @@ const Login = () => {
     }
     setBusy(true);
     try {
-      if (mode === "password") {
-        const { token, user } = await loginWithPassword(email, password);
+      if (mode === "password" && adminStep) {
+        const { token, user } = await verifyOtp(email, code, password);
         finish(token, user);
+      } else if (mode === "password") {
+        const res = await loginWithPassword(email, password);
+        if (needsSecondFactor(res)) {
+          setAdminStep(true);
+          if (res.dev_code) {
+            toast.info(t("login.devCode", { code: res.dev_code }), { duration: 20000 });
+          } else {
+            toast.success(t("login.adminCodeSent"), {
+              description: t("login.codeSentDesc"),
+              duration: 8000,
+            });
+          }
+        } else {
+          finish(res.token, res.user);
+        }
       } else if (!codeSent) {
         const res = await requestOtp(email);
         setCodeSent(true);
@@ -59,8 +79,19 @@ const Login = () => {
           });
         }
       } else {
-        const { token, user } = await verifyOtp(email, code);
-        finish(token, user);
+        try {
+          const { token, user } = await verifyOtp(email, code, needPassword ? password : undefined);
+          finish(token, user);
+        } catch (err) {
+          // Yönetici hesabı: kod doğru ama şifre de gerekiyor. Kod harcanmadı,
+          // şifre alanı açılır ve aynı kodla tekrar gönderilir.
+          if (err instanceof ApiError && err.field === "password" && !needPassword) {
+            setNeedPassword(true);
+            toast.info(t("login.adminPasswordNeeded"));
+            return;
+          }
+          throw err;
+        }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("common.error"));
@@ -69,25 +100,35 @@ const Login = () => {
     }
   };
 
-  const switchMode = (next: Mode) => {
-    setMode(next);
+  const resetCodeStep = () => {
     setCode("");
     setCodeSent(false);
+    setAdminStep(false);
+    setNeedPassword(false);
   };
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    resetCodeStep();
+  };
+
+  // Kod alanı: kod sekmesinde kod gidince, şifre sekmesinde yönetici adımında.
+  const showCode = (mode === "otp" && codeSent) || adminStep;
+  const showPassword = mode === "password" || needPassword;
 
   const submitLabel = busy
     ? t("login.busy")
-    : mode === "password"
-      ? t("login.submitLogin")
-      : codeSent
-        ? t("login.submitVerify")
+    : showCode
+      ? t("login.submitVerify")
+      : mode === "password"
+        ? t("login.submitLogin")
         : t("login.submitSendCode");
 
   const submitDisabled =
     busy ||
     !emailValid ||
-    (mode === "password" && password.length === 0) ||
-    (mode === "otp" && codeSent && code.length !== 6);
+    (showPassword && password.length === 0) ||
+    (showCode && code.length !== 6);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -133,24 +174,26 @@ const Login = () => {
                 onChange={e => setEmail(e.target.value)}
                 placeholder={t("login.emailPlaceholder")}
                 autoComplete="email"
-                disabled={mode === "otp" && codeSent}
+                disabled={showCode}
                 aria-label={t("login.emailPlaceholder")}
                 className="w-full h-12 pl-12 pr-4 bg-card border border-input rounded-xl text-foreground placeholder:text-muted-foreground/80 outline-none hover:border-foreground/30 focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 transition-colors disabled:opacity-60"
               />
             </div>
 
-            {mode === "password" && (
+            {showPassword && (
               <PasswordInput
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder={t("login.passwordPlaceholder")}
                 autoComplete="current-password"
                 aria-label={t("login.passwordPlaceholder")}
+                disabled={adminStep}
+                autoFocus={needPassword}
                 className="h-12 text-base"
               />
             )}
 
-            {mode === "otp" && codeSent && (
+            {showCode && (
               <div className="relative">
                 <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
                 <input
@@ -176,16 +219,16 @@ const Login = () => {
               {submitLabel}
             </Button>
 
-            {mode === "otp" && codeSent && (
+            {showCode && (
               <button
                 type="button"
-                onClick={() => { setCodeSent(false); setCode(""); }}
+                onClick={resetCodeStep}
                 className="text-[13px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
               >
                 {t("login.resend")}
               </button>
             )}
-            {mode === "password" && (
+            {mode === "password" && !adminStep && (
               <button
                 type="button"
                 onClick={() => switchMode("otp")}

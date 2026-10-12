@@ -77,7 +77,9 @@ def _make_user(client, email, name="Kullanıcı") -> dict:
     )
     code = res.json()["dev_code"]
     data = client.post(
-        "/api/auth/verify-otp", json={"email": email, "code": code}
+        "/api/auth/verify-otp",
+        # Şifre de gider: yönetici hesabında kod tek başına yetmez (2FA).
+        json={"email": email, "code": code, "password": "Sifre1234"},
     ).json()
     headers = {"Authorization": f"Bearer {data['token']}"}
     client.patch("/api/auth/me", headers=headers, json={"name": name})

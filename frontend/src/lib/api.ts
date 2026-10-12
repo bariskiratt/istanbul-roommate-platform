@@ -372,17 +372,39 @@ export const requestOtp = (email: string) =>
     email,
   });
 
-export const verifyOtp = (email: string, code: string) =>
+/**
+ * Kodu doğrular ve oturum açar. Yönetici hesabında kod tek başına yetmez:
+ * şifre de gönderilmelidir, yoksa sunucu `field: "password"` taşıyan bir 401
+ * döner (kod harcanmaz, aynı kodla şifreyle tekrar denenir).
+ */
+export const verifyOtp = (email: string, code: string, password?: string) =>
   postJSON<{ token: string; user: ApiUser }>("/api/auth/verify-otp", {
     email,
     code,
+    ...(password ? { password } : {}),
   });
 
+/** Yönetici şifresi doğru: oturum açılmadı, e-postaya kod gitti. */
+export interface SecondFactorRequired {
+  otp_required: true;
+  detail: string;
+  dev_code?: string | null;
+}
+
+/**
+ * Şifreyle giriş. Normal hesapta oturumu döndürür; yönetici hesabında
+ * `SecondFactorRequired` döner ve giriş, kod + aynı şifreyle `verifyOtp` ile
+ * tamamlanır (iki adımlı yönetici girişi, bkz. backend/app/auth.py).
+ */
 export const loginWithPassword = (email: string, password: string) =>
-  postJSON<{ token: string; user: ApiUser }>("/api/auth/login", {
+  postJSON<{ token: string; user: ApiUser } | SecondFactorRequired>("/api/auth/login", {
     email,
     password,
   });
+
+export const needsSecondFactor = (
+  res: { token: string; user: ApiUser } | SecondFactorRequired,
+): res is SecondFactorRequired => "otp_required" in res && res.otp_required === true;
 
 export const fetchMe = () => getJSON<ApiUser>("/api/auth/me");
 
