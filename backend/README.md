@@ -90,8 +90,12 @@ DEV_OTP=1 python -m app.main            # API + arayüz: http://127.0.0.1:8000
 `DEV_OTP=1`, doğrulama kodunu API yanıtında (`dev_code`) da döndürür ve
 arayüz onu bildirim olarak gösterir; böylece e-posta sağlayıcısı (Brevo)
 kurmadan kayıt olunabilir. Varsayılanı kapalıdır ve herkese açık bir
-kurulumda kapalı kalmalıdır: açıkken herkes her adresle, yönetici adresleri
-dâhil, şifresiz giriş yapabilir (DEPLOY.md §1.3).
+kurulumda kapalı kalmalıdır: açıkken herkes her adresle şifresiz giriş
+yapabilir; yalnızca yönetici hesabı koda ek olarak şifre ister (DEPLOY.md §1.3).
+
+Yönetici paneli yerelde de `ADMIN_EMAILS` ister; değişkenin varsayılanı yok,
+tanımsızsa kimse yönetici değildir:
+`ADMIN_EMAILS=sen@uni.edu.tr DEV_OTP=1 python -m app.main`.
 
 Geliştirirken otomatik yeniden yükleme için:
 `DEV_OTP=1 uvicorn app.main:app --reload`

@@ -113,10 +113,14 @@ they stay visible only to someone the person liked or matched.
 ### 2.5 The account-takeover attacker
 
 Wants someone else's session. The high-value target is not a student account but
-an address in `ADMIN_EMAILS` (`backend/app/config.py:73`), because admin rights
-are *derived from the email string alone* — there is no separate role column and
-no second factor (`backend/app/models.py:83`). Whoever controls that mailbox
-controls moderation, including permanent deletion.
+an address in `ADMIN_EMAILS` (`backend/app/config.py`), because admin rights
+are *derived from the email string alone* — there is no separate role column
+(`backend/app/models.py:83`). Two things now raise the bar: the list comes only
+from the environment (the repository no longer names the admin addresses), and
+an admin session needs the password **and** an emailed code together
+(`_start_admin_second_factor` / `_require_admin_password` in
+`backend/app/auth.py`). Controlling the mailbox alone, or knowing the password
+alone, no longer yields moderation power.
 
 ### 2.6 The vandal (denial of service)
 
@@ -384,16 +388,24 @@ backend/app/models.py:83-87
         return self.email.lower() in ADMIN_EMAILS
 ```
 
-`ADMIN_EMAILS` comes from an environment variable with a hard-coded default of
-the maintainer's own addresses (`backend/app/config.py:73-79`). Enforcement is a
-single dependency, `require_admin` (`backend/app/reports.py:54`), applied to
-every `/api/admin/*` route: 401 without a token, 403 with a non-admin token.
+`ADMIN_EMAILS` comes only from an environment variable; there is no default in
+the code, and a production boot (`DATABASE_URL` set) with an empty list stops
+(`check_admin_emails`, `backend/app/config.py`). Enforcement is a single
+dependency, `require_admin` (`backend/app/reports.py:54`), attached to the
+`/api/admin` router itself and again to every route: 401 without a token, 403
+with a non-admin token. The router-level copy is a backstop so a future route
+that forgets the parameter is still closed (`backend/tests/test_admin_login.py`
+checks every `/api/admin` route).
 
-The design consequence is stated plainly in the config comment itself
-(`backend/app/config.py:64-72`): there is no second factor and no separate role,
-so compromising one mailbox yields full moderation power *including permanent
-deletion*. This is an accepted risk, documented at the point of definition,
-which is the right place for it.
+There is still no separate role, so the email *is* the authority. What changed
+is how a session for that email is obtained: a normal account signs in with its
+password or an emailed code, an admin account needs both. The correct password
+sends a code (whose email warns that the password was just used) instead of
+opening a session; `verify-otp` checks the password only after the code
+matches, so a wrong-code probe cannot learn which addresses are admins. Email
+changes are impossible by construction (`UserUpdate` has no `email` field and
+no app code assigns `User.email`; both are tested), which matters because a
+changeable email would be a self-service admin grant.
 
 ### 5.3 Protected boundaries, and why they exist
 
@@ -951,8 +963,9 @@ closer to MEDIUM.
 
 **Fix:** add a domain rule to `EmailIn` (`domain == "edu.tr" or
 domain.endswith(".edu.tr")`) with an explicit exemption list for the non-`.edu.tr`
-address in `ADMIN_EMAILS` (`bariskirat5@gmail.com`,
-`backend/app/config.py:76`), and align it with `backend/app/universities.py`. If
+address in `ADMIN_EMAILS` (then a hard-coded default in
+`backend/app/config.py`, now environment-only), and align it with
+`backend/app/universities.py`. If
 the rule is *not* going to be enforced, the Safety and landing copy must be
 corrected instead.
 **Effort:** low.
@@ -1383,9 +1396,14 @@ are findings; they are the boundaries of the current design.
 1. **Identity is an email address.** No student-card verification, no phone
    number, no ID check. A determined bad actor re-registers after a ban. Since
    the H5 fix the new address must at least be a university one (section 4.1).
-2. **Admin authority is a string comparison.** No second factor, no role table,
-   no separation between "can suspend" and "can permanently delete". Documented
-   as an accepted risk at `backend/app/config.py:64-72`.
+2. **Admin authority is a string comparison.** No role table, no separation
+   between "can suspend" and "can permanently delete". Admin sign-in does take
+   two factors (the password and a code sent to the admin's inbox), but the
+   second factor is still email; an authenticator app (TOTP) would be the next
+   step. There is also no password reset: an admin who forgets the password
+   cannot sign in as admin (the code tab asks for it too), so keeping a second
+   admin address with its own password is the practical backup. Documented at
+   `backend/app/config.py`.
 3. **Encryption is at-rest only.** The server can and does read messages —
    necessarily, because moderation runs on plaintext. See section 7.2.
 4. **No key rotation.** Losing `MESSAGE_KEY` permanently destroys all encrypted
