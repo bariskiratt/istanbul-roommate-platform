@@ -55,6 +55,7 @@ from sqlalchemy.orm import Session
 from app import content_limits, models
 from app.auth import get_current_user
 from app.config import UPLOADS_DIR
+from app.i18n import localized
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
@@ -482,25 +483,27 @@ async def upload_photo(
     if ext is None:
         raise HTTPException(
             status_code=415,
-            detail="Yalnızca JPEG, PNG veya WebP yüklenebilir.",
+            detail=localized("Yalnızca JPEG, PNG veya WebP yüklenebilir."),
         )
 
     # Belleğe okumadan önce beyan edilen boyutu reddet (OOM önlemi)
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_BYTES + 10_000:
-        raise HTTPException(status_code=413, detail="Dosya 5 MB'den büyük olamaz.")
+        raise HTTPException(
+            status_code=413, detail=localized("Dosya 5 MB'den büyük olamaz.")
+        )
 
     data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(
-            status_code=413, detail="Dosya 5 MB'den büyük olamaz."
+            status_code=413, detail=localized("Dosya 5 MB'den büyük olamaz.")
         )
     if not data:
-        raise HTTPException(status_code=422, detail="Dosya boş.")
+        raise HTTPException(status_code=422, detail=localized("Dosya boş."))
     if not _matches_signature(data, ext):
         raise HTTPException(
             status_code=415,
-            detail="Dosya içeriği görüntü formatıyla uyuşmuyor.",
+            detail=localized("Dosya içeriği görüntü formatıyla uyuşmuyor."),
         )
 
     # Kota doğrulamadan SONRA sayılır: reddedilen dosya hak yemesin, ama
@@ -515,7 +518,7 @@ async def upload_photo(
         print(f"⚠️  Fotoğraf kovaya yazılamadı: {exc}")
         raise HTTPException(
             status_code=503,
-            detail="Fotoğraf şu an kaydedilemedi. Biraz sonra tekrar dene.",
+            detail=localized("Fotoğraf şu an kaydedilemedi. Biraz sonra tekrar dene."),
         )
 
     return {"url": f"{public_base_url(request)}{UPLOADS_PREFIX}{name}"}
@@ -536,7 +539,7 @@ def serve_photo(name: str):
     havuzunda çalıştırır.
     """
     if not _LOCAL_PHOTO_NAME.fullmatch(name):
-        raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Fotoğraf bulunamadı."))
     media_type = CONTENT_TYPES[name.rsplit(".", 1)[1]]
     headers = {"Cache-Control": PHOTO_CACHE_CONTROL}
 
@@ -544,7 +547,9 @@ def serve_photo(name: str):
     if settings is None:
         path = Path(UPLOADS_DIR) / name
         if not path.is_file():
-            raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+            raise HTTPException(
+                status_code=404, detail=localized("Fotoğraf bulunamadı.")
+            )
         return FileResponse(path, media_type=media_type, headers=headers)
 
     try:
@@ -557,10 +562,16 @@ def serve_photo(name: str):
             body.close()
     except ClientError as exc:
         if _is_missing(exc):
-            raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+            raise HTTPException(
+                status_code=404, detail=localized("Fotoğraf bulunamadı.")
+            )
         print(f"⚠️  Fotoğraf kovadan okunamadı ({name}): {exc}")
-        raise HTTPException(status_code=502, detail="Fotoğraf şu an yüklenemedi.")
+        raise HTTPException(
+            status_code=502, detail=localized("Fotoğraf şu an yüklenemedi.")
+        )
     except BotoCoreError as exc:
         print(f"⚠️  Fotoğraf kovadan okunamadı ({name}): {exc}")
-        raise HTTPException(status_code=502, detail="Fotoğraf şu an yüklenemedi.")
+        raise HTTPException(
+            status_code=502, detail=localized("Fotoğraf şu an yüklenemedi.")
+        )
     return Response(content=data, media_type=media_type, headers=headers)

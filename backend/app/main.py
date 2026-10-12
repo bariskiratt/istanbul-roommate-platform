@@ -32,6 +32,7 @@ from app.heatmap import (
     build_budget_heatmap,
     index_market_prices,
 )
+from app.i18n import LanguageMiddleware, localized
 from app import locations
 from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.listings import router as listings_router
@@ -256,7 +257,9 @@ class _BodyTooLarge(Exception):
 
 
 async def _send_413(send) -> None:
-    body = b'{"detail":"Istek govdesi cok buyuk."}'
+    body = json.dumps(
+        {"detail": localized("Istek govdesi cok buyuk.")}, separators=(",", ":")
+    ).encode()
     await send({
         "type": "http.response.start",
         "status": 413,
@@ -386,15 +389,19 @@ app.include_router(uploads.files_router)
 
 # --- Ara katman sırası ---------------------------------------------------
 # add_middleware TERS sırayla uygulanır: EN SON eklenen EN DIŞTAKİdir.
-# Aşağıdaki dört çağrı şu zinciri kurar (dıştan içe):
+# Aşağıdaki beş çağrı şu zinciri kurar (dıştan içe):
 #
-#   SecurityHeaders -> CORS -> BodySizeLimit -> GZip -> yönlendirici
+#   Language -> SecurityHeaders -> CORS -> BodySizeLimit -> GZip -> yönlendirici
 #
 # Neden bu sıra:
-#   * SecurityHeaders EN DIŞTA: CORS preflight (OPTIONS) isteğini kendi içinde
-#     yanıtlayıp kısa devre yapar, yani CORS'un İÇİNDEKİ hiçbir katmana
-#     uğramaz. SecurityHeaders içeride kalsaydı preflight yanıtları güvenlik
-#     başlıklarını hiç almazdı. Dışta olması CORS başlıklarını ezmez: var olan
+#   * Language EN DIŞTA: isteğin dilini (Accept-Language) her şeyden önce
+#     belirler; içerideki katmanların ürettiği hatalar da (ör. BodySizeLimit'in
+#     413'ü) o dilde yazılır. Yalnızca bir ContextVar ayarlar ve hata
+#     yanıtlarına Vary ekler, başka bir katmanın işine karışmaz.
+#   * SecurityHeaders CORS'un DIŞINDA: CORS preflight (OPTIONS) isteğini
+#     kendi içinde yanıtlayıp kısa devre yapar, yani CORS'un İÇİNDEKİ hiçbir
+#     katmana uğramaz. SecurityHeaders içeride kalsaydı preflight yanıtları
+#     güvenlik başlıklarını hiç almazdı. Dışta olması CORS başlıklarını ezmez: var olan
 #     başlığın üstüne yazmıyor.
 #   * CORS onun içinde: alt katmanların ürettiği hata yanıtları (ör. 413) da
 #     CORS başlığı almalı, yoksa tarayıcı bunu kullanıcıya "CORS hatası" diye
@@ -433,9 +440,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# EN SON eklenen EN DIŞTAKİdir: güvenlik başlıkları CORS'u da sarar, böylece
-# preflight yanıtları da başlıkları alır (bkz. yukarıdaki sıra açıklaması).
+# Güvenlik başlıkları CORS'u da sarar, böylece preflight yanıtları da
+# başlıkları alır (bkz. yukarıdaki sıra açıklaması).
 app.add_middleware(SecurityHeadersMiddleware)
+# EN SON eklenen EN DIŞTAKİdir: dil, isteğe dokunan her katmandan önce belli olur.
+app.add_middleware(LanguageMiddleware)
 
 
 # HEAD de kabul edilir: Render'ın sağlık yoklaması ve keep-alive işi kökü HEAD
@@ -497,7 +506,9 @@ async def get_geojson():
     indirilip önbelleğe alınabilir.
     """
     if "geojson" not in STATE:
-        raise HTTPException(status_code=503, detail="Veriler henüz yüklenmedi.")
+        raise HTTPException(
+            status_code=503, detail=localized("Veriler henüz yüklenmedi.")
+        )
     return JSONResponse(
         STATE["geojson"],
         headers={"Cache-Control": "public, max-age=3600"},
@@ -510,7 +521,9 @@ async def get_heatmap(
 ):
     """Verilen bütçe için mahalle durum listesini döndürür (kompakt)."""
     if "prices" not in STATE:
-        raise HTTPException(status_code=503, detail="Veriler henüz yüklenmedi.")
+        raise HTTPException(
+            status_code=503, detail=localized("Veriler henüz yüklenmedi.")
+        )
     return build_budget_heatmap(STATE["prices"], budget, STATE.get("counts"))
 
 
@@ -539,7 +552,9 @@ def _require_model():
     if model is None:
         raise HTTPException(
             status_code=503,
-            detail="Adil fiyat modeli yüklü değil. Önce 'python train_model.py' çalıştır.",
+            detail=localized(
+                "Adil fiyat modeli yüklü değil. Önce 'python train_model.py' çalıştır."
+            ),
         )
     return model
 
@@ -637,12 +652,17 @@ async def alternatives(
     if access is None:
         raise HTTPException(
             status_code=503,
-            detail="Toplu taşıma verisi yüklü değil. "
-                   "Önce 'python -m scripts.fetch_transit' çalıştır.",
+            detail=localized(
+                "Toplu taşıma verisi yüklü değil. "
+                "Önce 'python -m scripts.fetch_transit' çalıştır."
+            ),
         )
     result = access.recommend(neighborhood_id, budget)
+    # transit.py metinleri Türkçe üretir; isteğin diline burada çevrilir.
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=404, detail=localized(result["error"]))
+    if "message" in result:
+        result["message"] = localized(result["message"])
     return result
 
 

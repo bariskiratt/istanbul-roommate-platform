@@ -53,6 +53,13 @@ const fieldFromLoc = (loc: unknown): string | null => {
   return parts.length ? parts[parts.length - 1] : null;
 };
 
+/**
+ * Pydantic, sunucudaki doğrulayıcının fırlattığı metnin başına "Value error, "
+ * ekliyor. Metnin kendisi sunucuda zaten kullanıcının dilinde yazıldığı için
+ * bu İngilizce ek atılır ("Value error, Geçerli bir e-posta adresi girin.").
+ */
+const stripValueErrorPrefix = (msg: string): string => msg.replace(/^Value error, /, "");
+
 /** Liste biçimi (Pydantic doğrulama hatası). */
 const fromList = (items: unknown[], fallback: string): ErrorDetailInfo => {
   const messages: string[] = [];
@@ -65,7 +72,8 @@ const fromList = (items: unknown[], fallback: string): ErrorDetailInfo => {
     }
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
-    const msg = asText(record.msg) ?? asText(record.message);
+    const raw = asText(record.msg) ?? asText(record.message);
+    const msg = raw && stripValueErrorPrefix(raw);
     if (msg && !messages.includes(msg)) messages.push(msg);
     if (field === null) field = fieldFromLoc(record.loc);
   }

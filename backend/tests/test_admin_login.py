@@ -153,6 +153,29 @@ def test_admin_code_with_wrong_password_is_refused(client):
     assert res.json()["detail"]["field"] == "password"
 
 
+def test_admin_step_messages_follow_the_language(client):
+    """İngilizce arayüzde ikinci adımın metinleri de İngilizce gelir."""
+    _register_verified(client, ADMIN_EMAIL)
+    en = {"Accept-Language": "en"}
+
+    res = client.post(
+        "/api/auth/login",
+        json={"email": ADMIN_EMAIL, "password": PASSWORD},
+        headers=en,
+    )
+    assert res.json()["detail"] == "Admin account: enter the code we just emailed you."
+
+    res = client.post(
+        "/api/auth/verify-otp",
+        json={"email": ADMIN_EMAIL, "code": res.json()["dev_code"]},
+        headers=en,
+    )
+    assert res.json()["detail"] == {
+        "message": "Admin account: enter your password along with the code.",
+        "field": "password",
+    }
+
+
 def test_wrong_code_does_not_reveal_an_admin_account(client):
     """Yanlış kodla gelen istek, adresin yönetici olduğunu ÖĞRENEMEZ.
 
