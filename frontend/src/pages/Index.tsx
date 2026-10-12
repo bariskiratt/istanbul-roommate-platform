@@ -123,10 +123,9 @@ const Index = () => {
               {t("landing.ctaBrowse")}
             </Button>
           </div>
+          {/* İlan sayısı bilerek yok: yayının ilk günlerinde küçük bir sayı
+              siteyi boş gösteriyordu. */}
           <p className="mt-8 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{listings.length > 0 ? fmtNum(listings.length) : "0"}</span>{" "}
-            {t("landing.statListings")}
-            <span className="mx-3 text-border" aria-hidden="true">|</span>
             <span className="font-semibold text-foreground">968</span> {t("landing.statNeighborhoods")}
             <span className="mx-3 text-border" aria-hidden="true">|</span>
             <span className="font-semibold text-foreground">{t("landing.statErrorValue")}</span> {t("landing.statError")}
