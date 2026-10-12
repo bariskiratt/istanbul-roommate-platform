@@ -26,31 +26,46 @@ def email_enabled() -> bool:
     return bool(os.getenv("BREVO_API_KEY") and os.getenv("EMAIL_FROM"))
 
 
-def send_otp_email(to: str, code: str) -> bool:
-    """Kodu e-postayla yollar; başarı durumunu döner (istisna fırlatmaz)."""
+# Yönetici girişinin ikinci adımında giden posta. Bu kod yalnızca DOĞRU
+# ŞİFREYLE istenebildiği için "yok sayabilirsin" demek yanlış olurdu: yönetici
+# bu postayı kendisi istemediyse şifresi başkasının elinde demektir.
+ADMIN_LOGIN_NOTE = (
+    "Bu kod, yönetici hesabına şifreyle giriş yapıldığı için gönderildi. "
+    "Giriş yapan sen değilsen şifren başkasının elinde: hemen değiştir."
+)
+DEFAULT_NOTE = "Bu isteği sen yapmadıysan bu e-postayı yok sayabilirsin."
+
+
+def send_otp_email(to: str, code: str, *, admin_login: bool = False) -> bool:
+    """Kodu e-postayla yollar; başarı durumunu döner (istisna fırlatmaz).
+
+    admin_login=True yönetici girişinin ikinci adımıdır: konu ve not, kodu
+    istemeyen yöneticiyi şifresinin sızdığı konusunda uyaracak şekilde değişir.
+    """
     if not email_enabled():
         return False
 
+    label = "Yönetici giriş kodun" if admin_login else "Giriş kodun"
+    note = ADMIN_LOGIN_NOTE if admin_login else DEFAULT_NOTE
     sender_name = os.getenv("EMAIL_FROM_NAME", DEFAULT_SENDER_NAME)
     payload = {
         "sender": {"name": sender_name, "email": os.environ["EMAIL_FROM"]},
         "to": [{"email": to}],
-        "subject": f"Giriş kodun: {code}",
+        "subject": f"{label}: {code}",
         # Düz metin karşılığı olmayan (HTML-only) postalar spam puanı alır;
         # her iki gövde de gönderilir.
         "textContent": (
-            f"Giriş kodun: {code}\n\n"
+            f"{label}: {code}\n\n"
             "Kod 10 dakika geçerlidir.\n"
-            "Bu isteği sen yapmadıysan bu e-postayı yok sayabilirsin.\n\n"
+            f"{note}\n\n"
             "evdes.tr"
         ),
         "htmlContent": (
             "<div style='font-family:sans-serif;max-width:420px;margin:auto'>"
             "<h2 style='margin:0 0 16px'>evdes.tr</h2>"
-            "<p>Giriş kodun:</p>"
+            f"<p>{label}:</p>"
             f"<p style='font-size:32px;font-weight:bold;letter-spacing:6px'>{code}</p>"
-            "<p style='color:#666'>Kod 10 dakika geçerlidir. Bu isteği sen"
-            " yapmadıysan bu e-postayı yok sayabilirsin.</p>"
+            f"<p style='color:#666'>Kod 10 dakika geçerlidir. {note}</p>"
             "</div>"
         ),
         # Brevo istatistiklerinde işlemsel postaları ayırt etmek için.

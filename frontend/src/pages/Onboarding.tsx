@@ -197,9 +197,12 @@ const Onboarding = () => {
         }
       }
 
-      // Adım 1 → 2: kodu doğrula, oturumu başlat
+      // Adım 1 → 2: kodu doğrula, oturumu başlat. Şifre de gider: yönetici
+      // adresiyle açılan hesapta kod tek başına yetmez (normal hesapta yok
+      // sayılır). Sayfa yenilendiyse şifre bellekte yoktur; o durumda
+      // yönetici Giriş ekranının "Kodla gir" sekmesinden devam eder.
       if (currentStep === 1) {
-        const { token, user } = await verifyOtp(email, otp.join(""));
+        const { token, user } = await verifyOtp(email, otp.join(""), password || undefined);
         login(token, user);
       }
 

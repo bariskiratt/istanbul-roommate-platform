@@ -9,7 +9,7 @@ Kapsam:
 
 import pytest
 
-from app import auth, crypto, startup_checks
+from app import auth, config, crypto, startup_checks
 
 
 @pytest.fixture(autouse=True)
@@ -84,6 +84,37 @@ def test_production_dev_otp_on_only_warns_locally(monkeypatch):
     _set_valid_keys(monkeypatch)
     monkeypatch.setenv("DEV_OTP", "1")
     startup_checks.check_startup_config(production=False)
+
+
+def test_production_without_admin_emails_refuses_to_boot(monkeypatch):
+    """Yönetici listesinin varsayılanı yok; üretimde boşsa açılış durur.
+
+    Durmak, değişken unutulduğunda yöneticinin paneli kaybetmesinden iyidir:
+    Render önceki sürümü sunmaya devam eder.
+    """
+    _set_valid_keys(monkeypatch)
+    monkeypatch.delenv("DEV_OTP", raising=False)
+    monkeypatch.setattr(config, "ADMIN_EMAILS", set())
+    with pytest.raises(RuntimeError) as exc:
+        startup_checks.check_startup_config(production=True)
+    assert "ADMIN_EMAILS" in str(exc.value)
+
+
+def test_empty_admin_emails_only_warn_locally(monkeypatch, capsys):
+    _set_valid_keys(monkeypatch)
+    monkeypatch.setattr(config, "ADMIN_EMAILS", set())
+    startup_checks.check_startup_config(production=False)
+    assert "❌ ADMIN_EMAILS boş" in capsys.readouterr().out
+
+
+def test_admin_emails_count_is_logged(monkeypatch, capsys):
+    """Adresler günlüğe yazılmaz, yalnızca sayıları."""
+    _set_valid_keys(monkeypatch)
+    startup_checks.check_startup_config(production=False)
+    out = capsys.readouterr().out
+    assert f"✅ Yönetici (ADMIN_EMAILS): {len(config.ADMIN_EMAILS)} adres" in out
+    for email in config.ADMIN_EMAILS:
+        assert email not in out
 
 
 def test_critical_problems_lists_each_issue(monkeypatch):

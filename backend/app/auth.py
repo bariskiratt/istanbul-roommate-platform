@@ -361,13 +361,15 @@ def _dev_otp_enabled() -> bool:
     return os.getenv("DEV_OTP", "0") == "1"
 
 
-def _deliver_otp(email: str, code: str) -> dict:
+def _deliver_otp(email: str, code: str, *, admin_login: bool = False) -> dict:
     """Kodu e-postayla yollar; dev modda yanıtta da döndürür.
 
     E-posta gönderilemedi VE dev modu kapalıysa hata fırlatır — çağıran
-    henüz commit etmediği için kullanıcı kodsuz bırakılmaz.
+    henüz commit etmediği için kullanıcı kodsuz bırakılmaz. admin_login,
+    yönetici girişinin ikinci adımı için ayrı metinli posta seçer (bkz.
+    emailer.send_otp_email).
     """
-    sent = send_otp_email(email, code)
+    sent = send_otp_email(email, code, admin_login=admin_login)
     if not sent and not _dev_otp_enabled():
         raise HTTPException(
             status_code=502,
@@ -476,6 +478,9 @@ class RegisterIn(StudentEmailIn):
 
 class VerifyIn(EmailIn):
     code: str = Field(..., min_length=6, max_length=6)
+    # Yalnızca YÖNETİCİ hesabında istenir ve denetlenir (bkz.
+    # _require_admin_password); normal hesapta gönderilse de yok sayılır.
+    password: str | None = Field(None, min_length=1, max_length=128)
 
 
 class LoginIn(EmailIn):
@@ -588,6 +593,17 @@ class UserUpdate(BaseModel):
 class TokenOut(BaseModel):
     token: str
     user: UserOut
+
+
+class SecondFactorOut(BaseModel):
+    """Yönetici şifresi doğru: oturum henüz AÇILMADI, e-postaya kod gitti.
+
+    İstemci kodu, aynı şifreyle birlikte /verify-otp'a gönderir.
+    """
+
+    otp_required: bool = True
+    detail: str
+    dev_code: str | None = None
 
 
 class PasswordChange(BaseModel):
@@ -740,9 +756,13 @@ def _issue_token(db: Session, user: models.User) -> str:
     return token
 
 
-@router.post("/login", response_model=TokenOut)
+@router.post("/login", response_model=TokenOut | SecondFactorOut)
 def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
-    """E-posta + şifre ile giriş (OTP'siz).
+    """E-posta + şifre ile giriş (OTP'siz) — YÖNETİCİ HESABI HARİÇ.
+
+    Yönetici hesabında doğru şifre oturum açmaz: e-postaya kod gider ve
+    SecondFactorOut döner. Oturum, kod ile şifre birlikte /verify-otp'a
+    verilince açılır (bkz. _start_admin_second_factor).
 
     HIZ LİMİTİ KOVASI (e-posta, IP) İKİLİSİYLE ANAHTARLANIR ve başarılı
     girişte SIFIRLANIR. İkisi de bir DoS'u kapatmak için:
@@ -763,7 +783,9 @@ def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
     saklandığı ve en az 8 karakter olduğu için bu, kurbanı süresiz kilitleme
     garantisinden daha küçük bir risk. Aynı NAT'ın (yurt/kampüs) arkasındaki
     biri hâlâ komşusunu kilitleyebilir — dağıtık sayaç (Redis) ve
-    IP+hesap ayrımı bir sonraki adım.
+    IP+hesap ayrımı bir sonraki adım. Yönetici hesabında bu risk daha da
+    küçük: doğru tahmin edilen şifre oturum açmaz, yalnızca yöneticinin gelen
+    kutusuna bir kod (ve uyarı) yollar.
     """
     ip = _client_ip(request)
     _rate_limit("login", payload.email, ip)
@@ -790,9 +812,74 @@ def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
     # başarısız denemeler yüzünden bir sonraki girişte kilitlenmesi anlamsız.
     _reset_rate_limit("login", payload.email, ip)
 
+    if user.is_admin:
+        return _start_admin_second_factor(db, user)
+
     token = _issue_token(db, user)
     db.commit()
     return {"token": token, "user": user}
+
+
+# ---- yönetici girişi: iki adım ----
+#
+# Yönetici yetkisi tamamen e-posta eşleşmesine bağlı (models.User.is_admin) ve
+# yönetici hesabı kalıcı silme dâhil her moderasyon ucuna erişiyor. Normal
+# hesap İKİ YOLDAN BİRİYLE girer: şifre (/login) ya da e-postaya gelen kod
+# (/request-otp + /verify-otp). Yönetici hesabında bu, tek bir sırrın
+# sızmasının paneli vermesi demekti: tekrar kullanılmış bir şifre YA DA ele
+# geçirilmiş bir gelen kutusu yeterliydi.
+#
+# Artık yönetici hesabı İKİSİNİ BİRDEN ister. Sıkı kilitleme yerine bu
+# seçildi çünkü mevcut kod akışını aynen kullanıyor (yeni uygulama, kurulum
+# ya da kurtarma kodu yok; tek fark girişte bir kod daha yazmak) ve hesap
+# başına sert bir kilit, adresi bilen herkese yöneticiyi dışarıda bırakma
+# imkânı verirdi (bkz. login docstring'i).
+#
+# Yan kazanç: şifre doğru girildiğinde yöneticiye "biri şifrenle giriş yaptı"
+# diyen bir kod postası gider. Şifre sızmışsa yönetici bunu istemediği bir
+# kod postasından öğrenir.
+ADMIN_CODE_SENT = "Yönetici hesabı: e-postana gelen kodu gir."
+ADMIN_PASSWORD_REQUIRED = "Yönetici hesabı: kodla birlikte şifreni de gir."
+ADMIN_PASSWORD_WRONG = "Şifren hatalı."
+
+# Doğru şifreyle kod isteme sınırı. Buraya yalnızca şifreyi bilen ulaşır;
+# sınır, şifreyi ele geçiren birinin yöneticinin gelen kutusunu doldurmasını
+# keser. /request-otp'un kovasından AYRIDIR: o kova adresi bilen herkese açık
+# ve yabancının doldurduğu kova yöneticinin girişini tıkamamalı.
+ADMIN_LOGIN_OTP_LIMIT = 5
+
+
+def _start_admin_second_factor(db: Session, user: models.User) -> dict:
+    """Şifresi doğrulanmış yöneticiye kod yollar; oturum AÇMAZ."""
+    _rate_limit("admin-login-otp", user.email, limit=ADMIN_LOGIN_OTP_LIMIT)
+    code = _issue_otp(user)
+    response = _deliver_otp(user.email, code, admin_login=True)  # başarısızsa rollback
+    db.commit()
+    return {**response, "otp_required": True, "detail": localized(ADMIN_CODE_SENT)}
+
+
+def _require_admin_password(user: models.User, password: str | None) -> None:
+    """Yönetici hesabında koda ek olarak şifreyi de doğrular (401).
+
+    KOD DOĞRULANDIKTAN SONRA çağrılır, önce değil. Önce çağrılsaydı rastgele
+    bir kodla yapılan tek istek "bu adres yönetici" bilgisini verirdi —
+    yönetici adresleri artık repoda yazılı olmadığı için bu bir sızıntı olur.
+    Şimdi bu yanıtı ancak doğru kodu bilen, yani gelen kutusuna erişen alır.
+
+    Hata kodu TÜKETMEZ (çağıran commit etmeden fırlar): kodla girmeye çalışan
+    yönetici şifresini ekleyip AYNI kodla tekrar dener. Şifre tahmini yine
+    verify-otp kovasına sayılır (e-posta başına 5 / 15 dk).
+    """
+    if not password:
+        raise HTTPException(
+            status_code=401,
+            detail={"message": localized(ADMIN_PASSWORD_REQUIRED), "field": "password"},
+        )
+    if not user.password_hash or not _verify_password(password, user.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail={"message": localized(ADMIN_PASSWORD_WRONG), "field": "password"},
+        )
 
 
 @router.post("/verify-otp", response_model=TokenOut)
@@ -825,6 +912,9 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
         )
     if not _otp_matches(user.otp_hash, payload.code):
         raise HTTPException(status_code=400, detail=localized("Kod hatalı."))
+    # Yönetici hesabında kod tek başına yetmez (bkz. _start_admin_second_factor).
+    if user.is_admin:
+        _require_admin_password(user, payload.password)
 
     user.verified = True
     user.otp_hash = None

@@ -221,6 +221,8 @@ const tr = {
   "login.codeSent": "Giriş kodu e-postana gönderildi!",
   "login.codeSentDesc": "Gelmesi 1-2 dakikayı bulabilir; spam klasörünü de kontrol et.",
   "login.codeSentLoginDesc": "Bu adresle bir hesap varsa kod 1-2 dakika içinde gelir; spam klasörünü de kontrol et. Hesabın yoksa önce kayıt ol.",
+  "login.adminCodeSent": "Yönetici hesabı: e-postana gelen kodu da gir.",
+  "login.adminPasswordNeeded": "Yönetici hesabı: kodla birlikte şifreni de gir.",
 
   // ---- mesajlar / sohbet ----
   "messages.title": "Mesajlar",
@@ -1289,6 +1291,8 @@ const en: Record<TranslationKey, string> = {
   "login.codeSent": "Login code sent to your email!",
   "login.codeSentDesc": "It can take a minute or two; check your spam folder too.",
   "login.codeSentLoginDesc": "If an account uses this address, the code arrives within a minute or two; check your spam folder too. No account yet? Sign up first.",
+  "login.adminCodeSent": "Admin account: also enter the code we just emailed you.",
+  "login.adminPasswordNeeded": "Admin account: enter your password along with the code.",
 
   // ---- messages / chat ----
   "messages.title": "Messages",

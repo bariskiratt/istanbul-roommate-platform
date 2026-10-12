@@ -1,9 +1,19 @@
 """Ortak test kurulumu."""
 
-import pytest
+import os
 
-from app import auth, content_limits
-from app import db as app_db  # noqa: F401 — SQLite FK dinleyicisini kurar
+# Yönetici listesi YALNIZCA ortam değişkeninden okunur (varsayılanı yok, bkz.
+# app/config.py) ve modül yüklenirken bir kez hesaplanır. Bu yüzden değer
+# app'ten herhangi bir şey import edilmeden ÖNCE, burada verilir. Sabit bir
+# değer seçildi ki geliştiricinin kabuğundaki ADMIN_EMAILS testleri
+# değiştirmesin. Biri bilerek öğrenci adresi DEĞİL: yöneticinin .edu.tr
+# kuralından muaf olması da böylece sınanır.
+os.environ["ADMIN_EMAILS"] = "yonetici@uni.edu.tr,yonetici2@gmail.com"
+
+import pytest  # noqa: E402
+
+from app import auth, content_limits  # noqa: E402
+from app import db as app_db  # noqa: F401,E402 — SQLite FK dinleyicisini kurar
 
 # NOT: "PRAGMA foreign_keys=ON" burada TEKRARLANMAZ. Dinleyici app/db.py
 # içinde Engine sınıfına bağlıdır; bu modülü import etmek testlerin kurduğu

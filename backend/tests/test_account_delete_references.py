@@ -164,7 +164,8 @@ def _register(client, email: str = EMAIL) -> tuple[dict, int]:
     )
     data = client.post(
         "/api/auth/verify-otp",
-        json={"email": email, "code": res.json()["dev_code"]},
+        # Şifre de gider: yönetici hesabında kod tek başına yetmez (2FA).
+        json={"email": email, "code": res.json()["dev_code"], "password": PASSWORD},
     ).json()
     return {"Authorization": f"Bearer {data['token']}"}, data["user"]["id"]
 

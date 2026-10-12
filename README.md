@@ -28,7 +28,7 @@ API locally with `API_DOCS=1` to see them)
 | **Chat** | Per-match messaging (participants only), 4-second polling. Messages are encrypted at rest (see below). |
 | **Content moderation** | Every listing and message goes through a rule-based Turkish-aware checker: clear violations are rejected (422), borderline text is published but marked `is_flagged` and lands in the admin review queue. An optional AI layer runs only when `ANTHROPIC_API_KEY` is set and can only make the verdict stricter, never looser. |
 | **Reporting** | Users can report a listing, a user or a message with a fixed reason list. Reports land in an admin-only queue where they are resolved with a note; the same target can't be reported twice by the same user, and the reporter is never shown to the person they reported. |
-| **Admin moderation panel** | `/admin` — dashboard counters, the report queue, the flagged-content queue, the removed-content queue, user search and suspension, and an audit log of irreversible actions. Admins can also edit, publish, take down or permanently delete any listing, and delete any account. Access is decided solely by membership in `ADMIN_EMAILS`; all 15 `/api/admin/*` endpoints enforce it server-side. See below for which actions can be undone. |
+| **Admin moderation panel** | `/admin` — dashboard counters, the report queue, the flagged-content queue, the removed-content queue, user search and suspension, and an audit log of irreversible actions. Admins can also edit, publish, take down or permanently delete any listing, and delete any account. Access is decided solely by membership in `ADMIN_EMAILS` (environment only, no default); all 15 `/api/admin/*` endpoints enforce it server-side, on the router and on each route. Admin accounts sign in with password **and** an emailed code. See below for which actions can be undone. |
 | **Message encryption** | Chat messages are stored AES-256-GCM encrypted (`MESSAGE_KEY`) and decrypted on read. This is **at-rest** encryption, not end-to-end — the server holds the key. Without the key the app still runs, but messages are stored as plain text. |
 | **Abuse limits** | Per-user quotas on the content endpoints: 20 listings/hour, 30 messages/minute, 10 reports/hour, 100 photo uploads/day. Auth endpoints are limited per email *and* per IP, and a successful sign-in clears the counter so a stranger cannot lock someone out of their own account. |
 | **Theming** | Hinge-inspired layout with a campus notebook language: student ID cards, ruled paper for what people write, graph paper for what the model computes, a highlighter for the key number. Light "notebook" and dark "blackboard" themes (default light). |
@@ -96,10 +96,14 @@ listings and messages `is_flagged`, and users file reports. Both land in the
 admin panel at `/admin`, backed by `/api/admin/*`.
 
 **Who can get in.** An account is an admin if — and only if — its email is
-listed in `ADMIN_EMAILS`. There is no separate role, admin password or second
-factor. Endpoints are guarded on the server (`require_admin`: 401 without a
-session, 403 for a normal account); hiding the navigation entry is not the
-protection. An admin reviewing a flagged or reported message sees its
+listed in `ADMIN_EMAILS`, which is read from the environment only — the code
+has no default and the production API does not start without it. There is no
+separate role, but an admin signs in with two factors: the password opens no
+session on its own, it sends a code to the admin's inbox, and the session
+opens once that code is entered (the "Kodla gir" tab asks for the password
+after the code). Endpoints are guarded on the server (`require_admin`: 401
+without a session, 403 for a normal account); hiding the navigation entry is
+not the protection. An admin reviewing a flagged or reported message sees its
 plaintext — only that message, never the surrounding conversation, and only as
 long as the key it was encrypted with still exists.
 
@@ -171,7 +175,9 @@ DEV_OTP=1 python -m app.main
 
 `DEV_OTP=1` returns the sign-in code in the API response and the app shows it
 in a toast, so you can register without an email provider. It is off unless
-set, and must stay off on any public deployment (DEPLOY.md section 1.3).
+set, and must stay off on any public deployment (DEPLOY.md section 1.3). To use
+the admin panel locally, also set `ADMIN_EMAILS=you@uni.edu.tr` (any address
+you register with); nobody is an admin otherwise.
 
 On macOS, LightGBM needs: `brew install libomp`. Transit data ships with the
 repo; re-download with `python -m scripts.fetch_transit` if needed. The

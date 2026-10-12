@@ -43,3 +43,26 @@ def test_network_error_returns_false(monkeypatch):
 
     monkeypatch.setattr(emailer.requests, "post", fake_post)
     assert emailer.send_otp_email("ali@uni.edu.tr", "111111") is False
+
+
+def test_admin_login_mail_says_the_password_was_used(monkeypatch):
+    """Yönetici girişinin kodu "yok sayabilirsin" DEMEZ: şifre kullanıldı demektir."""
+    monkeypatch.setenv("BREVO_API_KEY", "key-123")
+    monkeypatch.setenv("EMAIL_FROM", "noreply@ornek.com")
+    captured = {}
+
+    class FakeResponse:
+        status_code = 201
+
+    def fake_post(url, json, headers, timeout):
+        captured.update(json=json)
+        return FakeResponse()
+
+    monkeypatch.setattr(emailer.requests, "post", fake_post)
+
+    assert emailer.send_otp_email("yonetici@uni.edu.tr", "222222", admin_login=True)
+    payload = captured["json"]
+    assert payload["subject"] == "Yönetici giriş kodun: 222222"
+    for body in (payload["textContent"], payload["htmlContent"]):
+        assert emailer.ADMIN_LOGIN_NOTE in body
+        assert emailer.DEFAULT_NOTE not in body

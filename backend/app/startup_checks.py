@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import os
 
-from app import auth, crypto
-from app.config import ADMIN_EMAILS, API_DOCS
+from app import auth, config, crypto
+from app.config import API_DOCS
 from app.emailer import email_enabled
 
 
@@ -68,6 +68,16 @@ def critical_problems() -> list[str]:
         problems.append(
             "DEV_OTP=1 — doğrulama kodu API yanıtında dönüyor (şifresiz giriş kapısı)"
         )
+    # Yönetici listesinin kodda varsayılanı yok (bkz. app/config.py). Boşken
+    # uygulama çalışır ama moderasyon paneline kimse giremez; bildirimler ve
+    # işaretli içerik sahipsiz kalır. Açılışı durdurmak, değişken unutulduğunda
+    # yöneticinin paneli kaybetmesi yerine önceki sürümün sunulmaya devam
+    # etmesini sağlar.
+    if not config.ADMIN_EMAILS:
+        problems.append(
+            "ADMIN_EMAILS boş — hiçbir hesap yönetici değil (Render → "
+            "roommatch-api → Environment → ADMIN_EMAILS, virgülle ayrılmış adresler)"
+        )
     return problems
 
 
@@ -103,8 +113,14 @@ def summary_lines(*, production: bool) -> list[str]:
             warn_only=True,
         ),
     ]
+    lines.append(
+        _mark(
+            bool(config.ADMIN_EMAILS),
+            f"Yönetici (ADMIN_EMAILS): {len(config.ADMIN_EMAILS)} adres tanımlı",
+            "ADMIN_EMAILS boş — hiçbir hesap yönetici değil",
+        )
+    )
     # Bilgilendirici satırlar (başlı başına sorun değil).
-    lines.append(f"ℹ️  Yönetici (ADMIN_EMAILS): {len(ADMIN_EMAILS)} adres tanımlı")
     if API_DOCS:
         lines.append("⚠️  API_DOCS=1 — /docs açık (yayında kapalı olmalı)")
     lines.append(

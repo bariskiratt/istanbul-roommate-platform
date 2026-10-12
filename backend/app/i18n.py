@@ -81,6 +81,10 @@ EN: dict[str, str | tuple[str, str]] = {
     "Yeni şifre eskisiyle aynı olamaz.":
         "The new password must be different from the old one.",
     "Şifren hatalı.": "Incorrect password.",
+    "Yönetici hesabı: e-postana gelen kodu gir.":
+        "Admin account: enter the code we just emailed you.",
+    "Yönetici hesabı: kodla birlikte şifreni de gir.":
+        "Admin account: enter your password along with the code.",
     "Çok hızlı gidiyorsun. Biraz bekleyip tekrar dene.":
         "You're going too fast. Wait a moment and try again.",
 

@@ -19,9 +19,11 @@ the steps below are mostly about creating accounts and wiring them together.
 5. Verify the message encryption key — see section 1.1. **Do this before real
    users start chatting**, otherwise messages are written to the database in
    plain text.
-6. Verify that `DEV_OTP` is `0` and that `ADMIN_EMAILS` holds *your* addresses —
-   see section 1.3. **Do this before the frontend goes public.** Getting it
-   wrong hands the moderation panel to anyone who knows an admin address.
+6. Set `ADMIN_EMAILS` to *your* admin addresses (comma-separated) and verify
+   that `DEV_OTP` is `0` — see sections 1.3 and 1.4. `ADMIN_EMAILS` has **no
+   default**: in production (`DATABASE_URL` set) the API refuses to start
+   without it, and the previous deploy keeps serving until you set it.
+   **Do this before the frontend goes public.**
 7. Set `DATABASE_URL` to a Neon database (section 1.6) and the four `S3_*`
    photo storage variables (section 1.5). Without the first the API falls back
    to a SQLite file inside the container, which is wiped like the photos are;
@@ -127,12 +129,11 @@ to keep all moderation local.
 > **`DEV_OTP=1` in production is a full account-takeover path, and it takes no
 > password.** With `DEV_OTP=1`, `POST /auth/request-otp` returns the six-digit
 > sign-in code in the API response body (field `dev_code`). Feed that code to
-> `POST /auth/verify-otp` and you hold a session token for that address. The
-> admin addresses are **written in the repository** (`backend/app/config.py`,
-> `ADMIN_EMAILS`), so anyone reading the source can pick one, ask for its code,
-> and land in the moderation panel — reading flagged private messages,
-> suspending users and taking listings down. If the address is not registered
-> yet, the attacker simply registers it first and then verifies it the same way.
+> `POST /auth/verify-otp` and you hold a session token for that address — any
+> student's account, with their matches and messages. Admin accounts are
+> somewhat better protected: their sign-in also asks for the password
+> (section 1.4) and their addresses are no longer written in the repository.
+> That does not make `DEV_OTP=1` acceptable; every other account is open.
 
 Why this is called out separately: one wrong value opens the admin panel to
 anyone. The code default in `backend/app/auth.py` is off (`"0"`); it used to be
@@ -170,9 +171,9 @@ curl -s -X POST https://YOUR-API/auth/request-otp \
   run the check again. Treat every admin account as compromised for the period
   the value was `1`.
 
-While you are there, confirm `ADMIN_EMAILS` is set to your own addresses. Unset
-means the two project addresses baked into `config.py` stay in force on *your*
-deployment.
+While you are there, confirm `ADMIN_EMAILS` is set to your own addresses. It
+has no default: unset means nobody is an admin, and in production the API
+refuses to start (the `🔒` block in the boot log names the variable).
 
 ### 1.4) Admin moderation panel
 
@@ -181,11 +182,26 @@ frontend at `/admin`: a dashboard summary, the user-report queue, a queue of
 content the automatic checker flagged, a queue of the content admins removed,
 and user suspension.
 
-**Who gets in.** Any account whose email is in `ADMIN_EMAILS` — that single
-match is the whole authorization check (`models.User.is_admin`). There is no
-separate admin role, password or second factor, which is why section 1.3
-matters so much. Every endpoint is guarded server-side (`require_admin`: 401
-without a session, 403 for non-admins); hiding the UI is not what protects it.
+**Who gets in.** Any account whose email is in `ADMIN_EMAILS` — that match is
+the whole authorization check (`models.User.is_admin`); there is no separate
+admin role. The list comes **only** from the environment variable (no default
+in the code), so the repository no longer tells anyone which account to
+target. Every endpoint is guarded server-side (`require_admin` on the whole
+`/api/admin` router and again on each route: 401 without a session, 403 for
+non-admins); hiding the UI is not what protects it.
+
+**Admin sign-in takes two factors.** A normal account signs in with its
+password *or* an emailed code. An admin account needs **both**: the correct
+password on the "Şifre ile" tab sends a code to the admin's inbox instead of
+opening a session, and the session opens once that code is entered. The
+"Kodla gir" tab works too, and asks for the password after the code. So a
+reused password alone, or a compromised inbox alone, no longer opens the
+panel. The code email for this step says the password was just used; an admin
+who receives one without signing in should change the password at once.
+Sessions opened before this rule keep working until they expire (30 days) or
+the admin signs out. There is no password reset, and for an admin the code tab
+no longer replaces a forgotten password, so list **two** admin addresses with
+different passwords: either one can still get in if the other is lost.
 
 **What an admin can see.** Reported and flagged rows including the **plaintext
 of private messages** that were flagged or reported (decrypted for review, just
@@ -404,15 +420,18 @@ choice.
 - [ ] The budget heatmap loads on the Vercel address (means CORS is correct)
 - [ ] Sign-up flow works (in dev mode the OTP appears in a toast)
 - [ ] The startup log prints a `🔒 Güvenlik yapılandırması` block with
-      `✅ Mesaj şifreleme açık` and `✅ OTP kodları HMAC ile saklanıyor` — the
-      Render free plan has no Shell, so the boot log is where you verify this
-      (sections 1.1 and 1.3). A production deploy with `MESSAGE_KEY`/`OTP_KEY`
-      missing or `DEV_OTP=1` **fails to start on purpose**; the previous version
-      keeps serving and the `🔒` block names the offending variable
+      `✅ Mesaj şifreleme açık`, `✅ OTP kodları HMAC ile saklanıyor` and
+      `✅ Yönetici (ADMIN_EMAILS): N adres tanımlı` — the Render free plan has
+      no Shell, so the boot log is where you verify this (sections 1.1, 1.3
+      and 1.4). A production deploy with `MESSAGE_KEY`/`OTP_KEY` missing,
+      `DEV_OTP=1` or `ADMIN_EMAILS` empty **fails to start on purpose**; the
+      previous version keeps serving and the `🔒` block names the offending
+      variable
 - [ ] `MESSAGE_KEY` is backed up outside Render
 - [ ] **`DEV_OTP=0` verified** — `/auth/request-otp` returns no `dev_code`
       field on the deployed API (section 1.3)
-- [ ] `ADMIN_EMAILS` is set to your own addresses, not the repo defaults
+- [ ] `ADMIN_EMAILS` is set to your own addresses (there is no default; the
+      API does not start in production without it)
 - [ ] `DATABASE_URL` points at Neon and `/api/listings` answers `[]` or a list,
       not an error (section 1.6)
 - [ ] `/api/health` answers 200 with `"database": "ok"` and
@@ -482,14 +501,14 @@ already delivering 10% of the requested schedule.
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///data/app.db` | Postgres connection — the Neon connection string (section 1.6), entered by hand. Unset → a SQLite file inside the container, which is wiped on redeploy and sleep. |
 | `CORS_ORIGINS` | localhost list | Comma-separated allowed origins. Unset → only localhost may call the API, so the deployed frontend gets CORS errors. |
-| `DEV_OTP` | `0` (also pinned by `render.yaml`) | `1`: the sign-in code is returned in the API response (`dev_code`) — local development only. In production it must be `0`: while it is `1`, anyone can sign in as any address without a password, including the admin addresses written in `config.py`. **In production (`DATABASE_URL` set) the API refuses to start while it is `1`** — see section 1.3. Unset is safe. |
+| `DEV_OTP` | `0` (also pinned by `render.yaml`) | `1`: the sign-in code is returned in the API response (`dev_code`) — local development only. In production it must be `0`: while it is `1`, anyone can sign in to any student's account without a password (admin accounts additionally ask for the password, section 1.4). **In production (`DATABASE_URL` set) the API refuses to start while it is `1`** — see section 1.3. Unset is safe. |
 | `MESSAGE_KEY` | — | base64 of 32 bytes; encrypts chat messages at rest (AES-256-GCM). Unset or malformed → messages would be stored in plain text, so **in production (`DATABASE_URL` set) the API refuses to start** and the previous deploy keeps serving; locally it falls back to plain text with a log warning. Losing or changing it makes previously encrypted messages permanently unreadable. See section 1.1. |
 | `OTP_KEY` | — | ≥32-char random string; sign-in codes are then stored as HMAC-SHA256 rather than unsalted SHA-256. Unset → codes are hashed with plain SHA-256 (a 10⁶ space that a database reader can reverse to take over an account), so **in production the API refuses to start**; locally it falls back with a log warning. `render.yaml` sets it via `generateValue`. |
 | `ANTHROPIC_API_KEY` | — | Enables the optional AI moderation layer. Unset → rule-based moderation only (still fully functional). Set → the full text of every listing and message is sent to `api.anthropic.com`, which must be disclosed to users. |
 | `BREVO_API_KEY` | — | Brevo API key (real OTP emails). Unset → no email is sent; only dev-mode OTP works. |
 | `EMAIL_FROM` | — | Sender address verified in Brevo. Email sending requires both this and `BREVO_API_KEY`. |
 | `EMAIL_FROM_NAME` | `evdes.tr` | Display name on outgoing OTP emails. Unset → the default name is used; nothing breaks. |
-| `ADMIN_EMAILS` | two project addresses | Comma-separated admin accounts. Membership in this list *is* the authorization check for the whole moderation panel — report queue, flagged private message text, user suspension, listing takedown (section 1.4). Unset → the defaults written in `config.py` stay in effect, so always set it explicitly for your own deployment. |
+| `ADMIN_EMAILS` | — (none) | Comma-separated admin accounts. Membership in this list *is* the authorization check for the whole moderation panel — report queue, flagged private message text, user suspension, listing takedown — and these accounts sign in with password **and** an emailed code (section 1.4). Listed addresses are also exempt from the `.edu.tr` sign-up rule. Unset → nobody is an admin; in production (`DATABASE_URL` set) the API **refuses to start** and the previous deploy keeps serving. |
 | `S3_BUCKET` | — | Photo bucket name (section 1.5). Set → photos are stored in the bucket. Unset → photos are written to `UPLOADS_DIR` and lost on redeploy and sleep. |
 | `S3_ENDPOINT_URL` | — | S3 API endpoint. For R2: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Unset → AWS S3. |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | — | The bucket's API token. Wrong or missing → uploads answer 503 and the startup log says so. |

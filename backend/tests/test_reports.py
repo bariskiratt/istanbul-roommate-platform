@@ -44,7 +44,9 @@ def _auth_headers(client, email=USER_EMAIL) -> dict:
     )
     code = res.json()["dev_code"]
     token = client.post(
-        "/api/auth/verify-otp", json={"email": email, "code": code}
+        "/api/auth/verify-otp",
+        # Şifre de gider: yönetici hesabında kod tek başına yetmez (2FA).
+        json={"email": email, "code": code, "password": "Sifre1234"},
     ).json()["token"]
     return {"Authorization": f"Bearer {token}"}
 

@@ -32,8 +32,8 @@ DB_PATH = DATA_DIR / "app.db"
 #
 # Bu liste artık yalnızca "Evler" sekmesinin görünürlüğünü değil, TÜM
 # moderasyon yetkisini belirler. Buradaki bir adresle giriş yapan hesap
-# models.User.is_admin ile yönetici sayılır (ayrı bir rol sütunu ya da ikinci
-# bir doğrulama adımı YOKTUR) ve require_admin'e bağlı her uca erişir:
+# models.User.is_admin ile yönetici sayılır (ayrı bir rol sütunu YOKTUR) ve
+# require_admin'e bağlı her uca erişir:
 #   GET  /api/reports                  ham bildirim listesi
 #   GET  /api/admin/summary            kuyruk sayaçları
 #   GET  /api/admin/reports            karar bağlamıyla bildirim kuyruğu
@@ -62,21 +62,26 @@ DB_PATH = DATA_DIR / "app.db"
 #
 # RİSK: yetki tek başına e-posta eşleşmesine dayandığı için, bu adreslerden
 # birinin hesabını ele geçiren kişi doğrudan moderatör olur. Artık yalnızca
-# içeriği gizleyemez, KALICI SİLEBİLİR de — aşağıdaki iki madde bu yüzden
-# eskisinden daha önemli. İki sonucu var:
-#   1. Kendi dağıtımında ADMIN_EMAILS'i MUTLAKA kendi adreslerinle ez;
-#      aşağıdaki varsayılanlar bu repoda açıkça yazılı.
-#   2. DEV_OTP üretimde 0 olmalı. 1 iken /auth/request-otp doğrulama kodunu
+# içeriği gizleyemez, KALICI SİLEBİLİR de. Üç önlem bu yüzden var:
+#   1. YÖNETİCİ GİRİŞİ İKİ ADIMLIDIR: şifre VE e-postaya giden kod birlikte
+#      istenir (app/auth.py, login ve verify_otp). Normal kullanıcı ikisinden
+#      biriyle girer; yönetici hesabında ikisinden biri tek başına yetmez.
+#   2. LİSTE YALNIZCA ORTAM DEĞİŞKENİNDEN GELİR, VARSAYILANI YOKTUR.
+#      Eskiden burada işletmecinin iki adresi varsayılan olarak yazılıydı;
+#      repo herkese açık olduğu için saldırgan hangi hesabı hedefleyeceğini
+#      kaynağı okuyarak öğreniyordu. Artık tanımsızsa liste BOŞTUR (kimse
+#      yönetici değildir) ve üretimde uygulama hiç açılmaz; Render önceki
+#      sürümü sunmaya devam eder (app/startup_checks.py). Render'da:
+#      roommatch-api → Environment → ADMIN_EMAILS (virgülle ayrılmış adresler).
+#   3. DEV_OTP üretimde 0 olmalı. 1 iken /auth/request-otp doğrulama kodunu
 #      API yanıtında döndürür; buradaki bir adres için kod isteyip
-#      /auth/verify-otp'a vermek yeterlidir — şifre hiç gerekmez. Adres henüz
-#      kayıtlı değilse saldırgan önce onunla kayıt olabilir. Ayrıntı: DEPLOY.md.
+#      /auth/verify-otp'a vermek yeterlidir. Ayrıntı: DEPLOY.md.
 ADMIN_EMAILS = {
     e.strip().lower()
-    for e in os.getenv(
-        "ADMIN_EMAILS", "bariskirat5@gmail.com,baris.kirat@std.yildiz.edu.tr"
-    ).split(",")
+    for e in os.getenv("ADMIN_EMAILS", "").split(",")
     if e.strip()
 }
+
 
 # ÖĞRENCİ E-POSTASI ZORUNLULUĞU — ADMIN_EMAILS'İN İKİNCİ İŞLEVİ
 #
@@ -88,10 +93,10 @@ ADMIN_EMAILS = {
 # (bkz. auth.is_student_email).
 #
 # MUAFİYET: yukarıdaki ADMIN_EMAILS adresleri kuraldan MUAFTIR. Sebebi
-# pratik: yöneticinin adreslerinden biri gmail.com'dur ve kural muafiyetsiz
-# uygulanırsa yönetici KENDİ HESABINI AÇAMAZ — moderasyon uçlarının tamamı
-# is_admin'e, o da e-posta eşleşmesine bağlı olduğu için sistem yöneticisiz
-# kalır.
+# pratik: yöneticinin adresi öğrenci adresi olmayabilir (ör. gmail.com) ve
+# kural muafiyetsiz uygulanırsa yönetici KENDİ HESABINI AÇAMAZ — moderasyon
+# uçlarının tamamı is_admin'e, o da e-posta eşleşmesine bağlı olduğu için
+# sistem yöneticisiz kalır.
 #
 # Muafiyetin sınırı: bu liste elle yazılan, dağıtımı yapan kişinin kontrol
 # ettiği bir ortam değişkenidir; dışarıdan bir kullanıcı buraya giremez. Yani

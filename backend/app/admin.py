@@ -53,6 +53,10 @@ Tasarım ilkeleri:
    last_suspension_reason'a taşınır.
 
 Tüm uçlar require_admin ile korunur: girişsiz 401, admin olmayan 403.
+Kontrol İKİ KATMANDA durur: router'ın kendisi (dependencies=...) ve her uç
+ayrıca kendi parametresinde. Router katmanı, ileride eklenen ve parametreyi
+unutan bir ucun herkese açılmasını engelleyen emniyet ağıdır; FastAPI aynı
+bağımlılığı istek başına bir kez çalıştırdığı için maliyeti yoktur.
 """
 
 import json
@@ -78,7 +82,12 @@ from app.listings import (
 )
 from app.reports import require_admin
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin"],
+    # Emniyet ağı: uç kendi require_admin parametresini unutsa da kapalı kalır.
+    dependencies=[Depends(require_admin)],
+)
 
 TargetType = Literal["listing", "user", "message"]
 FlagKind = Literal["listing", "message"]
