@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import content_limits, crypto, models, moderation
 from app.auth import get_current_user
 from app.db import get_db
+from app.i18n import localized
 from app.reports import require_admin
 
 router = APIRouter(tags=["swipes"])
@@ -79,9 +80,9 @@ class LikeTarget(BaseModel):
     @model_validator(mode="after")
     def _check_ref(self):
         if self.kind == "photo" and self.photo_index is None:
-            raise ValueError("Fotoğraf beğenisinde photo_index zorunlu.")
+            raise ValueError(localized("Fotoğraf beğenisinde photo_index zorunlu."))
         if self.kind == "prompt" and self.prompt_key is None:
-            raise ValueError("Kart beğenisinde prompt_key zorunlu.")
+            raise ValueError(localized("Kart beğenisinde prompt_key zorunlu."))
         return self
 
 
@@ -98,7 +99,9 @@ class SwipeIn(BaseModel):
         if self.direction != "like" and (
             self.target is not None or (self.comment or "").strip()
         ):
-            raise ValueError("Hedef ve yorum yalnızca beğenide gönderilebilir.")
+            raise ValueError(
+                localized("Hedef ve yorum yalnızca beğenide gönderilebilir.")
+            )
         return self
 
 
@@ -186,7 +189,8 @@ def _prepare_comment(
     content_limits.check("like_comment", user_id)
     if moderation.is_system_marker(text):
         raise HTTPException(
-            status_code=422, detail=moderation.SYSTEM_MARKER_REJECTION
+            status_code=422,
+            detail=localized(moderation.SYSTEM_MARKER_REJECTION),
         )
     result = moderation.check(text, kind="message")
     if result.blocked:
@@ -194,7 +198,7 @@ def _prepare_comment(
             status_code=422,
             detail=(
                 f"{moderation.describe(result.reasons, subject='Yorumda')} "
-                "Yorumunu düzenleyip tekrar gönder."
+                + localized("Yorumunu düzenleyip tekrar gönder.")
             ),
         )
     return crypto.encrypt(text), result.flagged, moderation.reasons_csv(result)
@@ -216,7 +220,7 @@ def _resolve_target(
         photos = listing.photos or []
         if target.photo_index is None or target.photo_index >= len(photos):
             raise HTTPException(
-                status_code=422, detail="Beğenilen fotoğraf bu ilanda yok."
+                status_code=422, detail=localized("Beğenilen fotoğraf bu ilanda yok.")
             )
         return "photo", photos[target.photo_index]
     return "prompt", target.prompt_key
@@ -325,9 +329,11 @@ def swipe(
         or not listing.is_active
         or (listing.owner is not None and listing.owner.is_suspended)
     ):
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if listing.owner_id == user.id:
-        raise HTTPException(status_code=400, detail="Kendi ilanını kaydıramazsın.")
+        raise HTTPException(
+            status_code=400, detail=localized("Kendi ilanını kaydıramazsın.")
+        )
 
     target_kind, target_ref = _resolve_target(payload.target, listing)
     comment, comment_flagged, comment_reasons = _prepare_comment(
@@ -472,14 +478,14 @@ def respond_to_like(
     """
     row = db.get(models.Swipe, swipe_id)
     if row is None or row.direction != "like":
-        raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
     if row.listing.owner_id != user.id:
         # 404, 403 DEĞİL: 403 "böyle bir beğeni var ama senin değil" derdi ve
         # id gezerek platformdaki beğenileri saymaya yarardı (bulgu L4).
         # Yanıt, olmayan bir id ile birebir aynı.
-        raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
     if row.swiper is not None and row.swiper.is_suspended:
-        raise HTTPException(status_code=404, detail="Beğeni bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
 
     matched, match_id = False, None
     if payload.accept:

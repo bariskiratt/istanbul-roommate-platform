@@ -17,6 +17,7 @@ from sqlalchemy.orm import joinedload
 from app import content_limits, models, moderation
 from app.auth import get_current_user, get_optional_user
 from app.db import get_db
+from app.i18n import localized
 from app.uploads import (
     MAX_PHOTO_URL_LENGTH,
     delete_unused_photos,
@@ -61,15 +62,20 @@ def _check_photos(value: list[str] | None) -> list[str] | None:
         return value
     for url in value:
         if not isinstance(url, str) or not url.strip():
-            raise ValueError("Fotoğraf adresi boş olamaz.")
+            raise ValueError(localized("Fotoğraf adresi boş olamaz."))
         if len(url) > MAX_PHOTO_URL_LENGTH:
             raise ValueError(
-                f"Fotoğraf adresi {MAX_PHOTO_URL_LENGTH} karakterden uzun olamaz."
+                localized(
+                    "Fotoğraf adresi {max} karakterden uzun olamaz.",
+                    max=MAX_PHOTO_URL_LENGTH,
+                )
             )
         if not is_allowed_photo_url(url):
             raise ValueError(
-                "Fotoğraf adresi kabul edilmiyor: yalnızca uygulamaya "
-                "yüklenen fotoğraflar ve izin verilen barındırıcılar geçerli."
+                localized(
+                    "Fotoğraf adresi kabul edilmiyor: yalnızca uygulamaya "
+                    "yüklenen fotoğraflar ve izin verilen barındırıcılar geçerli."
+                )
             )
     return value
 
@@ -89,7 +95,7 @@ def _reject(field: str, reasons: list[str]) -> HTTPException:
             # büyük İ'nin küçük harfe çevrilmesinde bozuk çıktı veriyor.
             "message": (
                 f"{moderation.describe(reasons, subject=label)} "
-                "Bu alanı düzenleyip tekrar deneyin."
+                + localized("Bu alanı düzenleyip tekrar deneyin.")
             ),
             "field": field,
             "reasons": reasons,
@@ -106,7 +112,7 @@ def _moderate_field(text: str, field: str) -> moderation.ModerationResult:
         raise HTTPException(
             status_code=422,
             detail={
-                "message": moderation.SYSTEM_MARKER_REJECTION,
+                "message": localized(moderation.SYSTEM_MARKER_REJECTION),
                 "field": field,
                 "reasons": [moderation.SYSTEM_MARKER],
             },
@@ -252,9 +258,10 @@ def _parse_features(raw: str | None) -> list[str]:
     if invalid:
         raise HTTPException(
             status_code=422,
-            detail=(
-                f"Geçersiz özellik: {', '.join(invalid)}. "
-                f"Geçerli anahtarlar: {', '.join(FEATURE_FIELDS)}."
+            detail=localized(
+                "Geçersiz özellik: {invalid}. Geçerli anahtarlar: {valid}.",
+                invalid=", ".join(invalid),
+                valid=", ".join(FEATURE_FIELDS),
             ),
         )
     # Tekrar eden anahtar aynı koşulu iki kez eklemesin.
@@ -301,12 +308,18 @@ class ListingIn(BaseModel):
     def _check_type_fields(self):
         if self.type == "ev_ilani":
             if self.rent is None or not self.room_count:
-                raise ValueError("Ev ilanı için kira ve oda sayısı zorunlu.")
+                raise ValueError(
+                    localized("Ev ilanı için kira ve oda sayısı zorunlu.")
+                )
         else:
             if self.budget_min is None or self.budget_max is None:
-                raise ValueError("Kişisel ilan için bütçe aralığı zorunlu.")
+                raise ValueError(
+                    localized("Kişisel ilan için bütçe aralığı zorunlu.")
+                )
             if self.budget_min > self.budget_max:
-                raise ValueError("Bütçe alt sınırı üst sınırdan büyük olamaz.")
+                raise ValueError(
+                    localized("Bütçe alt sınırı üst sınırdan büyük olamaz.")
+                )
         return self
 
 
@@ -428,7 +441,9 @@ def list_listings(
     stmt = _exclude_suspended_owners(stmt)
     if mine:
         if user is None:
-            raise HTTPException(status_code=401, detail="Giriş yapman gerekiyor.")
+            raise HTTPException(
+                status_code=401, detail=localized("Giriş yapman gerekiyor.")
+            )
         stmt = stmt.where(models.Listing.owner_id == user.id)
     if unswiped and user is not None:
         # Karar verilmiş ilanlar desteye geri gelmesin; kendi ilanları da çıkar
@@ -467,7 +482,7 @@ def get_listing(
 ):
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active or _owner_suspended(row):
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     # Liste ucuyla aynı kural: girişsiz istemci sahibin adını/üniversitesini
     # görmez, yoksa tek tek id gezerek aynı listeyi toplamak yeterdi.
     if user is None:
@@ -487,10 +502,11 @@ def listing_fair_price(listing_id: int, db: Session = Depends(get_db)):
 
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active or _owner_suspended(row):
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.type != "ev_ilani" or row.rent is None:
         raise HTTPException(
-            status_code=400, detail="Yalnızca ev ilanları için hesaplanır."
+            status_code=400,
+            detail=localized("Yalnızca ev ilanları için hesaplanır."),
         )
 
     result = estimate_for_listing(
@@ -498,7 +514,7 @@ def listing_fair_price(listing_id: int, db: Session = Depends(get_db)):
     )
     if result is None:
         raise HTTPException(
-            status_code=503, detail="Adil fiyat modeli yüklü değil."
+            status_code=503, detail=localized("Adil fiyat modeli yüklü değil.")
         )
     return result
 
@@ -543,9 +559,11 @@ def update_listing(
     """İlan güncelleme — yalnızca ilan sahibi."""
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active:
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.owner_id is None or user is None or user.id != row.owner_id:
-        raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
+        raise HTTPException(
+            status_code=403, detail=localized("Bu ilan sana ait değil.")
+        )
 
     # null gönderilen alanlar "değiştirme" sayılır — zorunlu alanların
     # PATCH ile boşaltılıp kaydın bozulmasını engeller.
@@ -558,7 +576,8 @@ def update_listing(
     eff_max = updates.get("budget_max", row.budget_max)
     if eff_min is not None and eff_max is not None and eff_min > eff_max:
         raise HTTPException(
-            status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
+            status_code=422,
+            detail=localized("Bütçe alt sınırı üst sınırdan büyük olamaz."),
         )
 
     # Denetim YALNIZCA metin gerçekten değişiyorsa çalışır.
@@ -603,8 +622,10 @@ def deactivate_listing(
     """
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active:
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.owner_id is None or user.id != row.owner_id:
-        raise HTTPException(status_code=403, detail="Bu ilan sana ait değil.")
+        raise HTTPException(
+            status_code=403, detail=localized("Bu ilan sana ait değil.")
+        )
     row.is_active = False
     db.commit()

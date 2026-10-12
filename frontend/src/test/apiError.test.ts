@@ -109,6 +109,24 @@ describe("describeApiError — liste detail (Pydantic doğrulama)", () => {
   it("boş listede yedek metne düşer", () => {
     expect(describeApiError({ detail: [] }, FALLBACK).message).toBe(FALLBACK);
   });
+
+  it("sunucu doğrulayıcısının metnindeki 'Value error, ' ekini atar", () => {
+    // Kayıtta .edu.tr dışı adres gönderilince gelen gerçek gövde (İngilizce mod).
+    const info = describeApiError(
+      {
+        detail: [
+          {
+            type: "value_error",
+            loc: ["body", "email"],
+            msg: "Value error, Only university email addresses (.edu.tr) can sign up.",
+          },
+        ],
+      },
+      FALLBACK,
+    );
+    expect(info.message).toBe("Only university email addresses (.edu.tr) can sign up.");
+    expect(info.field).toBe("email");
+  });
 });
 
 describe("describeApiError — gövde yoksa", () => {

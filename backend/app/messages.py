@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app import content_limits, crypto, models, moderation
 from app.auth import get_current_user
 from app.db import get_db
+from app.i18n import localized
 
 router = APIRouter(prefix="/api/matches", tags=["messages"])
 
@@ -59,7 +60,7 @@ def _require_participant(
     """
     match = db.get(models.Match, match_id)
     if match is None or user.id not in (match.user_a_id, match.user_b_id):
-        raise HTTPException(status_code=404, detail="Eşleşme bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Eşleşme bulunamadı."))
     return match
 
 
@@ -123,19 +124,20 @@ def send_message(
     if other is not None and other.is_suspended:
         raise HTTPException(
             status_code=403,
-            detail="Bu hesap askıya alındı; şu an mesaj gönderilemiyor.",
+            detail=localized("Bu hesap askıya alındı; şu an mesaj gönderilemiyor."),
         )
 
     content = payload.content.strip()
     if not content:
-        raise HTTPException(status_code=422, detail="Mesaj boş olamaz.")
+        raise HTTPException(status_code=422, detail=localized("Mesaj boş olamaz."))
 
     # Kullanıcı sistemin ağzından konuşamaz: "[removed_by_moderation]" ya da
     # "[unreadable]" yazan bir mesaj arayüzde sistem metni olarak basılırdı
     # (bkz. moderation.SYSTEM_MARKERS).
     if moderation.is_system_marker(content):
         raise HTTPException(
-            status_code=422, detail=moderation.SYSTEM_MARKER_REJECTION
+            status_code=422,
+            detail=localized(moderation.SYSTEM_MARKER_REJECTION),
         )
 
     result = moderation.check(content, kind="message")
@@ -144,7 +146,7 @@ def send_message(
             status_code=422,
             detail=(
                 f"{moderation.describe(result.reasons)} "
-                "Mesajını düzenleyip tekrar gönder."
+                + localized("Mesajını düzenleyip tekrar gönder.")
             ),
         )
 

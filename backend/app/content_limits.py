@@ -19,6 +19,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
+from app.i18n import localized
+
 # Uç -> (pencere içindeki en fazla istek, pencere).
 # Sınırlar NORMAL KULLANIMIN ÇOK ÜSTÜNDE seçildi: amaç kullanıcıyı yavaşlatmak
 # değil, otomatik yığın üretimini durdurmak.
@@ -57,7 +59,7 @@ def check(action: str, user_id: int) -> None:
         retry_after = max(1, int((window - (now - bucket[0])).total_seconds()))
         raise HTTPException(
             status_code=429,
-            detail="Çok hızlı gidiyorsun. Biraz bekleyip tekrar dene.",
+            detail=localized("Çok hızlı gidiyorsun. Biraz bekleyip tekrar dene."),
             headers={"Retry-After": str(retry_after)},
         )
     bucket.append(now)

@@ -67,6 +67,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import crypto, models, moderation
 from app.auth import purge_user
 from app.db import get_db
+from app.i18n import localized
 from app.listings import (
     FEATURE_FIELDS,
     ListingOut,
@@ -302,7 +303,7 @@ class DeleteIn(BaseModel):
     def _not_blank(cls, v: str) -> str:
         # min_length boşluklardan oluşan bir gerekçeyi geçirirdi.
         if not v.strip():
-            raise ValueError("Silme gerekçesi boş olamaz.")
+            raise ValueError(localized("Silme gerekçesi boş olamaz."))
         return v.strip()
 
 
@@ -616,7 +617,7 @@ def resolve_report(
     """Raporu kapatır ya da yeniden açar; kararı kimin verdiğini kaydeder."""
     row = db.get(models.Report, report_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Rapor bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Rapor bulunamadı."))
 
     row.resolved = payload.resolved
     if payload.resolved:
@@ -783,11 +784,11 @@ def review_flagged(
     model = models.Listing if kind == "listing" else models.Message
     row = db.get(model, item_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="İçerik bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İçerik bulunamadı."))
     if payload.action == "clear" and row.moderation_removed:
         raise HTTPException(
             status_code=400,
-            detail=(
+            detail=localized(
                 "Bu içerik yönetici tarafından kaldırılmış; işaret temizlemek "
                 "kaldırmayı geri almaz. Geri almak için 'restore' kullan."
             ),
@@ -873,11 +874,13 @@ def restore_removed(
     model = models.Listing if kind == "listing" else models.Message
     row = db.get(model, item_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="İçerik bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İçerik bulunamadı."))
     if not row.moderation_removed:
         raise HTTPException(
             status_code=400,
-            detail="Bu içerik yönetici tarafından kaldırılmamış; zaten yayında.",
+            detail=localized(
+                "Bu içerik yönetici tarafından kaldırılmamış; zaten yayında."
+            ),
         )
 
     if kind == "message" and row.original_content is None:
@@ -1045,7 +1048,7 @@ def admin_update_listing(
     """
     row = db.get(models.Listing, listing_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
 
     # null gönderilen alanlar "değiştirme" sayılır — sahibin ucundaki kuralın
     # aynısı: zorunlu alanlar PATCH ile boşaltılıp kayıt bozulmasın.
@@ -1058,7 +1061,8 @@ def admin_update_listing(
     eff_max = updates.get("budget_max", row.budget_max)
     if eff_min is not None and eff_max is not None and eff_min > eff_max:
         raise HTTPException(
-            status_code=422, detail="Bütçe alt sınırı üst sınırdan büyük olamaz."
+            status_code=422,
+            detail=localized("Bütçe alt sınırı üst sınırdan büyük olamaz."),
         )
 
     changed = {k: v for k, v in updates.items() if getattr(row, k) != v}
@@ -1112,11 +1116,11 @@ def publish_listing(
     """
     row = db.get(models.Listing, listing_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.moderation_removed:
         raise HTTPException(
             status_code=409,
-            detail=(
+            detail=localized(
                 "Bu ilan yönetici tarafından kaldırılmış. Yayına almak için "
                 "POST /api/admin/listing/{id}/restore kullan."
             ),
@@ -1164,7 +1168,7 @@ def delete_listing(
     """
     row = db.get(models.Listing, listing_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="İlan bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
 
     # Satır silinmeden ÖNCE okunmalı: sonrasında okunacak bir yer kalmıyor.
     detail = {
@@ -1244,10 +1248,13 @@ def _protect_admin_accounts(
     # Sıra önemli: yönetici kendisi de yönetici olduğu için önce "kendini"
     # kontrolü gelmeli, yoksa 400 yerine 403 dönerdi.
     if target.id == admin.id:
-        raise HTTPException(status_code=400, detail=f"Kendini {verb}.")
+        raise HTTPException(
+            status_code=400, detail=localized("Kendini {verb}.", verb=localized(verb))
+        )
     if target.is_admin:
         raise HTTPException(
-            status_code=403, detail=f"Başka bir yöneticiyi {verb}."
+            status_code=403,
+            detail=localized("Başka bir yöneticiyi {verb}.", verb=localized(verb)),
         )
 
 
@@ -1320,7 +1327,7 @@ def suspend_user(
     """
     target = db.get(models.User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Kullanıcı bulunamadı."))
     _protect_admin_accounts(target, admin, "askıya alamazsın")
 
     target.is_suspended = True
@@ -1359,7 +1366,7 @@ def unsuspend_user(
     """
     target = db.get(models.User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Kullanıcı bulunamadı."))
 
     if target.is_suspended:
         # Gerekçe geçmişe taşınır. Yürürlükteki alanda bırakılsaydı arayüz
@@ -1407,7 +1414,7 @@ def delete_user(
     """
     target = db.get(models.User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise HTTPException(status_code=404, detail=localized("Kullanıcı bulunamadı."))
     _protect_admin_accounts(target, admin, "silemezsin")
 
     # Satır gitmeden önce okunur; sonrasında hesabın kim olduğunu söyleyecek
