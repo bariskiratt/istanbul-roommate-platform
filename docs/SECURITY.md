@@ -241,7 +241,9 @@ comes back.
   `render.yaml` generates, so the stored value is useless without it. Without
   `OTP_KEY`, or with one shorter than 32 characters, storage falls back to an
   unsalted SHA-256 and the process prints a warning once
-  (`backend/app/auth.py:289-311`).
+  (`backend/app/auth.py:289-311`) — but in production (`DATABASE_URL` set) the
+  app refuses to start in that state rather than run with the weak hash
+  (`backend/app/startup_checks.py`).
 - Compared with `hmac.compare_digest` (`_otp_matches`,
   `backend/app/auth.py:322-334`) — constant time, so no timing oracle on the
   code itself.
@@ -596,9 +598,13 @@ written in plaintext. The cost is that no entropy check is performed on the raw
 path — see **L5**.
 
 **The failure mode that matters:** if `MESSAGE_KEY` is absent or malformed,
-encryption silently disables itself and messages are stored as plaintext, with
-only a log warning (`backend/app/crypto.py:90-94`, `:115-119`). The app keeps
-working. `render.yaml` and `DEPLOY.md §1.1` both carry warnings about this.
+encryption cannot turn on. In production (`DATABASE_URL` set) the app now
+**refuses to start** instead of silently storing plaintext — a startup check
+(`backend/app/startup_checks.py`) raises, so a misconfigured deploy fails and
+the previous version keeps serving until the key is fixed. Locally (SQLite, no
+`DATABASE_URL`) it still falls back to plaintext with a log warning
+(`backend/app/crypto.py:90-94`, `:115-119`) so development is not blocked.
+`render.yaml` and `DEPLOY.md §1.1` carry the operational detail.
 
 **If the key is lost or rotated:** every message encrypted under the old key
 becomes permanently unreadable and renders as `[unreadable]`. There is no key
@@ -1048,8 +1054,9 @@ login**; prefer exponential backoff over an email-keyed hard lockout.
 > **Now: fixed.** The engine is created with `hide_parameters=True`
 > (`backend/app/db.py:78`), and codes are stored as HMAC-SHA256 under
 > `OTP_KEY` (`backend/app/auth.py:314-319`), which `render.yaml` generates.
-> Without `OTP_KEY` storage falls back to plain SHA-256 with a warning
-> (section 4.2).
+> Without `OTP_KEY` storage falls back to plain SHA-256 with a warning — now
+> only locally; in production (`DATABASE_URL` set) the app refuses to start
+> instead (`backend/app/startup_checks.py`, section 4.2).
 
 **Where:** `backend/app/db.py:44` — `create_engine(...)` is called without
 `hide_parameters=True`.
@@ -1162,10 +1169,12 @@ middleware that sets `X-Content-Type-Options: nosniff` and
 #### M5 — No security headers on either the API or the frontend
 
 > **Now: fixed.** The API adds `X-Content-Type-Options`, `Referrer-Policy`,
-> `X-Frame-Options`, `Permissions-Policy` and, over HTTPS, HSTS to every
-> response (`SecurityHeadersMiddleware`, `backend/app/main.py:161-232`; tests
-> in `backend/tests/test_security_headers.py`). `frontend/vercel.json:74-104`
-> gives the site a CSP and the same set of headers. Not checked against
+> `X-Frame-Options`, `Permissions-Policy`, a strict `Content-Security-Policy`
+> (`default-src 'none'; frame-ancestors 'none'; base-uri 'none'`, skipped only
+> on the `API_DOCS` pages so Swagger still loads) and, over HTTPS, HSTS to every
+> response (`SecurityHeadersMiddleware` in `backend/app/main.py`; tests in
+> `backend/tests/test_security_headers.py`). `frontend/vercel.json:74-104`
+> gives the site its own CSP and the same set of headers. Not checked against
 > production (section 11).
 
 **Where:** `backend/app/main.py:161-187` — the only middleware is GZip and CORS;
