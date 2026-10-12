@@ -133,8 +133,9 @@ function layout({ title, description, canonical, jsonLd, body }) {
 <meta property="og:image:alt" content="evdes.tr — İstanbul'da ev arkadaşı bul">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${SITE}/og.jpg">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="alternate icon" href="/favicon.png" type="image/png">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
