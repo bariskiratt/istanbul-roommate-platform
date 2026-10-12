@@ -22,8 +22,11 @@ Bu modül ayrıca ORTAK yardımcıları barındırır (diğer uçlar buradan ça
   is_allowed_photo_url(url) -> bool       hangi fotoğraf adresleri kabul edilir
   delete_local_photos(urls) -> int        bizim ürettiğimiz dosyaları depodan siler
   delete_unused_photos(db, urls) -> int   aynısı, ama hâlâ bir satırda geçen
-                                          dosyaya dokunmadan (silme uçları bunu
-                                          kullanır)
+                                          dosyaya dokunmadan (silme ve
+                                          düzenleme uçları bunu kullanır)
+  sweep_orphan_photos(db) -> int          hiçbir kayda bağlanmamış eski
+                                          dosyaları siler (açılışta başlayan
+                                          start_orphan_sweeper günde bir çağırır)
 
 ("local" burada "diskte" değil "BİZİM ürettiğimiz" demektir; kova kullanılırken
 de aynı isimler geçerlidir.)
@@ -39,6 +42,8 @@ import os
 import re
 import secrets
 import threading
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import unquote, urlparse
@@ -443,6 +448,13 @@ def photo_names_in_use(db: Session) -> set[str]:
     Karşılaştırma DOSYA ADI üzerinden yapılır, URL metni üzerinden değil:
     aynı dosya bir kayıtta göreli ("/uploads/ab..jpg"), diğerinde mutlak
     adresle durabilir.
+
+    Fotoğrafa verilen, henüz yanıtlanmamış beğeniler de sayılır: beğeni,
+    beğenildiği ANDAKİ fotoğrafın adresini saklar (models.Swipe.target_ref)
+    ve Beğeniler ekranı yanıt verilene kadar o kareyi gösterir. İlan sahibi
+    fotoğrafı bu arada ilanından çıkarsa dosya silinmez; beğeniyi yanıtlayınca
+    (ya da ilan veya hesap silinince) kare hiçbir yerde gösterilmez ve dosya
+    sahipsiz kalır, süpürme onu toplar.
     """
     used: set[str] = set()
     for column in (models.Listing.photos, models.User.photos):
@@ -451,6 +463,17 @@ def photo_names_in_use(db: Session) -> set[str]:
                 name = local_photo_name(url)
                 if name:
                     used.add(name)
+    # Koşullar swipes.received_likes ile aynı (askı hariç: askıdaki hesabın
+    # beğenisi kaldırılınca geri gelebilir, dosyası durmalı).
+    liked = select(models.Swipe.target_ref).where(
+        models.Swipe.target_kind == "photo",
+        models.Swipe.direction == "like",
+        models.Swipe.responded.is_(False),
+    )
+    for url in db.scalars(liked).all():
+        name = local_photo_name(url)
+        if name:
+            used.add(name)
     return used
 
 
@@ -470,6 +493,146 @@ def delete_unused_photos(db: Session, urls: list[str]) -> int:
     in_use = photo_names_in_use(db)
     orphans = [url for url in urls if (local_photo_name(url) or "") not in in_use]
     return delete_local_photos(orphans)
+
+
+# ---------------------------------------------------------------------------
+# Sahipsiz dosyaların temizliği
+# ---------------------------------------------------------------------------
+#
+# Fotoğraf, ilan ya da profil kaydedilmeden ÖNCE yüklenir. Kullanıcı formu
+# yarıda bırakırsa, fotoğrafı kaydetmeden kaldırırsa ya da sekmeyi kapatırsa
+# dosya depoda kalır ve hiçbir kayıt ona işaret etmez; silme uçları onu hiç
+# görmez. Düzenlemeyle ilandan veya profilden çıkarılan fotoğraflar
+# düzenleme anında silinir (delete_unused_photos); buradaki süpürme geri
+# kalanı, yani hiç bağlanmamış dosyaları toplar.
+
+# Hiçbir kayda bağlanmamış dosya en az bu kadar eskiyse silinir. Beklemenin
+# sebebi: yüklenen adres kaydet'e basılana kadar formda (kayıt formunda
+# sessionStorage taslağında) durur. Yeni yüklenmiş dosyayı sahipsiz sayıp
+# silmek, birkaç dakika sonra kaydeden kişiye kırık fotoğraf bırakırdı. Bir
+# hafta, günlerce açık kalmış bir sekmeye bile yeter.
+ORPHAN_GRACE = timedelta(days=7)
+
+# Açılıştan sonra ilk süpürmeye kadar beklenen süre ve sonraki aralık.
+# Render'ın ücretsiz planı boşta kalan servisi uyutur, yani süreç sık sık
+# yeniden başlar; ilk süpürme bu yüzden kısa bir gecikmeyle koşar. Süreç
+# uzun yaşarsa (izleme servisi uyanık tutuyorsa) günde bir tekrarlanır.
+SWEEP_FIRST_DELAY = timedelta(minutes=1)
+SWEEP_INTERVAL = timedelta(hours=24)
+
+# "0" ise süpürme hiç başlamaz. Acil durum anahtarı: bir şey ters giderse
+# kod değiştirmeden durdurmak için.
+PHOTO_SWEEP_ENV = "PHOTO_SWEEP"
+
+
+def _stored_photos() -> list[tuple[str, datetime]]:
+    """Depodaki BİZİM ürettiğimiz dosyalar ve yazılma zamanları (UTC).
+
+    Desene uymayan nesneler (ör. bucket_available'ın sınama nesnesi) hiç
+    listelenmez, dolayısıyla süpürme onlara dokunamaz. Kova hatası yukarı
+    fırlar: liste eksik gelirse süpürme o turu atlar.
+    """
+    settings = bucket_settings()
+    if settings is None:
+        base = Path(UPLOADS_DIR)
+        if not base.is_dir():
+            return []
+        found = []
+        for path in base.iterdir():
+            if _LOCAL_PHOTO_NAME.fullmatch(path.name) and path.is_file():
+                written = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+                found.append((path.name, written))
+        return found
+
+    client = _s3_client(settings)
+    prefix = _object_key("")
+    found = []
+    request = {"Bucket": settings.bucket, "Prefix": prefix}
+    while True:
+        page = client.list_objects_v2(**request)
+        for obj in page.get("Contents", []):
+            name = obj["Key"][len(prefix):]
+            if _LOCAL_PHOTO_NAME.fullmatch(name):
+                found.append((name, obj["LastModified"]))
+        if not page.get("IsTruncated"):
+            return found
+        request["ContinuationToken"] = page["NextContinuationToken"]
+
+
+def sweep_orphan_photos(db: Session, now: datetime | None = None) -> int:
+    """Hiçbir kayıtta geçmeyen ve ORPHAN_GRACE'ten eski dosyaları siler.
+
+    Silinen dosya sayısını döner. Güvenlik kuralları:
+
+    - "Kullanımda" listesi photo_names_in_use ile, depo LİSTELENDİKTEN SONRA
+      okunur: listeleme sırasında bir kayda bağlanan dosya kullanımda görünür.
+    - Hiçbir kayıt tek bir fotoğraf bile kullanmıyorsa süpürme yapılmaz.
+      Bu ya boş bir veritabanıdır ya da yanlış veritabanına bağlanılmıştır
+      (ör. DATABASE_URL unutulmuş, uygulama boş bir SQLite açmış). İkinci
+      durumda depodaki HER dosya sahipsiz görünür; geri dönüşü olmayan bir
+      toplu silmeyi tek bir yapılandırma hatasına bağlamamak için durulur.
+    - Silme delete_local_photos ile yapılır: yalnızca bizim ad desenimiz,
+      hata fırlatmaz, silinemeyen nesneyi loga yazar.
+    """
+    now = now or datetime.now(timezone.utc)
+    stored = _stored_photos()
+    if not stored:
+        return 0
+    in_use = photo_names_in_use(db)
+    if not in_use:
+        print(f"⚠️  Sahipsiz fotoğraf temizliği atlandı: depoda {len(stored)} "
+              "dosya var ama hiçbir kayıt fotoğraf kullanmıyor.")
+        return 0
+    cutoff = now - ORPHAN_GRACE
+    orphans = [
+        UPLOADS_PREFIX + name
+        for name, written in stored
+        if name not in in_use and written < cutoff
+    ]
+    deleted = delete_local_photos(orphans)
+    if deleted:
+        print(f"🧹 {deleted} sahipsiz fotoğraf depodan silindi.")
+    return deleted
+
+
+def _sweep_once() -> None:
+    # Geç import: app.db modül yüklenirken motoru kurar; testler bu modülü
+    # kendi motorlarıyla kullanıyor ve süpürmeyi hiç başlatmıyor.
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        sweep_orphan_photos(db)
+    finally:
+        db.close()
+
+
+def start_orphan_sweeper() -> None:
+    """Sahipsiz fotoğraf süpürmesini arka planda başlatır (açılışta bir kez).
+
+    Kova tanımlı ama DATABASE_URL tanımlı değilse BAŞLAMAZ: o durumda
+    uygulama yerel SQLite'a bakıyordur, kova ise gerçek (yayındaki)
+    fotoğrafları tutuyordur. Yerel .env'e yayın kovasının anahtarlarını
+    kopyalayan bir geliştirici, yayındaki her fotoğrafı sildirebilirdi.
+    """
+    if os.getenv(PHOTO_SWEEP_ENV, "1").strip() == "0":
+        print(f"Sahipsiz fotoğraf temizliği kapalı ({PHOTO_SWEEP_ENV}=0).")
+        return
+    if bucket_settings() is not None and not os.getenv("DATABASE_URL", "").strip():
+        print("⚠️  Sahipsiz fotoğraf temizliği kapalı: kova tanımlı ama "
+              "DATABASE_URL yok, kayıtlar güvenilir değil.")
+        return
+
+    def loop() -> None:
+        time.sleep(SWEEP_FIRST_DELAY.total_seconds())
+        while True:
+            try:
+                _sweep_once()
+            except Exception as exc:  # noqa: BLE001 — iş parçacığı ölmesin
+                print(f"⚠️  Sahipsiz fotoğraf temizliği yarıda kaldı: {exc}")
+            time.sleep(SWEEP_INTERVAL.total_seconds())
+
+    threading.Thread(target=loop, name="photo-orphan-sweep", daemon=True).start()
 
 
 @router.post("", status_code=201)

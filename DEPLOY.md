@@ -302,6 +302,26 @@ Deploy**, and check the photo still loads.
 already gone; listings that point at them show broken images until their owners
 upload new ones.
 
+**Cleanup.** A photo removed from a listing or profile is deleted from the
+bucket when the edit is saved, unless another listing, a profile or an
+unanswered like on that photo still uses it. Photos uploaded but never saved anywhere (an
+abandoned sign-up or listing form) are swept up by a background job: about a
+minute after every startup, and then once a day while the process stays up,
+the API lists the bucket and deletes every photo that no record uses and that
+is older than **7 days**. The log line is `🧹 N sahipsiz fotoğraf depodan
+silindi.` Safeguards:
+
+- The sweep does not start when `S3_BUCKET` is set but `DATABASE_URL` is not:
+  the app would be reading an empty local SQLite file, and every photo in the
+  bucket would look unused. This matters on a developer machine that has the
+  production bucket keys in its `.env`.
+- It deletes nothing when no record uses a single photo, for the same reason.
+- `PHOTO_SWEEP=0` turns it off without a code change.
+
+The first sweep after this was added also removes photos left over from
+before a database reset, since no record points at them any more. Each sweep
+costs one list request (Class A) per 1,000 photos; deletes are free.
+
 **Cost.** R2 has no spending cap: usage beyond the free tier is charged to the
 card on file. Beyond the free tier the prices are $0.015 per GB-month of
 storage, $4.50 per million uploads (Class A) and $0.36 per million photo reads
@@ -465,3 +485,4 @@ already delivering 10% of the requested schedule.
 | `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
 | `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
+| `PHOTO_SWEEP` | `1` | `0` stops the background job that deletes uploaded photos no record uses (section 1.5). It never runs when `S3_BUCKET` is set and `DATABASE_URL` is not. |

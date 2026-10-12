@@ -39,6 +39,8 @@ const SECTIONS: { heading: TranslationKey; body: TranslationKey[] }[] = [
       "privacy.shareCloudflare",
       "privacy.shareVercel",
       "privacy.shareBrevo",
+      "privacy.shareGoogleFonts",
+      "privacy.shareOsm",
       "privacy.shareNoAi",
       "privacy.shareNoSale",
     ],
@@ -49,7 +51,11 @@ const SECTIONS: { heading: TranslationKey; body: TranslationKey[] }[] = [
   },
   {
     heading: "privacy.retentionTitle",
-    body: ["privacy.retentionBody", "privacy.retentionAudit"],
+    body: [
+      "privacy.retentionBody",
+      "privacy.retentionAudit",
+      "privacy.retentionPhotos",
+    ],
   },
   {
     heading: "privacy.rightsTitle",

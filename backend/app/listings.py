@@ -574,9 +574,17 @@ def update_listing(
         row.is_flagged = result.flagged
         row.flag_reasons = moderation.reasons_csv(result)
 
+    old_photos = list(row.photos or [])
     for key, value in updates.items():
         setattr(row, key, value)
     db.commit()
+    # İlandan çıkarılan fotoğrafın dosyası da silinir; yoksa hiçbir kayıt ona
+    # işaret etmeden depoda sonsuza kadar kalırdı. Commit'ten SONRA: kayıt
+    # yazılamazsa dosya gitmiş olmasın. Başka bir yerde (profil, başka ilan,
+    # bir beğeni) hâlâ geçen dosyaya delete_unused_photos dokunmaz.
+    removed = [url for url in old_photos if url not in (row.photos or [])]
+    if removed:
+        delete_unused_photos(db, removed)
     db.refresh(row)
     return row
 

@@ -39,7 +39,9 @@ const Index = () => {
   });
   const houses = listings.filter(l => l.type === "ev_ilani").slice(0, 10);
 
-  // Semt tablosu: ilan sayısı ve medyan oda payı, gerçek ilanlardan
+  // Semt tablosu: medyan oda payı, gerçek ilanlardan. Sıralama ilan sayısına
+  // göre ama sayının kendisi bilerek gösterilmiyor: yayının ilk günlerinde
+  // 1, 2 gibi sayılar siteyi boş gösteriyordu (ana başlıktaki sayı gibi).
   const districtStats = useMemo(() => {
     const acc = new Map<string, { count: number; rents: number[] }>();
     for (const l of listings) {
@@ -290,7 +292,6 @@ const Index = () => {
                 <thead>
                   <tr className="text-sm text-muted-foreground border-b border-border bg-card/80">
                     <th className="font-medium py-3 px-5">{t("landing.colDistrict")}</th>
-                    <th className="font-medium py-3 px-5 text-right">{t("landing.colListings")}</th>
                     <th className="font-medium py-3 px-5 text-right">{t("landing.colMedian")}</th>
                   </tr>
                 </thead>
@@ -302,7 +303,6 @@ const Index = () => {
                           {d.name}
                         </button>
                       </td>
-                      <td className="py-3 px-5 text-right tabular-nums text-foreground">{d.count}</td>
                       <td className="py-3 px-5 text-right tabular-nums text-foreground">
                         {d.median != null ? `${fmtNum(d.median)} TL` : "—"}
                       </td>
