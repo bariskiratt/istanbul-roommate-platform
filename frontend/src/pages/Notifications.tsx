@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import UserAvatar from "@/components/UserAvatar";
 import StudentCard from "@/components/campus/StudentCard";
+import LikeContext from "@/components/LikeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
 import { useI18n } from "@/i18n";
@@ -20,6 +21,7 @@ const toNotification = (r: ReceivedLike, unnamed: string) => ({
   id: String(r.swipe_id),
   swipeId: r.swipe_id,
   listingTitle: r.listing_title,
+  raw: r,
   user: {
     id: r.user.id,
     name: r.user.name || unnamed,
@@ -215,7 +217,8 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
       <div className="flex-1 min-w-0">
         <p className="font-display text-lg font-semibold leading-tight text-foreground truncate">{user.name}</p>
         <p className="text-[13px] text-muted-foreground truncate">{user.university}</p>
-        <p className="text-[13px] mt-0.5">
+        <LikeContext like={notification.raw} compact />
+        <p className="text-[13px] mt-1">
           <span className="marker font-semibold">{n(user.budgetMin)}–{n(user.budgetMax)} ₺</span>
         </p>
         <div className="flex flex-wrap gap-1 mt-2">

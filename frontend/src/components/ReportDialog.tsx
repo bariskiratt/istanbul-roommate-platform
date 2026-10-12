@@ -13,6 +13,7 @@ import {
   type ReportTargetType,
 } from "@/lib/api";
 import { reportReasonKey } from "@/lib/reportReasons";
+import { useDialogFocus } from "@/hooks/use-dialog-focus";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 
@@ -42,9 +43,6 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  // Kapanışta odağı çağıran düğmeye geri veririz (klavye kullanıcısı
-  // listenin/başlığın başına fırlamasın).
-  const returnFocusRef = useRef<HTMLElement | null>(null);
   const headingId = useId();
 
   const { data: reasons, isPending, isError } = useQuery({
@@ -60,43 +58,10 @@ const ReportDialog = ({ open, onClose, targetType, targetId, targetLabel }: Repo
     setReason("");
     setNote("");
     setError(null);
-    returnFocusRef.current = document.activeElement as HTMLElement | null;
-    // Panel çizildikten sonra odağı kapat düğmesine al.
-    const id = window.setTimeout(() => closeRef.current?.focus(), 0);
-    return () => {
-      window.clearTimeout(id);
-      returnFocusRef.current?.focus?.();
-    };
   }, [open]);
 
-  // Esc ile kapanma + odağın panel içinde dönmesi (basit tuzak).
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-        return;
-      }
-      if (e.key !== "Tab" || !panelRef.current) return;
-      const focusables = panelRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), textarea, [href], input, select, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || !panelRef.current.contains(active))) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+  // Odak kapat düğmesinde açılır; Esc kapatır, Tab panelde döner.
+  useDialogFocus(open, onClose, panelRef, closeRef);
 
   const submit = async () => {
     if (!reason || sending) return;

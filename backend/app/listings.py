@@ -310,6 +310,20 @@ class ListingIn(BaseModel):
         return self
 
 
+class OwnerProfile(BaseModel):
+    """İlan sahibinin destede görünen "ev arkadaşı" kısmı (bkz.
+    models.Listing.owner_profile). Kartın soru-cevapları buradan üretilir."""
+
+    department: str | None = None
+    year: int | None = None
+    sleep_schedule: str | None = None
+    smoking: bool | None = None
+    pets: bool | None = None
+    alcohol: bool | None = None
+    # Profilin ilk fotoğrafı; öğrenci kartında basılır.
+    photo: str | None = None
+
+
 # NOT: ListingIn'den türetilmez — türetilirse tip doğrulayıcısı yanıt
 # şemasında da koşar ve bozuk bir satır GET'leri 500'e düşürür.
 class ListingOut(BaseModel):
@@ -340,21 +354,24 @@ class ListingOut(BaseModel):
     owner_id: int | None = None
     owner_name: str | None = None
     owner_university: str | None = None
+    owner_profile: OwnerProfile | None = None
 
 
 def _hide_owner(row: models.Listing) -> ListingOut:
-    """İlanı sahibinin adı ve üniversitesi olmadan döndürür.
+    """İlanı sahibinin adı, üniversitesi ve profili olmadan döndürür.
 
     GİRİŞSİZ istemciye ilan sahibinin adı ve okuduğu üniversite gitmemeli:
     ikisi birlikte, hesap bile açmadan tek istekle toplanabilen bir kişi
     listesi üretiyordu (bulgu L3). Bilgi giriş yapan kullanıcıya aynen
     dönmeye devam eder — kimin ilanına baktığını görmek ürünün özü.
+    Sahibin profil özeti (owner_profile: uyku düzeni, alışkanlıklar, bölüm,
+    profil fotoğrafı) aynı kurala bağlı: yalnızca giriş yapana gider.
 
     owner_id KALIR: kimliğe götüren bir isim değil, arayüzün "bu benim ilanım"
     ve raporlama akışlarında kullandığı iç anahtar.
     """
     return ListingOut.model_validate(row).model_copy(
-        update={"owner_name": None, "owner_university": None}
+        update={"owner_name": None, "owner_university": None, "owner_profile": None}
     )
 
 

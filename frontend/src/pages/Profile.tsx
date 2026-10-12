@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Pencil, MapPin, Plus, Trash2 } from "lucide-react";
+import { Settings, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import StudentCard from "@/components/campus/StudentCard";
+import ProfileTimeline from "@/components/campus/ProfileTimeline";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
+import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
 
 const Profile = () => {
@@ -47,7 +48,6 @@ const Profile = () => {
   const location = useLocation();
   const initialTab = (location.state as { tab?: string } | null)?.tab === "listings" ? "listings" : "photos";
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">(initialTab);
-  const [bioExpanded, setBioExpanded] = useState(false);
 
   // Kancalardan SONRA erken çıkışlar. Girişsizken AuthGate, oturum açıkken
   // `me` henüz gelmemişken yükleniyor durumu basılır: bu aralıkta sahte bir
@@ -87,6 +87,10 @@ const Profile = () => {
     bio: me.bio,
     photos: me.photos,
   };
+
+  // Önizleme: başkalarının Beğeniler'de gördüğü düzen (kart, fotoğraf, kart…).
+  // Kapak fotoğrafı yukarıdaki öğrenci kartında olduğu için 1'den başlar.
+  const timeline = interleave(user.photos.slice(1), personPrompts(me, { t, n, locale }), 1);
 
   const matchCount = myMatches.length;
   const listingCount = myListings.length;
@@ -131,40 +135,6 @@ const Profile = () => {
           verified={!!me.university}
         />
 
-        <div className="mt-5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-[13px] text-muted-foreground">{t("profile.fieldBudget")}</span>
-          <span className="marker font-semibold text-[17px]">
-            {n(user.budgetMin)}–{n(user.budgetMax)} ₺
-          </span>
-          <span className="text-[13px] text-muted-foreground">{t("common.perMonth")}</span>
-        </div>
-        {user.preferredDistrict !== "—" && (
-          <p className="mt-2 text-[14px] text-foreground flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-muted-foreground" /> {user.preferredDistrict}
-          </p>
-        )}
-
-        <div className="flex flex-wrap gap-1.5 mt-4">
-          <LifestyleTag type="smoking" value={user.smoking} />
-          <LifestyleTag type="pets" value={user.pets} />
-          <LifestyleTag type="alcohol" value={user.alcohol} />
-          <LifestyleTag type="sleep" value={user.sleepSchedule} />
-        </div>
-
-        {/* Bio: kişinin kendi yazdığı metin, çizgili kâğıtta */}
-        {user.bio && (
-          <div className="mt-5">
-            <p className={`paper-ruled rounded-lg text-[15px] text-foreground whitespace-pre-line ${!bioExpanded ? "line-clamp-4" : ""}`}>
-              {user.bio}
-            </p>
-            {user.bio.length > 160 && (
-              <button onClick={() => setBioExpanded(!bioExpanded)} className="text-[13px] text-secondary font-semibold mt-1.5">
-                {t(bioExpanded ? "profile.showLess" : "profile.showMore")}
-              </button>
-            )}
-          </div>
-        )}
-
         <p className="mt-5 text-[14px] text-muted-foreground">
           <span className="font-semibold text-foreground">{listingCount}</span> {t("profile.statListings")}
           <span className="mx-2.5 text-border" aria-hidden="true">|</span>
@@ -199,20 +169,24 @@ const Profile = () => {
 
         <div className="pt-4">
           {activeTab === "photos" && (
-            user.photos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {user.photos.map((photo, i) => (
-                  <div key={i} className="aspect-[4/5] rounded-xl overflow-hidden bg-muted">
-                    <img src={photo} alt="" className="w-full h-full object-cover object-top" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 space-y-3">
-                <p className="text-muted-foreground">{t("profile.noPhotos")}</p>
-                <Button variant="outline" onClick={() => navigate("/profile/edit")}>{t("profile.edit")}</Button>
-              </div>
-            )
+            <div className="space-y-3">
+              <p className="text-[13px] text-muted-foreground">{t("profile.previewHint")}</p>
+              {user.photos.length === 0 && (
+                <div className="py-2 space-y-3">
+                  <p className="text-muted-foreground">{t("profile.noPhotos")}</p>
+                  <Button variant="outline" onClick={() => navigate("/profile/edit")}>{t("profile.edit")}</Button>
+                </div>
+              )}
+              {timeline.length > 0 ? (
+                <ProfileTimeline items={timeline} />
+              ) : (
+                user.photos.length > 0 && <p className="text-muted-foreground py-2">{t("profile.noPrompts")}</p>
+              )}
+              {/* Bio: kişinin kendi yazdığı metin, çizgili kâğıtta */}
+              {user.bio && (
+                <p className="paper-ruled rounded-lg text-[15px] text-foreground whitespace-pre-line">{user.bio}</p>
+              )}
+            </div>
           )}
 
           {activeTab === "listings" && (

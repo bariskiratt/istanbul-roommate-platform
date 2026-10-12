@@ -2,16 +2,18 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { X, Check, MapPin } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { toast } from "sonner";
-import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import StudentCard from "@/components/campus/StudentCard";
+import ProfileTimeline from "@/components/campus/ProfileTimeline";
+import LikeContext from "@/components/LikeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
 
 // API beğenisini kart bileşeninin beklediği görünüme çevirir
@@ -19,22 +21,15 @@ const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
   id: String(r.swipe_id),
   swipeId: r.swipe_id,
   listingTitle: r.listing_title,
+  // Sunucudaki hâli: neyin beğenildiği, yorum ve kartların kaynağı.
+  raw: r,
   user: {
     id: r.user.id,
     // Ham üniversite: öğrenci kartındaki mühür yalnızca bu doluysa basılır
     rawUniversity: r.user.university,
     rawDepartment: r.user.department,
     name: r.user.name || unnamed,
-    university: r.user.university ?? "—",
-    department: r.user.department ?? "—",
     year: r.user.year ?? 0,
-    preferredDistrict: r.user.preferred_districts.join(", ") || "—",
-    budgetMin: r.user.budget_min ?? 0,
-    budgetMax: r.user.budget_max ?? 0,
-    smoking: r.user.smoking ?? false,
-    pets: r.user.pets ?? false,
-    alcohol: r.user.alcohol ?? false,
-    sleepSchedule: (r.user.sleep_schedule ?? "esnek") as "erken" | "gece" | "esnek",
     bio: r.user.bio,
     photos: r.user.photos,
   },
@@ -252,7 +247,10 @@ const Matches = () => {
   );
 };
 
-/* Sürüklenebilir profil: üstte öğrenci kartı, altında kişinin kendi notları */
+/*
+ * Sürüklenebilir profil, Hinge düzeninde: önce NEYİ beğendiği ve yorumu, sonra
+ * öğrenci kartı, sonra kart, fotoğraf, kart… ve en sonda kendi yazdığı bio.
+ */
 interface ProfileCardProps {
   notification: LikeCard;
   onSwipe: (dir: "left" | "right") => void;
@@ -260,12 +258,15 @@ interface ProfileCardProps {
 }
 
 const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => {
-  const { user } = notification;
-  const { t, n } = useI18n();
+  const { user, raw } = notification;
+  const { t, n, locale } = useI18n();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const acceptOpacity = useTransform(x, [0, 100], [0, 1]);
   const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
+
+  // Kapak fotoğrafı öğrenci kartında; kalanlar kartların arasına girer.
+  const timeline = interleave(raw.user.photos.slice(1), personPrompts(raw.user, { t, n, locale }), 1);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 100) onSwipe("right");
@@ -292,7 +293,12 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
         <span className="stamp stamp-red text-2xl px-4 py-1.5 bg-card/80">{t("likes.passLabel")}</span>
       </motion.div>
 
-      <div className="h-full rounded-2xl border border-border bg-card p-3 space-y-4 overflow-y-auto">
+      {/* İç kaydırıcı dikey kayar, kart yatay sürüklenir (touch-pan-y). */}
+      <div className="h-full rounded-2xl border border-border bg-card p-3 space-y-4 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
+        <div className="px-1 pt-1">
+          <LikeContext like={raw} />
+        </div>
+
         <StudentCard
           name={user.name}
           photo={user.photos[0]}
@@ -303,36 +309,11 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
           verified={!!user.rawUniversity}
         />
 
-        <div className="px-1 space-y-4">
-          <p className="text-[13px] text-muted-foreground">
-            {t("likes.interested", { title: notification.listingTitle })}
-          </p>
+        <ProfileTimeline items={timeline} />
 
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-[13px] text-muted-foreground">{t("profile.fieldBudget")}</span>
-            <span className="marker font-semibold">
-              {n(user.budgetMin)}–{n(user.budgetMax)} ₺
-            </span>
-          </div>
-
-          {user.preferredDistrict !== "—" && (
-            <p className="text-[13px] text-foreground flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-              {user.preferredDistrict}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-1.5">
-            <LifestyleTag type="smoking" value={user.smoking} />
-            <LifestyleTag type="pets" value={user.pets} />
-            <LifestyleTag type="alcohol" value={user.alcohol} />
-            <LifestyleTag type="sleep" value={user.sleepSchedule} />
-          </div>
-
-          {user.bio && (
-            <p className="paper-ruled rounded-lg text-[14px] text-foreground whitespace-pre-line">{user.bio}</p>
-          )}
-        </div>
+        {user.bio && (
+          <p className="paper-ruled rounded-lg text-[14px] text-foreground whitespace-pre-line">{user.bio}</p>
+        )}
       </div>
     </motion.div>
   );

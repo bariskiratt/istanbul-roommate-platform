@@ -171,8 +171,8 @@ downloads. (The code comment at `backend/app/main.py:160` estimates
 module owns its prefix — `/api/listings` at `backend/app/listings.py:21`,
 `/api/auth` at `backend/app/auth.py:30`, `/api/admin` at
 `backend/app/admin.py:80` — except `swipes.py`, which registers a bare router
-and spells out full paths per endpoint (`backend/app/swipes.py:21`,
-`backend/app/swipes.py:123`, `backend/app/swipes.py:275`) because it serves two
+and spells out full paths per endpoint (`backend/app/swipes.py:28`,
+`backend/app/swipes.py:314`, `backend/app/swipes.py:497`) because it serves two
 unrelated prefixes, `/api/swipes` and `/api/matches`.
 
 **4. Dependency injection.** The handler signature is the whole authorization
@@ -402,6 +402,10 @@ erDiagram
         int listing_id FK "decision is about a LISTING"
         string direction "like | pass"
         bool responded
+        string target_kind "NULLABLE - photo | prompt"
+        string target_ref "NULLABLE - photo URL or card key"
+        text comment "NULLABLE - AES-256-GCM at rest"
+        bool comment_delivered "moved into the chat"
     }
     matches {
         int id PK
@@ -483,7 +487,7 @@ drop every anonymous row (`backend/app/listings.py:178-188`).
 ### `swipes` — why the decision points at a listing, not a person
 
 A swipe is `(swiper_id, listing_id, direction)` with a uniqueness constraint on
-the pair (`backend/app/models.py:191-209`). Attaching the decision to a
+the pair (`backend/app/models.py:214-249`). Attaching the decision to a
 **listing** rather than to a user is the more informative choice, and it is
 what the matching rule needs: one person may post several listings, and liking
 "the 2+1 in Kadıköy" is not the same statement as liking its owner.
@@ -491,30 +495,50 @@ what the matching rule needs: one person may post several listings, and liking
 This shows up directly in the reciprocity check. A match fires when the current
 user likes a listing *and* that listing's owner has previously liked **any**
 listing of the current user — a join from swipe to listing to owner
-(`backend/app/swipes.py:107-118`, used at `backend/app/swipes.py:163-169`). If
+(`backend/app/swipes.py:298-309`, used at `backend/app/swipes.py:375-383`). If
 swipes pointed at users, that query would be trivial but the deck could not
 distinguish "not interested in this room" from "not interested in you", and
 `?unswiped=1` — which hides already-decided listings
-(`backend/app/listings.py:340-348`) — would have no natural key.
+(`backend/app/listings.py:433-441`) — would have no natural key.
 
 The `responded` flag exists because a like has a second life: it appears in the
 owner's "Likes" queue until the owner accepts or rejects it
-(`backend/app/swipes.py:198-229`, `backend/app/swipes.py:265`). And re-deciding
+(`backend/app/swipes.py:412-446`, `backend/app/swipes.py:491`). And re-deciding
 the same listing updates the existing row only when the direction actually
 changed, so re-liking cannot be used to spam an owner's queue
-(`backend/app/swipes.py:147-152`).
+(`backend/app/swipes.py:351-363`).
+
+A like can also say **what** was liked and carry a short comment, the way
+Hinge does. `target_kind`/`target_ref` name one photo or one profile card; all
+four new columns are NULL on a plain like, which is what every row written
+before the feature means. A photo is sent as an index and stored as the URL
+read from the listing at that moment (`_resolve_target`,
+`backend/app/swipes.py:203-222`), so a later reorder does not change what was
+liked and a client cannot make the server store an arbitrary URL. Card keys
+are a closed list (`PromptKey`, `backend/app/swipes.py:35-42`); the card text
+itself is generated in the client from the receiver's own data.
+
+The comment's second life is the chat. However the match comes about, by a
+mutual like or by the owner accepting in Likes, `_deliver_comments`
+(`backend/app/swipes.py:242-295`) copies every undelivered comment between the
+two people into the conversation as its first messages, oldest first, and sets
+`comment_delivered` so a comment is moved only once. The ciphertext and the
+moderation flag are copied as they are. A like the owner already **passed** on
+is excluded, so a rejected comment cannot reach the chat later through a
+match on another listing. That is also why the accept path delivers before it
+marks the like `responded` (`backend/app/swipes.py:485-491`).
 
 ### `matches` — normalised pairs, and a nullable `listing_id`
 
 A match is one row per *pair*, with `user_a_id < user_b_id` enforced by sorting
-before insert (`backend/app/swipes.py:88`) so that the unique constraint
-(`backend/app/models.py:220`) catches the mirrored duplicate. Without the
+before insert (`backend/app/swipes.py:152`) so that the unique constraint
+(`backend/app/models.py:260`) catches the mirrored duplicate. Without the
 normalisation, `(3,7)` and `(7,3)` would be two matches and two separate chats
 for one relationship.
 
 **`listing_id` is nullable on purpose.** The model comment states the rule:
 the listing is the *reason a match began*, not its subject — "the match
-survives even if the listing closes" (`backend/app/models.py:225-226`). Two
+survives even if the listing closes" (`backend/app/models.py:265-266`). Two
 places depend on that:
 
 - Permanently deleting a listing sets `matches.listing_id = NULL` and leaves
@@ -522,7 +546,7 @@ places depend on that:
   the rationale spelled out at `backend/app/listings.py:145-150`: deleting a
   listing must not delete what people said to each other.
 - The match list tolerates the null and simply omits the title
-  (`backend/app/swipes.py:318`).
+  (`backend/app/swipes.py:540`).
 
 There is also a hard constraint underneath the philosophy: `matches.listing_id`
 carries a real foreign key, so on Postgres a listing cannot be deleted while a
@@ -683,11 +707,11 @@ change.** The second file is `backend/app/migrate.py`.
 | `app/main.py` | 379 | app assembly, lifespan, map & price endpoints |
 | `app/config.py` | 83 | paths resolved from `__file__`, admin e-mails, upload dir |
 | `app/db.py` | 82 | engine, session factory, `init_db`, `get_db` |
-| `app/models.py` | 348 | the eight tables |
-| `app/migrate.py` | 210 | additive column migrations + drift warning |
+| `app/models.py` | 388 | the eight tables |
+| `app/migrate.py` | 220 | additive column migrations + drift warning |
 | `app/auth.py` | 655 | registration, OTP, sessions, profile, account deletion |
-| `app/listings.py` | 501 | listing CRUD, feed filters, fair-price passthrough |
-| `app/swipes.py` | 325 | swipes, likes queue, match creation, match list |
+| `app/listings.py` | 610 | listing CRUD, feed filters, fair-price passthrough |
+| `app/swipes.py` | 547 | swipes, likes with a target and comment, likes queue, match creation, match list |
 | `app/messages.py` | 152 | per-match chat |
 | `app/reports.py` | 171 | user reports + `require_admin` |
 | `app/admin.py` | 1493 | the moderation surface, `/api/admin/*` |
@@ -805,6 +829,7 @@ cd backend && source venv/bin/activate && python -m pytest tests/ -q
 | `tests/test_auth.py` | 13 | registration, OTP, sessions |
 | `tests/test_messages.py` | 11 | chat endpoints |
 | `tests/test_indexing.py` | 10 | CPI factor |
+| `tests/test_like_comments.py` | 21 | liked photo or card, comments into the chat |
 | `tests/test_swipes.py` | 10 | swipes and matching |
 | `tests/test_reports.py` | 9 | user reports |
 | `tests/test_listing_features.py` | 7 | feature filters |
@@ -816,10 +841,10 @@ cd backend && source venv/bin/activate && python -m pytest tests/ -q
 | `tests/test_departments.py` | 4 | closed department list |
 | `tests/test_emailer.py` | 3 | Brevo delivery |
 | `tests/test_listing_update.py` | 3 | PATCH semantics |
-| **Total** | **381** | |
+| **Total** | **402** | |
 
 The distribution says something true about the project: **moderation,
-reporting and administration are about 60% of the suite** (236 of 381). That
+reporting and administration are about 60% of the suite** (236 of 402). That
 matches where the risk is — these are the code paths that delete data, hide
 content and reveal private text.
 
@@ -927,7 +952,7 @@ Stated plainly, because a document that only lists strengths is not useful.
    every open conversation costs a request per tick.
 
 6. **`GET /api/matches` issues one query per match.** The last message is
-   fetched in a Python loop (`backend/app/swipes.py:302-323`). Fine for a
+   fetched in a Python loop (`backend/app/swipes.py:524-546`). Fine for a
    student with a handful of matches; linear growth in queries per request.
 
 7. **Listing owners cannot reopen their own listings.** Closing is one-way from
