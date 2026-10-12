@@ -134,7 +134,7 @@ const SearchableMenu = ({
 
   return (
     <div className="space-y-2" ref={rootRef}>
-      <label className="text-sm font-medium text-foreground">{label}</label>
+      <label className="text-sm font-semibold text-foreground">{label}</label>
       <div className="relative">
         <button
           ref={triggerRef}
@@ -154,7 +154,7 @@ const SearchableMenu = ({
               setOpen(true);
             }
           }}
-          className="w-full h-14 px-4 rounded-2xl bg-card border border-border text-left flex items-center justify-between hover:border-primary/40 transition-colors disabled:opacity-50 disabled:hover:border-border"
+          className="w-full h-12 px-3.5 rounded-xl bg-card border border-input text-left text-[15px] flex items-center justify-between hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:hover:border-input"
         >
           <span className={value ? "text-foreground" : "text-muted-foreground"}>
             {value || (disabled && disabledHint ? disabledHint : placeholder)}
@@ -165,7 +165,7 @@ const SearchableMenu = ({
         </button>
 
         {open && (
-          <div className="absolute z-50 mt-2 w-full rounded-2xl bg-card border border-border shadow-xl overflow-hidden">
+          <div className="absolute z-50 mt-2 w-full rounded-xl bg-popover border border-border shadow-[0_12px_32px_-12px_hsl(var(--foreground)/0.25)] overflow-hidden">
             <div className="relative border-b border-border">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
@@ -194,7 +194,7 @@ const SearchableMenu = ({
                     <button
                       type="button"
                       onClick={() => onRetry()}
-                      className="text-sm font-semibold text-primary hover:underline"
+                      className="text-sm font-semibold text-secondary hover:underline"
                     >
                       {t("common.retry")}
                     </button>
@@ -221,7 +221,7 @@ const SearchableMenu = ({
                       index === active ? "bg-muted" : ""
                     } ${
                       selected
-                        ? "text-primary font-semibold"
+                        ? "text-foreground font-semibold"
                         : item
                           ? "text-foreground"
                           : "text-muted-foreground"
@@ -286,12 +286,12 @@ const LocationPicker = ({ value, onChange, districtOnly }: Props) => {
       {/* Uç düştüğünde ne kaybedildiği açıkça söylenir: ilçe seçilebilir,
           mahalle seçilemez, dolayısıyla tahmin ilçe geneline dayanır. */}
       {isError && (
-        <div className="flex items-start gap-2 text-xs text-muted-foreground">
+        <div className="flex items-start gap-2 text-[13px] text-muted-foreground">
           <span className="flex-1 leading-relaxed">{t("loc.fallbackNotice")}</span>
           <button
             type="button"
             onClick={() => refetch()}
-            className="font-semibold text-primary hover:underline shrink-0"
+            className="font-semibold text-secondary hover:underline shrink-0"
           >
             {t("common.retry")}
           </button>
@@ -312,7 +312,7 @@ const LocationPicker = ({ value, onChange, districtOnly }: Props) => {
             noMatchText={t("loc.noNeighborhoodMatch")}
             clearLabel={t("loc.neighborhoodNone")}
           />
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-[13px] text-muted-foreground leading-relaxed">
             {t("loc.neighborhoodHint")}
           </p>
         </div>

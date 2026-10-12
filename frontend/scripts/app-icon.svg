@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Ana ekran ikonu: public/favicon.svg'nin köşesiz ve işareti küçültülmüş
+       hali. iOS ve Android köşeleri kendisi yuvarlar; saydam köşe iOS'ta
+       siyah görünür, o yüzden zemin kareyi tam doldurur. İşaret, Android'in
+       maskeleme için güvenli saydığı orta dairenin (çap yüzde 80) içinde.
+       public/apple-touch-icon.png (180) ve public/icon-maskable-512.png
+       bundan çizildi. -->
+  <rect width="64" height="64" fill="#151a33"/>
+  <path fill="#ffffff" d="M27.46 16.04Q31.68 16.04 34.58 17.74Q37.49 19.45 39.09 22.72Q40.69 25.99 40.99 30.72H18.76V27.48L35.8 26.7L31.68 28.56Q31.58 25.56 31.01 23.63Q30.43 21.71 29.37 20.76Q28.31 19.82 26.72 19.82Q25.07 19.82 23.82 20.73Q22.57 21.64 21.86 23.8Q21.15 25.96 21.15 29.77Q21.15 33.52 22.42 36.03Q23.69 38.55 26.05 39.81Q28.41 41.08 31.72 41.08Q33.27 41.08 34.65 40.84Q36.03 40.6 37.35 40.08Q38.67 39.56 40.02 38.71L40.99 40.81Q38.9 42.97 36.73 44.59Q34.55 46.21 32.22 47.08Q29.89 47.96 27.33 47.96Q22.64 47.96 19.16 45.97Q15.69 43.98 13.8 40.5Q11.91 37.03 11.91 32.51Q11.91 27.92 13.71 24.17Q15.52 20.43 19 18.23Q22.47 16.04 27.46 16.04Z"/>
+  <circle cx="46.92" cy="42.83" r="4.26" fill="#ffe83d"/>
+</svg>

@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Edit, MapPin, GraduationCap, Calendar, DollarSign, Plus, Trash2, Instagram, Cigarette, Dog, Wine, Moon, FileText, ChevronRight } from "lucide-react";
+import { Settings, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { motion } from "framer-motion";
 import AuthGate from "@/components/AuthGate";
-import UserAvatar from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import StudentCard from "@/components/campus/StudentCard";
+import ProfileTimeline from "@/components/campus/ProfileTimeline";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
+import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
 
 const Profile = () => {
@@ -46,7 +48,6 @@ const Profile = () => {
   const location = useLocation();
   const initialTab = (location.state as { tab?: string } | null)?.tab === "listings" ? "listings" : "photos";
   const [activeTab, setActiveTab] = useState<"photos" | "listings" | "about">(initialTab);
-  const [bioExpanded, setBioExpanded] = useState(false);
 
   // Kancalardan SONRA erken çıkışlar. Girişsizken AuthGate, oturum açıkken
   // `me` henüz gelmemişken yükleniyor durumu basılır: bu aralıkta sahte bir
@@ -87,6 +88,10 @@ const Profile = () => {
     photos: me.photos,
   };
 
+  // Önizleme: başkalarının Beğeniler'de gördüğü düzen (kart, fotoğraf, kart…).
+  // Kapak fotoğrafı yukarıdaki öğrenci kartında olduğu için 1'den başlar.
+  const timeline = interleave(user.photos.slice(1), personPrompts(me, { t, n, locale }), 1);
+
   const matchCount = myMatches.length;
   const listingCount = myListings.length;
   const memberSince = parseUtc(me.created_at).toLocaleDateString(locale, {
@@ -95,102 +100,51 @@ const Profile = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
       <AppHeader
         title={t("profile.title")}
         rightAction={
-          <div className="flex items-center gap-2">
-            {me && (
-              <button onClick={() => navigate("/profile/edit")} className="text-xs font-medium text-primary flex items-center gap-1 px-3 py-2 rounded-full hover:bg-primary/5 transition-colors">
-                {t("profile.edit")} <Edit className="w-3 h-3" />
-              </button>
-            )}
-            <button onClick={() => navigate("/settings")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate("/profile/edit")}
+              className="h-10 px-3.5 rounded-full border border-border text-[13px] font-semibold text-foreground flex items-center gap-1.5 hover:bg-muted transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> {t("profile.edit")}
+            </button>
+            <button
+              onClick={() => navigate("/settings")}
+              aria-label={t("settings.title")}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+            >
               <Settings className="w-5 h-5" />
             </button>
           </div>
         }
       />
 
-      {/* Compact hero. Yükseklik sınırı yok: dar ekranda yaşam tarzı
-          etiketleri iki satıra inince alttaki istatistik kutusunun üstüne
-          taşıyordu. */}
-      <div className="relative">
-        <div className="h-[100px]" style={{ background: "linear-gradient(135deg, hsl(var(--lavender)) 0%, hsl(var(--background)) 100%)" }} />
-        
-        <div className="px-6 -mt-10 relative z-10">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
-              <UserAvatar
-                name={user.name}
-                photo={user.photos[0]}
-                className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
-                imageClassName="object-top"
-              />
-            </div>
-            {/* Info right of avatar */}
-            <div className="flex-1 pt-2">
-              <h2 className="text-xl font-bold text-foreground">{user.name}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{user.university} · {user.department}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3" /> {user.preferredDistrict} · {t("likes.year", { year: user.year })}
-              </p>
-              {/* Budget pill */}
-              <div className="mt-2 inline-flex items-center gap-1.5 bg-accent/15 rounded-full px-3 py-1">
-                <DollarSign className="w-3 h-3 text-accent" />
-                <span className="text-xs font-bold text-foreground">
-                  {n(user.budgetMin)} — {n(user.budgetMax)} ₺
-                </span>
-              </div>
-            </div>
-          </div>
+      <div className="px-5 pt-5 max-w-lg mx-auto">
+        {/* Öğrenci kartı: kişinin kendisi. Mühür yalnızca üniversite e-posta
+            alan adından gelmişse basılır (bkz. StudentCard). */}
+        <StudentCard
+          name={user.name}
+          photo={user.photos[0]}
+          university={me.university}
+          department={me.department}
+          year={me.year}
+          memberNo={me.id}
+          verified={!!me.university}
+        />
 
-          {/* Lifestyle tags */}
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            <LifestyleTag type="smoking" value={user.smoking} />
-            <LifestyleTag type="pets" value={user.pets} />
-            <LifestyleTag type="alcohol" value={user.alcohol} />
-            <LifestyleTag type="sleep" value={user.sleepSchedule} />
-          </div>
-        </div>
-      </div>
+        <p className="mt-5 text-[14px] text-muted-foreground">
+          <span className="font-semibold text-foreground">{listingCount}</span> {t("profile.statListings")}
+          <span className="mx-2.5 text-border" aria-hidden="true">|</span>
+          <span className="font-semibold text-foreground">{matchCount}</span> {t("profile.statMatches")}
+          <span className="mx-2.5 text-border" aria-hidden="true">|</span>
+          {t("profile.memberSince", { date: memberSince })}
+        </p>
 
-      {/* Bio */}
-      <div className="px-6 pt-4">
-        {user.bio && (
-          <div>
-            <p className={`text-sm text-muted-foreground italic leading-relaxed ${!bioExpanded ? "line-clamp-3" : ""}`}>
-              "{user.bio}"
-            </p>
-            {user.bio.length > 120 && (
-              <button onClick={() => setBioExpanded(!bioExpanded)} className="text-xs text-primary font-medium mt-1">
-                {t(bioExpanded ? "profile.showLess" : "profile.showMore")}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Stats row */}
-      <div className="px-6 pt-4">
-        <div className="grid grid-cols-3 border border-border rounded-xl overflow-hidden">
-          {[
-            { label: t("profile.statListings"), value: listingCount.toString() },
-            { label: t("profile.statMatches"), value: matchCount.toString() },
-            { label: t("profile.statMember"), value: memberSince },
-          ].map((stat, i) => (
-            <div key={stat.label} className={`text-center py-3 ${i < 2 ? "border-r border-border" : ""}`}>
-              <p className="text-lg font-bold text-foreground">{stat.value}</p>
-              <p className="text-[11px] text-muted-foreground">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab bar */}
-      <div className="px-6 pt-5">
-        <div className="flex border-b border-border">
+        {/* Sekmeler */}
+        <div className="mt-6 flex border-b border-border" role="tablist">
           {[
             { key: "photos" as const, label: t("profile.tabPhotos") },
             { key: "listings" as const, label: t("profile.tabListings") },
@@ -198,132 +152,108 @@ const Profile = () => {
           ].map(tab => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === tab.key ? "text-primary" : "text-muted-foreground"
+              className={`flex-1 py-3 text-[14px] font-semibold transition-colors relative ${
+                activeTab === tab.key ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {tab.label}
               {activeTab === tab.key && (
-                <motion.div
-                  layoutId="tab-underline"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                />
+                <motion.div layoutId="tab-underline" className="absolute -bottom-px left-0 right-0 h-[3px] bg-foreground" />
               )}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Tab content */}
-      <div className="px-6 pt-4">
-        {activeTab === "photos" && (
-          user.photos.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
-              {user.photos.map((photo, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="aspect-square rounded-lg overflow-hidden"
-                >
-                  <img src={photo} alt="" className="w-full h-full object-cover object-top" />
-                </motion.div>
-              ))}
+        <div className="pt-4">
+          {activeTab === "photos" && (
+            <div className="space-y-3">
+              <p className="text-[13px] text-muted-foreground">{t("profile.previewHint")}</p>
+              {user.photos.length === 0 && (
+                <div className="py-2 space-y-3">
+                  <p className="text-muted-foreground">{t("profile.noPhotos")}</p>
+                  <Button variant="outline" onClick={() => navigate("/profile/edit")}>{t("profile.edit")}</Button>
+                </div>
+              )}
+              {timeline.length > 0 ? (
+                <ProfileTimeline items={timeline} />
+              ) : (
+                user.photos.length > 0 && <p className="text-muted-foreground py-2">{t("profile.noPrompts")}</p>
+              )}
+              {/* Bio: kişinin kendi yazdığı metin, çizgili kâğıtta */}
+              {user.bio && (
+                <p className="paper-ruled rounded-lg text-[15px] text-foreground whitespace-pre-line">{user.bio}</p>
+              )}
             </div>
-          ) : (
-            <p className="text-center text-sm text-muted-foreground py-8">{t("profile.noPhotos")}</p>
-          )
-        )}
+          )}
 
-        {activeTab === "listings" && (
-          <div className="space-y-3">
-            {myListings.length > 0 ? myListings.map((listing, i) => (
-              <motion.div
-                key={listing.id}
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: i * 0.1 }}
-                className="card-listing overflow-hidden flex"
-              >
-                {listing.photos[0] ? (
-                  <img src={listing.photos[0]} alt="" className="w-28 h-28 object-cover" />
-                ) : (
-                  <div className="w-28 h-28 shrink-0 bg-muted" />
-                )}
-                <div className="p-4 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
-                      listing.type === "ev_ilani" ? "bg-lavender/50 text-foreground" : "bg-accent/15 text-foreground"
-                    }`}>
+          {activeTab === "listings" && (
+            <div className="space-y-3">
+              {myListings.length > 0 ? myListings.map(listing => (
+                <div key={listing.id} className="rounded-2xl border border-border p-2 flex items-center gap-3">
+                  {listing.photos[0] ? (
+                    <img src={listing.photos[0]} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl shrink-0 bg-muted" />
+                  )}
+                  <div className="flex-1 min-w-0 py-1">
+                    <p className="text-[12px] text-muted-foreground">
                       {t(listing.type === "ev_ilani" ? "profile.house" : "profile.personal")}
-                    </span>
-                    {listing.is_active && (
-                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-accent/15 text-foreground font-medium">{t("profile.active")}</span>
-                    )}
+                      {listing.is_active && <span className="ml-2 text-accent font-semibold">{t("profile.active")}</span>}
+                    </p>
+                    <p className="font-display text-[17px] leading-snug text-foreground truncate">{listing.title}</p>
+                    <p className="text-[13px] text-muted-foreground">
+                      {listing.district},{" "}
+                      {listing.type === "ev_ilani"
+                        ? `${n(listing.rent ?? 0)} TL`
+                        : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} TL`}
+                    </p>
                   </div>
-                  <p className="font-bold text-sm text-foreground mt-1.5 truncate">{listing.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {listing.district} • {listing.type === "ev_ilani"
-                      ? `${n(listing.rent ?? 0)} ₺`
-                      : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} ₺`}
-                  </p>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(t("profile.confirmRemove", { title: listing.title }))) {
+                        removeListing.mutate(listing.id);
+                      }
+                    }}
+                    disabled={removeListing.isPending}
+                    aria-label={t("profile.removeListing")}
+                    title={t("profile.removeListing")}
+                    className="mr-1 w-10 h-10 shrink-0 rounded-full text-muted-foreground flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    if (window.confirm(t("profile.confirmRemove", { title: listing.title }))) {
-                      removeListing.mutate(listing.id);
-                    }
-                  }}
-                  disabled={removeListing.isPending}
-                  className="self-center mr-3 w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                  title={t("profile.removeListing")}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </motion.div>
-            )) : (
-              <p className="text-center text-muted-foreground py-8">{t("profile.noListings")}</p>
-            )}
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate("/create-listing")}
-              className="w-full card-listing p-4 flex items-center justify-center gap-2 text-primary font-semibold hover:shadow-lg transition-shadow"
-            >
-              <Plus className="w-5 h-5" />
-              {t("profile.newListing")}
-            </motion.button>
-          </div>
-        )}
+              )) : (
+                <p className="text-muted-foreground py-4">{t("profile.noListings")}</p>
+              )}
+              <Button variant="outline" onClick={() => navigate("/create-listing")} className="w-full h-12">
+                <Plus /> {t("profile.newListing")}
+              </Button>
+            </div>
+          )}
 
-        {activeTab === "about" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-0"
-          >
-            {[
-              { icon: "✉️", label: t("profile.fieldEmail"), value: me?.email ?? "—" },
-              { icon: "🎓", label: t("profile.fieldUniversity"), value: `${user.university} · ${user.department}` },
-              { icon: "📍", label: t("profile.fieldDistrict"), value: user.preferredDistrict },
-              { icon: "💰", label: t("profile.fieldBudget"), value: `${n(user.budgetMin)} — ${n(user.budgetMax)} ₺${t("common.perMonth")}` },
-              { icon: "🚬", label: t("profile.fieldSmoking"), value: t(user.smoking ? "profile.smokes" : "profile.noSmoke") },
-              { icon: "🐾", label: t("profile.fieldPets"), value: t(user.pets ? "profile.petFriendly" : "profile.noPets") },
-              { icon: "🍺", label: t("profile.fieldAlcohol"), value: t(user.alcohol ? "profile.drinks" : "profile.noDrinks") },
-              { icon: "🌙", label: t("profile.fieldSleep"), value: t(user.sleepSchedule === "gece" ? "profile.nightOwl" : user.sleepSchedule === "erken" ? "profile.earlyBird" : "profile.flexible") },
-              { icon: "📝", label: t("profile.fieldBio"), value: user.bio },
-            ].map((field, i) => (
-              <div key={field.label} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-                <span className="text-base">{field.icon}</span>
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">{field.label}</p>
-                  <p className="text-sm text-foreground mt-0.5">{field.value}</p>
+          {activeTab === "about" && (
+            <dl className="divide-y divide-border">
+              {[
+                { label: t("profile.fieldEmail"), value: me?.email ?? "—" },
+                { label: t("profile.fieldUniversity"), value: [me.university, me.department].filter(Boolean).join(", ") || "—" },
+                { label: t("profile.fieldDistrict"), value: user.preferredDistrict },
+                { label: t("profile.fieldBudget"), value: `${n(user.budgetMin)}–${n(user.budgetMax)} TL${t("common.perMonth")}` },
+                { label: t("profile.fieldSmoking"), value: t(user.smoking ? "profile.smokes" : "profile.noSmoke") },
+                { label: t("profile.fieldPets"), value: t(user.pets ? "profile.petFriendly" : "profile.noPets") },
+                { label: t("profile.fieldAlcohol"), value: t(user.alcohol ? "profile.drinks" : "profile.noDrinks") },
+                { label: t("profile.fieldSleep"), value: t(user.sleepSchedule === "gece" ? "profile.nightOwl" : user.sleepSchedule === "erken" ? "profile.earlyBird" : "profile.flexible") },
+              ].map(field => (
+                <div key={field.label} className="py-3 grid grid-cols-[8.5rem_1fr] gap-3">
+                  <dt className="text-[13px] text-muted-foreground">{field.label}</dt>
+                  <dd className="text-[15px] text-foreground break-words">{field.value}</dd>
                 </div>
-              </div>
-            ))}
-          </motion.div>
-        )}
+              ))}
+            </dl>
+          )}
+        </div>
       </div>
 
       <BottomNav />

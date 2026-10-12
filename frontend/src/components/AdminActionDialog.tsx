@@ -188,22 +188,14 @@ const AdminActionDialog = ({
             aria-modal="true"
             aria-labelledby={headingId}
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
+            className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-[440px] max-h-[85vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Başlık */}
             <div className="flex items-start gap-3 px-6 py-4 border-b border-border">
-              <div
-                className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                  config.destructive ? "bg-destructive/10" : "bg-primary/10"
-                }`}
-              >
-                <ShieldAlert
-                  className={`w-4 h-4 ${config.destructive ? "text-destructive" : "text-primary"}`}
-                />
-              </div>
+              <ShieldAlert className={`w-5 h-5 mt-1 shrink-0 ${config.destructive ? "text-destructive" : "text-foreground"}`} />
               <div className="flex-1 min-w-0">
-                <h2 id={headingId} className="text-base font-bold text-foreground">
+                <h2 id={headingId} className="font-display text-xl font-semibold leading-tight text-foreground">
                   {t(config.titleKey)}
                 </h2>
                 {targetLabel && (
@@ -214,7 +206,7 @@ const AdminActionDialog = ({
                 ref={closeRef}
                 onClick={onClose}
                 aria-label={t("common.close")}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-muted/80 shrink-0"
+                className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -233,7 +225,7 @@ const AdminActionDialog = ({
               {config.input !== "none" && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="text-[15px] font-semibold text-foreground">
                       {t(
                         config.input === "reason"
                           ? (config.reasonLabelKey ?? "admin.dlgReasonLabel")
@@ -279,7 +271,7 @@ const AdminActionDialog = ({
               <Button
                 onClick={() => onConfirm(note)}
                 disabled={blocked}
-                className={`rounded-full h-11 px-6 text-sm font-bold ${
+                className={`rounded-full h-11 px-6 text-sm font-semibold ${
                   config.destructive
                     ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     : ""

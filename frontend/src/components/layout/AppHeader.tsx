@@ -1,26 +1,32 @@
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
+import Wordmark from "@/components/campus/Wordmark";
 import { BRAND } from "@/lib/brand";
+import { useI18n } from "@/i18n";
 
 interface AppHeaderProps {
   title: string;
   showBack?: boolean;
+  /** Geri düğmesi geçmişe değil belirli bir sayfaya dönsün (ör. Ayarlar → Profil). */
+  onBack?: () => void;
   rightAction?: React.ReactNode;
   /** Tema/dil düğmelerini gizler (dar başlıklar için). */
   hideControls?: boolean;
 }
 
-const AppHeader = ({ title, showBack = false, rightAction, hideControls = false }: AppHeaderProps) => {
+const AppHeader = ({ title, showBack = false, onBack, rightAction, hideControls = false }: AppHeaderProps) => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   return (
-    <header className="nav-header sticky top-0 z-50 px-6 py-4 flex items-center gap-3">
+    <header className="nav-header sticky top-0 z-50 px-5 h-16 flex items-center gap-3">
       {showBack && (
         <button
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+          onClick={onBack ?? (() => navigate(-1))}
+          aria-label={t("common.back")}
+          className="-ml-2 w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -29,17 +35,14 @@ const AppHeader = ({ title, showBack = false, rightAction, hideControls = false 
           BRAND üzerinden: iki yerde elle yazılsaydı biri değişince logo
           sessizce kaybolurdu. */}
       {!showBack && title === BRAND ? (
-        <div className="flex items-center gap-2 flex-1 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <Home className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-extrabold text-lg text-foreground tracking-tight">{BRAND}</span>
-        </div>
+        <button onClick={() => navigate("/")} className="flex-1 text-left" aria-label={BRAND}>
+          <Wordmark />
+        </button>
       ) : (
-        <h1 className="font-bold text-xl flex-1 text-foreground">{title}</h1>
+        <h1 className="font-display text-[1.6rem] font-semibold flex-1 text-foreground truncate leading-none">{title}</h1>
       )}
       {!hideControls && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <LanguageToggle />
           <ThemeToggle />
         </div>

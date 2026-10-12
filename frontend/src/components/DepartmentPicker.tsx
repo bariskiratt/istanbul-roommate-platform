@@ -41,7 +41,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full h-14 px-4 rounded-2xl bg-card border border-border text-left flex items-center justify-between hover:border-primary/40 transition-colors"
+        className="w-full h-12 px-3.5 rounded-xl bg-card border border-input text-left text-[15px] flex items-center justify-between hover:border-foreground/30 transition-colors"
       >
         <span className={value ? "text-foreground" : "text-muted-foreground"}>
           {value || t(isLoading ? "dept.loading" : "dept.select")}
@@ -50,7 +50,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-2xl bg-card border border-border shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-2 w-full rounded-xl bg-popover border border-border shadow-[0_12px_32px_-12px_hsl(var(--foreground)/0.25)] overflow-hidden">
           <div className="relative border-b border-border">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -76,7 +76,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="text-sm font-semibold text-primary hover:underline"
+                  className="text-sm font-semibold text-secondary hover:underline"
                 >
                   {t("common.retry")}
                 </button>
@@ -89,7 +89,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
             )}
             {Object.entries(filtered).map(([group, items]) => (
               <div key={group}>
-                <p className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="px-4 pt-3 pb-1 text-[12px] font-semibold text-muted-foreground">
                   {group}
                 </p>
                 {items.map(d => (
@@ -102,7 +102,7 @@ const DepartmentPicker = ({ value, onChange }: Props) => {
                       setQuery("");
                     }}
                     className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between hover:bg-muted transition-colors ${
-                      value === d ? "text-primary font-semibold" : "text-foreground"
+                      value === d ? "text-foreground font-semibold" : "text-foreground"
                     }`}
                   >
                     {d}

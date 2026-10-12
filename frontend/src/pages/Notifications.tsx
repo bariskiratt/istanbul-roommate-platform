@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, GraduationCap, DollarSign, MessageCircle, ArrowRight } from "lucide-react";
+import { X, Heart } from "lucide-react";
 import { toast } from "sonner";
 import LifestyleTag from "@/components/LifestyleTag";
 import BottomNav from "@/components/layout/BottomNav";
@@ -10,6 +10,8 @@ import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
 import UserAvatar from "@/components/UserAvatar";
+import StudentCard from "@/components/campus/StudentCard";
+import LikeContext from "@/components/LikeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
 import { useI18n } from "@/i18n";
@@ -19,9 +21,14 @@ const toNotification = (r: ReceivedLike, unnamed: string) => ({
   id: String(r.swipe_id),
   swipeId: r.swipe_id,
   listingTitle: r.listing_title,
+  raw: r,
   user: {
+    id: r.user.id,
     name: r.user.name || unnamed,
     university: r.user.university ?? "—",
+    rawUniversity: r.user.university,
+    rawDepartment: r.user.department,
+    year: r.user.year,
     budgetMin: r.user.budget_min ?? 0,
     budgetMax: r.user.budget_max ?? 0,
     smoking: r.user.smoking ?? false,
@@ -81,127 +88,89 @@ const Notifications = () => {
   }, {} as Record<string, Notification[]>);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
       <AppHeader title={t("notif.title")} />
 
-      <div className="px-6 py-4 space-y-6">
+      <div className="px-5 py-5 space-y-8 max-w-lg mx-auto">
         {Object.entries(groupedByListing).map(([listingTitle, notifs]) => (
-          <div key={listingTitle} className="space-y-3 animate-fade-in">
-            {/* Listing group header — white card with left accent bar */}
-            <div className="card-listing p-4 flex items-center gap-3 border-l-4 border-l-primary">
-              <div>
-                <p className="text-sm font-bold text-foreground">🏠 {listingTitle}</p>
-                <p className="text-xs text-primary font-medium">
-                  {t("notif.likedYourHouse", { count: notifs.length })}
-                </p>
-              </div>
+          <section key={listingTitle} className="space-y-3">
+            {/* Grup başlığı: hangi ilanın beğenildiği */}
+            <div>
+              <h2 className="text-xl text-foreground leading-snug">{listingTitle}</h2>
+              <p className="text-[13px] text-muted-foreground mt-0.5">
+                {t("notif.likedYourHouse", { count: notifs.length })}
+              </p>
             </div>
 
-            {notifs.map(notif => (
-              <NotificationCard
-                key={notif.id}
-                notification={notif}
-                onSwipe={(dir) => handleSwipe(notif.id, dir)}
-              />
-            ))}
-          </div>
+            <ul className="rounded-2xl border border-border divide-y divide-border">
+              {notifs.map(notif => (
+                <NotificationCard
+                  key={notif.id}
+                  notification={notif}
+                  onSwipe={(dir) => handleSwipe(notif.id, dir)}
+                />
+              ))}
+            </ul>
+          </section>
         ))}
 
         {notifications.length === 0 && !matchPopup && (
-          <div className="text-center py-20 animate-fade-in">
-            <div className="w-20 h-20 rounded-3xl bg-lavender/50 flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-10 h-10 text-primary" />
-            </div>
-            <p className="text-muted-foreground font-medium">{t("notif.empty")}</p>
+          <div className="py-16 space-y-2">
+            <p className="font-display text-2xl text-foreground">{t("notif.empty")}</p>
+            <Button variant="outline" onClick={() => navigate("/swipe")}>{t("likes.keepExploring")}</Button>
           </div>
         )}
       </div>
 
-      {/* Match popup — full-screen modal with radial gradient */}
+      {/* Eşleşme anı: Beğeniler sayfasıyla aynı, karşıdakinin kartı ve mühür */}
       <AnimatePresence>
         {matchPopup && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            onClick={() => setMatchPopup(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm"
           >
-            {/* Background gradient */}
-            <div className="absolute inset-0 gradient-hero" />
-            <div className="absolute inset-0 bg-foreground/20" />
-            
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              transition={{ type: "spring", damping: 20 }}
-              className="relative z-10 text-center space-y-6 w-full max-w-sm px-6"
-              onClick={e => e.stopPropagation()}
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: "spring", damping: 22 }}
+              className="relative w-full max-w-sm px-6 space-y-6"
             >
-              <motion.p
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-5xl"
-              >
-                🎉
-              </motion.p>
-              <h2 className="text-3xl font-extrabold text-foreground">{t("likes.matched")}</h2>
-              
-              {/* Avatar merge */}
-              <div className="flex items-center justify-center gap-[-8px]">
-                <motion.div
-                  initial={{ x: -40, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
+              <h2 className="text-5xl leading-none text-foreground">{t("likes.matched")}</h2>
+              <div className="relative">
+                <StudentCard
+                  name={matchPopup.user.name}
+                  photo={matchPopup.user.photos[0]}
+                  university={matchPopup.user.rawUniversity}
+                  department={matchPopup.user.rawDepartment}
+                  year={matchPopup.user.year}
+                  memberNo={matchPopup.user.id}
+                  className="rotate-[-1.5deg]"
+                />
+                <motion.span
+                  initial={{ scale: 1.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.35, duration: 0.25 }}
+                  className="absolute -bottom-4 right-3 rotate-[-10deg]"
                 >
-                  <UserAvatar
-                    name={matchPopup.user.name}
-                    photo={matchPopup.user.photos[0]}
-                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
-                  />
-                </motion.div>
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="w-10 h-10 rounded-full bg-accent flex items-center justify-center -mx-3 z-10 shadow-lg"
-                >
-                  <Heart className="w-5 h-5 text-accent-foreground" />
-                </motion.div>
-                <motion.div
-                  initial={{ x: 40, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <UserAvatar
-                    name={me?.name ?? ""}
-                    photo={me?.photos[0]}
-                    className="w-20 h-20 text-2xl border-4 border-card shadow-lg"
-                  />
-                </motion.div>
+                  <span className="stamp text-2xl px-4 py-1.5 bg-card/80">{t("likes.matchStamp")}</span>
+                </motion.span>
               </div>
-
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground pt-2">
                 {t("likes.matchedWith", { name: matchPopup.user.name })}
               </p>
-              
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2">
                 <Button
+                  size="lg"
                   onClick={() => { setMatchPopup(null); navigate("/messages"); }}
-                  className="w-full h-14 bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg font-bold text-base"
+                  className="w-full h-12 text-base"
                 >
-                  <MessageCircle className="w-5 h-5 mr-2" />
                   {t("likes.sendMessage")}
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setMatchPopup(null)}
-                  className="w-full h-12 text-foreground font-medium"
-                >
-                  {t("landing.ctaContinue")}
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                <Button variant="ghost" size="lg" onClick={() => setMatchPopup(null)} className="w-full h-12">
+                  {t("likes.keepExploring")}
                 </Button>
               </div>
             </motion.div>
@@ -209,26 +178,25 @@ const Notifications = () => {
         )}
       </AnimatePresence>
 
-      {/* Confetti — pastel colors */}
+      {/* Delgeç konfetisi: kâğıttan delinmiş yuvarlaklar */}
       {confetti && (
-        <div className="fixed inset-0 z-40 pointer-events-none overflow-hidden">
-          {Array.from({ length: 40 }).map((_, i) => (
+        <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden" aria-hidden="true">
+          {Array.from({ length: 36 }).map((_, i) => (
             <div
               key={i}
-              className="absolute w-3 h-3 animate-confetti"
+              className="absolute w-2.5 h-2.5 rounded-full animate-confetti"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `-${Math.random() * 20}%`,
                 animationDelay: `${Math.random() * 0.5}s`,
                 animationDuration: `${1 + Math.random() * 1}s`,
                 backgroundColor: [
-                  "hsl(var(--lavender))",
-                  "hsl(var(--mint))",
-                  "hsl(var(--primary))",
-                  "hsl(var(--sand))",
-                  "hsl(var(--coral) / 0.5)",
-                ][Math.floor(Math.random() * 5)],
-                borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+                  "hsl(var(--highlighter))",
+                  "hsl(var(--secondary))",
+                  "hsl(var(--accent))",
+                  "hsl(var(--card))",
+                ][i % 4],
+                border: "1px solid hsl(var(--border))",
               }}
             />
           ))}
@@ -244,18 +212,15 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
   const { user } = notification;
   const { t, n } = useI18n();
   return (
-    <div className="card-listing p-5 flex items-center gap-4">
+    <li className="p-4 flex items-center gap-4">
       <UserAvatar name={user.name} photo={user.photos[0]} className="w-14 h-14 text-lg" />
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-foreground truncate">{user.name}</p>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-          <GraduationCap className="w-3.5 h-3.5" />
-          {user.university}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-          <DollarSign className="w-3.5 h-3.5" />
-          {n(user.budgetMin)} — {n(user.budgetMax)} {t("common.currency")}
-        </div>
+        <p className="font-display text-lg font-semibold leading-tight text-foreground truncate">{user.name}</p>
+        <p className="text-[13px] text-muted-foreground truncate">{user.university}</p>
+        <LikeContext like={notification.raw} compact />
+        <p className="text-[13px] mt-1">
+          <span className="marker font-semibold">{n(user.budgetMin)}–{n(user.budgetMax)} TL</span>
+        </p>
         <div className="flex flex-wrap gap-1 mt-2">
           <LifestyleTag type="smoking" value={user.smoking} compact />
           <LifestyleTag type="pets" value={user.pets} compact />
@@ -263,14 +228,22 @@ const NotificationCard = ({ notification, onSwipe }: { notification: Notificatio
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <button onClick={() => onSwipe("right")} className="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-all hover:shadow-md active:scale-95">
+        <button
+          onClick={() => onSwipe("right")}
+          aria-label={t("swipe.like")}
+          className="btn-swipe-like w-11 h-11 flex items-center justify-center"
+        >
           <Heart className="w-5 h-5" />
         </button>
-        <button onClick={() => onSwipe("left")} className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-all hover:shadow-md active:scale-95">
+        <button
+          onClick={() => onSwipe("left")}
+          aria-label={t("swipe.pass")}
+          className="btn-swipe-pass w-11 h-11 flex items-center justify-center"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
-    </div>
+    </li>
   );
 };
 

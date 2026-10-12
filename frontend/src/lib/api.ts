@@ -231,6 +231,22 @@ export interface ListingPayload {
   budget_max?: number;
 }
 
+/**
+ * İlan sahibinin destede görünen "ev arkadaşı" kısmı. Kartın soru-cevapları
+ * (uyku düzeni, alışkanlıklar, bölüm) buradan üretilir (bkz. lib/prompts.ts).
+ * Bütçe, semtler ve bio bilerek yok; girişsiz istekte alanın tamamı null.
+ */
+export interface OwnerProfile {
+  department: string | null;
+  year: number | null;
+  sleep_schedule: string | null;
+  smoking: boolean | null;
+  pets: boolean | null;
+  alcohol: boolean | null;
+  /** Profilin ilk fotoğrafı. */
+  photo: string | null;
+}
+
 export interface ApiListing extends ListingPayload {
   id: number;
   /** Sunucu her zaman alanı döndürür; seçilmemişse null. */
@@ -240,6 +256,8 @@ export interface ApiListing extends ListingPayload {
   owner_id: number | null;
   owner_name: string | null;
   owner_university: string | null;
+  /** Yalnızca giriş yapmış istekte dolu. Eski sunucu alanı hiç göndermeyebilir. */
+  owner_profile?: OwnerProfile | null;
 }
 
 export const createListing = (payload: ListingPayload) =>
@@ -422,11 +440,42 @@ export interface SwipeResult {
   match_id: number | null;
 }
 
+/**
+ * Beğenilebilen kartlar — sunucudaki kapalı listeyle birebir
+ * (backend/app/swipes.py PromptKey). Kartın metni arayüzde üretilir.
+ */
+export type PromptKey =
+  | "description"
+  | "sleep"
+  | "habits"
+  | "studies"
+  | "house_rules"
+  | "amenities";
+
+/**
+ * Hinge tarzı beğeninin hedefi. Fotoğrafta ADRES değil dizin gönderilir;
+ * sunucu adresi ilandan okur (istemcinin yazdığı adres saklanmaz).
+ */
+export type LikeTarget =
+  | { kind: "photo"; photo_index: number }
+  | { kind: "prompt"; prompt_key: PromptKey };
+
+/** Sunucunun yorumu kabul ettiği en uzun metin. */
+export const LIKE_COMMENT_MAX = 300;
+
 export interface ReceivedLike {
   swipe_id: number;
   user: PublicUser;
   listing_id: number;
   listing_title: string;
+  /** null: ilanın tamamı beğenildi. Fotoğrafta beğenildiği andaki adres gelir. */
+  target: {
+    kind: "photo" | "prompt";
+    photo_url: string | null;
+    prompt_key: string | null;
+  } | null;
+  /** Beğeniyle gelen yorum; yoksa null. Eşleşince sohbetin ilk mesajı olur. */
+  comment: string | null;
   created_at: string;
 }
 
@@ -440,8 +489,22 @@ export interface Match {
   last_message_at: string | null;
 }
 
-export const postSwipe = (listingId: number, direction: "like" | "pass") =>
-  postJSON<SwipeResult>("/api/swipes", { listing_id: listingId, direction });
+/**
+ * Kaydırma kararı. Beğenide isteğe bağlı olarak hedef (fotoğraf / kart) ve
+ * yorum gider; boş yorum hiç gönderilmez. Yorum denetimden geçmezse sunucu
+ * 422 döner ve beğeni KAYDEDİLMEZ — çağıran metni kullanıcıya geri vermeli.
+ */
+export const postSwipe = (
+  listingId: number,
+  direction: "like" | "pass",
+  like?: { target?: LikeTarget; comment?: string },
+) =>
+  postJSON<SwipeResult>("/api/swipes", {
+    listing_id: listingId,
+    direction,
+    ...(like?.target ? { target: like.target } : {}),
+    ...(like?.comment?.trim() ? { comment: like.comment.trim() } : {}),
+  });
 
 export const fetchReceivedLikes = () =>
   getJSON<ReceivedLike[]>("/api/swipes/received");

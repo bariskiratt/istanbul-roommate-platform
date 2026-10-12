@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
-  ArrowLeft, ArrowRight, ArrowUpDown, Car, Check, Cigarette, Dog, FileText,
+  ArrowLeft, ArrowUpDown, Car, Check, Cigarette, Dog,
   Flame, Home, ImagePlus, Sofa, Sun, Thermometer, User, Wifi, X
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -293,62 +293,48 @@ const CreateListing = () => {
     );
   }
 
+  // Seçili seçenek: mürekkeple doldurulmuş kutu (Onboarding ile aynı dil)
+  const choice = (selected: boolean) =>
+    selected
+      ? "border-foreground bg-foreground text-background"
+      : "border-input bg-card text-foreground hover:border-foreground/40";
+
   // Type selection screen
   if (!listingType) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <div className="px-6 pt-4 pb-2 flex items-center gap-3">
+        <div className="px-4 h-16 flex items-center gap-2 border-b border-border">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+            aria-label={t("common.back")}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="font-bold text-xl text-foreground">{t("create.title")}</h1>
+          <h1 className="font-display text-[1.35rem] font-semibold text-foreground">{t("create.title")}</h1>
         </div>
 
-        <div className="flex-1 px-6 pt-8 space-y-6">
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-2xl bg-lavender/50 flex items-center justify-center mx-auto">
-              <FileText className="w-8 h-8 text-primary" />
-            </div>
-            <h2 className="text-[28px] font-bold text-foreground">{t("create.typeQuestion")}</h2>
-            <p className="text-muted-foreground text-sm max-w-[280px] mx-auto">
-              {t("create.typeSub")}
-            </p>
-          </div>
+        <div className="flex-1 w-full max-w-md mx-auto px-5 pt-8 pb-12">
+          <h2 className="text-[2.1rem] text-foreground leading-[1.08]">{t("create.typeQuestion")}</h2>
+          <p className="mt-2 text-muted-foreground leading-relaxed">{t("create.typeSub")}</p>
 
-          <div className="space-y-4 pt-4">
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => { setListingType("ev_ilani"); setCurrentStep(0); }}
-              className="w-full card-listing p-6 flex items-center gap-5 text-left hover:shadow-lg transition-shadow"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0">
-                <Home className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg text-foreground">{t("common.houseListing")}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{t("create.houseDesc")}</p>
-              </div>
-              <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => { setListingType("kisisel_ilan"); setCurrentStep(0); }}
-              className="w-full card-listing p-6 flex items-center gap-5 text-left hover:shadow-lg transition-shadow"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center flex-shrink-0">
-                <User className="w-8 h-8 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg text-foreground">{t("common.personalListing")}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{t("create.personalDesc")}</p>
-              </div>
-              <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
-            </motion.button>
+          <div className="mt-8 space-y-3">
+            {[
+              { type: "ev_ilani" as const, icon: Home, label: t("common.houseListing"), desc: t("create.houseDesc") },
+              { type: "kisisel_ilan" as const, icon: User, label: t("common.personalListing"), desc: t("create.personalDesc") },
+            ].map(opt => (
+              <button
+                key={opt.type}
+                onClick={() => { setListingType(opt.type); setCurrentStep(0); }}
+                className="w-full rounded-2xl border border-border bg-card p-5 flex items-start gap-4 text-left hover:border-foreground/40 transition-colors"
+              >
+                <opt.icon className="w-6 h-6 mt-1 shrink-0 text-secondary" />
+                <span className="min-w-0">
+                  <span className="block font-display text-xl font-semibold text-foreground">{opt.label}</span>
+                  <span className="block mt-1 text-[14px] text-muted-foreground leading-relaxed">{opt.desc}</span>
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -357,55 +343,50 @@ const CreateListing = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
-      <div className="px-6 pt-4 pb-2 flex items-center gap-3">
+      {/* Üst çubuk: geri, adım sayacı, ilan tipi */}
+      <div className="px-4 h-16 flex items-center gap-2 border-b border-border">
         <button
           onClick={back}
-          className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+          aria-label={t("common.back")}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
-          <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
-            isHouse ? "bg-lavender/50 text-foreground" : "bg-accent/15 text-foreground"
-          }`}>
-            {isHouse ? `🏠 ${t("common.houseListing")}` : `👤 ${t("common.personalListing")}`}
-          </span>
-        </div>
+        <span className="flex-1 text-[13px] text-muted-foreground text-center">
+          {t("ob.stepCounter", { current: currentStep + 1, total: totalSteps })}
+        </span>
+        <span className="h-8 px-3 rounded-full border border-border text-[12px] font-semibold text-foreground flex items-center">
+          {isHouse ? t("common.houseListing") : t("common.personalListing")}
+        </span>
       </div>
 
-      {/* Progress */}
-      <div className="px-6 pb-2">
-        <div className="h-[3px] w-full bg-muted rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          />
-        </div>
+      {/* İlerleme: mürekkep çizgisi */}
+      <div className="h-[3px] w-full bg-muted">
+        <motion.div
+          className="h-full bg-foreground"
+          initial={false}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        />
       </div>
 
       {/* Content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStep}
-          initial={{ opacity: 0, x: 30 }}
+          initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -30 }}
-          transition={{ duration: 0.3 }}
-          className="flex-1 px-6 pb-32 overflow-y-auto"
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.25 }}
+          className="flex-1 w-full max-w-md mx-auto px-5 pb-40 overflow-y-auto"
         >
           {/* Step 0: Details */}
           {currentStep === 0 && (
-            <div className="space-y-5 pt-6">
-              <div className="text-center space-y-2 pb-4">
-                <h2 className="text-[28px] font-bold text-foreground">{t("create.detailsTitle")}</h2>
-                <p className="text-muted-foreground text-sm">{t("create.detailsSub")}</p>
-              </div>
+            <div className="space-y-5">
+              <StepHeader title={t("create.detailsTitle")} sub={t("create.detailsSub")} />
 
               <div className="space-y-2">
-                <label htmlFor="listing-title" className="text-sm font-medium text-foreground">
+                <label htmlFor="listing-title" className="text-sm font-semibold text-foreground">
                   {t("create.titleLabel")}
                 </label>
                 <Input
@@ -415,21 +396,19 @@ const CreateListing = () => {
                   onChange={e => { setTitle(e.target.value); clearFieldError("title"); }}
                   aria-invalid={titleRejected}
                   aria-describedby={titleRejected ? "listing-title-error" : undefined}
-                  className={`h-14 text-base rounded-2xl bg-card shadow-sm focus:shadow-md transition-shadow ${
-                    titleRejected
-                      ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/25"
-                      : "border-border focus:ring-2 focus:ring-primary/20"
-                  }`}
+                  className={`h-12 ${titleRejected ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20" : ""}`}
                 />
                 {titleRejected && (
-                  <p id="listing-title-error" role="alert" className="text-xs text-destructive leading-relaxed">
+                  <p id="listing-title-error" role="alert" className="text-[13px] text-destructive leading-relaxed">
                     {submitError.message}
                   </p>
                 )}
               </div>
 
+              {/* Açıklama kişinin kendi sözü: ilanda nasıl görünecekse
+                  (çizgili kâğıt) öyle yazılır. */}
               <div className="space-y-2">
-                <label htmlFor="listing-desc" className="text-sm font-medium text-foreground">
+                <label htmlFor="listing-desc" className="text-sm font-semibold text-foreground">
                   {t("create.descLabel")}
                 </label>
                 <textarea
@@ -437,17 +416,18 @@ const CreateListing = () => {
                   placeholder={t("create.descPlaceholder")}
                   value={description}
                   onChange={e => { setDescription(e.target.value); clearFieldError("description"); }}
-                  rows={4}
+                  rows={5}
                   aria-invalid={descRejected}
                   aria-describedby={descRejected ? "listing-desc-error" : undefined}
-                  className={`w-full rounded-2xl bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground shadow-sm focus:shadow-md transition-shadow outline-none resize-none ${
+                  style={{ backgroundAttachment: "local" }}
+                  className={`paper-ruled w-full rounded-xl border text-[15px] text-foreground placeholder:text-muted-foreground/80 outline-none resize-none transition-colors focus-visible:ring-[3px] ${
                     descRejected
-                      ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/25"
-                      : "border border-border focus:ring-2 focus:ring-primary/20"
+                      ? "border-destructive focus-visible:ring-destructive/20"
+                      : "border-input hover:border-foreground/30 focus-visible:border-secondary focus-visible:ring-secondary/20"
                   }`}
                 />
                 {descRejected && (
-                  <p id="listing-desc-error" role="alert" className="text-xs text-destructive leading-relaxed">
+                  <p id="listing-desc-error" role="alert" className="text-[13px] text-destructive leading-relaxed">
                     {submitError.message}
                   </p>
                 )}
@@ -456,27 +436,26 @@ const CreateListing = () => {
               {isHouse && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">{t("create.rentLabel")}</label>
+                    <label htmlFor="listing-rent" className="text-sm font-semibold text-foreground">{t("create.rentLabel")}</label>
                     <Input
+                      id="listing-rent"
                       type="number"
+                      inputMode="numeric"
                       placeholder={t("create.rentPlaceholder")}
                       value={rent}
                       onChange={e => setRent(e.target.value)}
-                      className="h-14 text-base rounded-2xl bg-card border-border shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      className="h-12"
                     />
                   </div>
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground">{t("create.roomsLabel")}</label>
-                    <div className="grid grid-cols-4 gap-3">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-foreground">{t("create.roomsLabel")}</p>
+                    <div className="grid grid-cols-4 gap-2">
                       {["1+0", "1+1", "2+1", "3+1"].map(r => (
                         <button
                           key={r}
                           onClick={() => setRoomCount(r)}
-                          className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all ${
-                            roomCount === r
-                              ? "border-secondary bg-lavender/30 shadow-md"
-                              : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
-                          }`}
+                          aria-pressed={roomCount === r}
+                          className={`h-12 rounded-xl border text-[15px] font-semibold transition-colors ${choice(roomCount === r)}`}
                         >
                           {r}
                         </button>
@@ -490,68 +469,56 @@ const CreateListing = () => {
 
           {/* Step 1: Rules + features (ev) or Budget (kişisel) */}
           {currentStep === 1 && isHouse && (
-            <div className="space-y-5 pt-6">
-              <div className="text-center space-y-2 pb-4">
-                <h2 className="text-[28px] font-bold text-foreground">{t("create.rulesTitle")}</h2>
-                <p className="text-muted-foreground text-sm">{t("create.rulesSub")}</p>
+            <div className="space-y-6">
+              <StepHeader title={t("create.rulesTitle")} sub={t("create.rulesSub")} />
+
+              <div className="rounded-2xl border border-border divide-y divide-border">
+                {[
+                  { key: "smoking", icon: Cigarette, label: t("create.smokingLabel"), desc: t("create.smokingDesc"), value: smokingAllowed, setValue: setSmokingAllowed },
+                  { key: "pets", icon: Dog, label: t("create.petsLabel"), desc: t("create.petsDesc"), value: petsAllowed, setValue: setPetsAllowed },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    role="switch"
+                    aria-checked={item.value}
+                    onClick={() => item.setValue(!item.value)}
+                    className="w-full flex items-center gap-4 px-4 py-4 text-left"
+                  >
+                    <item.icon className="w-5 h-5 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-semibold text-foreground">{item.label}</span>
+                      <span className="block text-[13px] text-muted-foreground">{item.desc}</span>
+                    </span>
+                    <span className={`w-11 h-6 shrink-0 rounded-full p-0.5 transition-colors ${item.value ? "bg-foreground" : "bg-muted"}`}>
+                      <motion.span
+                        className="block w-5 h-5 rounded-full bg-card"
+                        animate={{ x: item.value ? 20 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      />
+                    </span>
+                  </button>
+                ))}
               </div>
 
-              {[
-                { key: "smoking", icon: Cigarette, label: t("create.smokingLabel"), desc: t("create.smokingDesc"), value: smokingAllowed, setValue: setSmokingAllowed },
-                { key: "pets", icon: Dog, label: t("create.petsLabel"), desc: t("create.petsDesc"), value: petsAllowed, setValue: setPetsAllowed },
-              ].map(item => (
-                <button
-                  key={item.key}
-                  onClick={() => item.setValue(!item.value)}
-                  className={`w-full flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
-                    item.value
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : "border-border bg-card hover:shadow-sm"
-                  }`}
-                >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
-                    item.value ? "bg-primary text-primary-foreground" : "bg-lavender/50 text-muted-foreground"
-                  }`}>
-                    <item.icon className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <div className={`w-12 h-7 rounded-full p-0.5 transition-colors ${
-                    item.value ? "bg-primary" : "bg-muted"
-                  }`}>
-                    <motion.div
-                      className="w-6 h-6 rounded-full bg-card shadow-sm"
-                      animate={{ x: item.value ? 20 : 0 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  </div>
-                </button>
-              ))}
-
               {/* Ev özellikleri — yalnızca ev ilanında; işaretlenenler filtrelerde kullanılıyor */}
-              <div className="pt-2 space-y-3">
+              <div className="space-y-3">
                 <div>
-                  <h3 className="text-sm font-medium text-foreground">{t("create.featuresTitle")}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{t("create.featuresSub")}</p>
+                  <h3 className="text-xl text-foreground">{t("create.featuresTitle")}</h3>
+                  <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{t("create.featuresSub")}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {featureFields.map(f => {
                     const selected = features[f.value];
                     return (
                       <button
                         key={f.value}
                         onClick={() => toggleFeature(f.value)}
-                        className={`p-4 rounded-2xl border-2 text-sm font-medium transition-all flex items-center gap-2 text-left ${
-                          selected
-                            ? "border-secondary bg-lavender/30 shadow-md"
-                            : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
-                        }`}
+                        aria-pressed={selected}
+                        className={`min-h-[3.25rem] px-3.5 py-2.5 rounded-xl border text-[14px] font-semibold transition-colors flex items-center gap-2 text-left ${choice(selected)}`}
                       >
-                        <f.icon className={`w-4 h-4 flex-shrink-0 ${selected ? "text-primary" : "text-muted-foreground"}`} />
+                        <f.icon className={`w-4 h-4 shrink-0 ${selected ? "" : "text-muted-foreground"}`} />
                         <span className="leading-tight">{t(f.key)}</span>
-                        {selected && <Check className="w-4 h-4 text-primary ml-auto flex-shrink-0" />}
+                        {selected && <Check className="w-4 h-4 ml-auto shrink-0" />}
                       </button>
                     );
                   })}
@@ -561,18 +528,15 @@ const CreateListing = () => {
           )}
 
           {currentStep === 1 && !isHouse && (
-            <div className="space-y-6 pt-6">
-              <div className="text-center space-y-2 pb-4">
-                <h2 className="text-[28px] font-bold text-foreground">{t("create.budgetTitle")}</h2>
-                <p className="text-muted-foreground text-sm">{t("create.budgetSub")}</p>
-              </div>
+            <div className="space-y-6">
+              <StepHeader title={t("create.budgetTitle")} sub={t("create.budgetSub")} />
 
-              <div className="card-listing p-6 space-y-5">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">
-                    {n(budget[0])} {t("common.currency")} — {n(budget[1])} {t("common.currency")}
+              <div className="rounded-2xl border border-border p-5 space-y-5">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1.5">{t("create.budgetLabel")}</p>
+                  <p className="text-2xl font-semibold">
+                    <span className="marker">{n(budget[0])}–{n(budget[1])} TL</span>
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t("create.budgetLabel")}</p>
                 </div>
                 <Slider
                   value={budget}
@@ -583,8 +547,8 @@ const CreateListing = () => {
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{n(1000)} {t("common.currency")}</span>
-                  <span>{n(20000)} {t("common.currency")}</span>
+                  <span>{n(1000)} TL</span>
+                  <span>{n(20000)} TL</span>
                 </div>
               </div>
             </div>
@@ -592,13 +556,11 @@ const CreateListing = () => {
 
           {/* Step 2: Location */}
           {currentStep === 2 && (
-            <div className="space-y-5 pt-6">
-              <div className="text-center space-y-2 pb-4">
-                <h2 className="text-[28px] font-bold text-foreground">{t("create.locationTitle")}</h2>
-                <p className="text-muted-foreground text-sm">
-                  {isHouse ? t("create.locationSubHouse") : t("create.locationSubPersonal")}
-                </p>
-              </div>
+            <div className="space-y-5">
+              <StepHeader
+                title={t("create.locationTitle")}
+                sub={isHouse ? t("create.locationSubHouse") : t("create.locationSubPersonal")}
+              />
 
               {/* İlçe/mahalle listesi sunucudan gelir (38 ilçe, 539 mahalle).
                   Mahalle YALNIZCA ev ilanında sorulur: adil fiyat sadece ev
@@ -620,26 +582,23 @@ const CreateListing = () => {
 
           {/* Step 3: Photos */}
           {currentStep === 3 && (
-            <div className="space-y-5 pt-6">
-              <div className="text-center space-y-2 pb-4">
-                <h2 className="text-[28px] font-bold text-foreground">{t("create.photosTitle")}</h2>
-                <p className="text-muted-foreground text-sm">
-                  {isHouse ? t("create.photosSubHouse") : t("create.photosSubPersonal")}
-                </p>
-              </div>
+            <div className="space-y-5">
+              <StepHeader
+                title={t("create.photosTitle")}
+                sub={isHouse ? t("create.photosSubHouse") : t("create.photosSubPersonal")}
+              />
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {photos.map((photo, i) => (
-                  <div key={i} className="aspect-square rounded-2xl overflow-hidden border-2 border-primary relative shadow-md group">
+                  <div key={i} className="aspect-[3/4] rounded-xl overflow-hidden bg-muted relative">
                     <img src={photo} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                      <Check className="w-4 h-4 text-accent-foreground" />
-                    </div>
+                    {/* Dokunmatik ekranda üzerine gelme yok: kaldır düğmesi hep görünür */}
                     <button
                       onClick={() => removePhoto(i)}
-                      className="absolute top-2 left-2 w-6 h-6 rounded-full bg-destructive/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label={t("pedit.removePhoto")}
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-background/90 text-foreground flex items-center justify-center hover:bg-background transition-colors"
                     >
-                      <X className="w-3 h-3 text-destructive-foreground" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -647,12 +606,12 @@ const CreateListing = () => {
                   <button
                     onClick={() => pickPhoto(MAX_PHOTOS - photos.length)}
                     disabled={uploading}
-                    className={`aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 bg-card hover:bg-lavender/20 transition-all hover:border-primary/40 hover:shadow-sm disabled:opacity-50 ${
-                      photosRejected ? "border-destructive" : "border-muted-foreground/30"
+                    className={`aspect-[3/4] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 bg-card transition-colors hover:border-foreground/40 disabled:opacity-50 ${
+                      photosRejected ? "border-destructive" : "border-input"
                     }`}
                   >
-                    <ImagePlus className={`w-8 h-8 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
-                    <span className="text-xs text-muted-foreground font-medium">
+                    <ImagePlus className={`w-7 h-7 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />
+                    <span className="text-[13px] text-muted-foreground font-semibold">
                       {uploading ? t("common.loading") : t("create.addPhoto")}
                     </span>
                   </button>
@@ -664,24 +623,24 @@ const CreateListing = () => {
                   atlıyor ve çubuk üçüncüden sonra dolmayı bırakıyordu.
                   Alt sınıra kadar olanlar zorunlu, sonrası isteğe bağlı. */}
               <div className="space-y-2">
-                <div className="flex items-center justify-center gap-1.5" aria-hidden="true">
+                <div className="flex items-center gap-1.5" aria-hidden="true">
                   {Array.from({ length: MAX_PHOTOS }).map((_, i) => (
                     <span
                       key={i}
                       className={`h-1.5 w-6 rounded-full transition-colors ${
                         i < photos.length
-                          ? "bg-primary"
+                          ? "bg-foreground"
                           : i < MIN_PHOTOS
-                            ? "bg-muted"
-                            : "bg-muted/50"
+                            ? "bg-muted-foreground/30"
+                            : "bg-muted"
                       }`}
                     />
                   ))}
                 </div>
-                <p className="text-xs font-semibold text-foreground text-center" aria-live="polite">
+                <p className="text-[13px] font-semibold text-foreground" aria-live="polite">
                   {t("create.photoCount", { count: photos.length, max: MAX_PHOTOS })}
                 </p>
-                <p className="text-xs text-muted-foreground text-center leading-relaxed">
+                <p className="text-[13px] text-muted-foreground leading-relaxed">
                   {photos.length < MIN_PHOTOS
                     ? t("create.photoMinHint", { min: MIN_PHOTOS })
                     : t("create.photoEnough", { max: MAX_PHOTOS })}
@@ -690,7 +649,7 @@ const CreateListing = () => {
 
               {/* Sunucu fotoğrafları reddettiyse (ör. 3'ten az) burada söylenir. */}
               {photosRejected && (
-                <p role="alert" className="text-xs text-destructive text-center leading-relaxed">
+                <p role="alert" className="text-[13px] text-destructive leading-relaxed">
                   {submitError.message}
                 </p>
               )}
@@ -700,15 +659,15 @@ const CreateListing = () => {
               {uploadError && (
                 <div
                   role="alert"
-                  className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 space-y-2"
+                  className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 space-y-2"
                 >
-                  <p className="text-xs font-semibold text-foreground">{t("common.photoUploadFailed")}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{uploadError}</p>
+                  <p className="text-[13px] font-semibold text-foreground">{t("common.photoUploadFailed")}</p>
+                  <p className="text-[13px] text-muted-foreground leading-relaxed">{uploadError}</p>
                   {photos.length < MAX_PHOTOS && (
                     <button
                       onClick={() => pickPhoto(MAX_PHOTOS - photos.length)}
                       disabled={uploading}
-                      className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                      className="text-[13px] font-semibold text-secondary hover:underline disabled:opacity-50"
                     >
                       {t("common.retry")}
                     </button>
@@ -720,39 +679,49 @@ const CreateListing = () => {
         </motion.div>
       </AnimatePresence>
 
-      {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]" style={{ boxShadow: '0 -1px 0 rgba(0,0,0,0.04)' }}>
-        {/* Gönderim hatası formu kapatmaz; sunucunun açıklaması burada kalır. */}
-        {submitError && (
-          <div className="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 space-y-2">
-            <p className="text-xs font-semibold text-foreground">
-              {submitError.moderation ? t("create.moderationTitle") : t("create.failedTitle")}
-            </p>
-            {/* Metin ilgili adımda alanın altında duruyorsa burada tekrarlanmaz. */}
-            {!shownInline && (
-              <p className="text-xs text-muted-foreground leading-relaxed">{submitError.message}</p>
-            )}
-            {!shownInline && errorStep !== undefined && (
-              <button
-                onClick={() => setCurrentStep(errorStep)}
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                {errorStep === 3 ? t("create.goToPhotos") : t("create.editTexts")}
-              </button>
-            )}
-          </div>
-        )}
-        <Button
-          onClick={next}
-          disabled={!canProceed() || submitting}
-          className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg disabled:opacity-40"
-        >
-          {submitting ? t("create.publishing") : currentStep === totalSteps - 1 ? t("create.publish") : t("common.continue")}
-          <ArrowRight className="w-5 h-5 ml-2" />
-        </Button>
+      {/* Alttaki düğme: sabit, güvenli alan payıyla */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="w-full max-w-md mx-auto">
+          {/* Gönderim hatası formu kapatmaz; sunucunun açıklaması burada kalır. */}
+          {submitError && (
+            <div className="mb-3 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 space-y-2">
+              <p className="text-[13px] font-semibold text-foreground">
+                {submitError.moderation ? t("create.moderationTitle") : t("create.failedTitle")}
+              </p>
+              {/* Metin ilgili adımda alanın altında duruyorsa burada tekrarlanmaz. */}
+              {!shownInline && (
+                <p className="text-[13px] text-muted-foreground leading-relaxed">{submitError.message}</p>
+              )}
+              {!shownInline && errorStep !== undefined && (
+                <button
+                  onClick={() => setCurrentStep(errorStep)}
+                  className="text-[13px] font-semibold text-secondary hover:underline"
+                >
+                  {errorStep === 3 ? t("create.goToPhotos") : t("create.editTexts")}
+                </button>
+              )}
+            </div>
+          )}
+          <Button
+            size="lg"
+            onClick={next}
+            disabled={!canProceed() || submitting}
+            className="w-full flex h-12 text-base disabled:opacity-40"
+          >
+            {submitting ? t("create.publishing") : currentStep === totalSteps - 1 ? t("create.publish") : t("common.continue")}
+          </Button>
+        </div>
       </div>
     </div>
   );
 };
+
+/** Adım başlığı: sola yaslı, serif; Onboarding'deki başlıkla aynı ölçü. */
+const StepHeader = ({ title, sub }: { title: string; sub: string }) => (
+  <div className="space-y-2 pt-8 pb-2">
+    <h2 className="text-[2.1rem] text-foreground leading-[1.08]">{title}</h2>
+    <p className="text-muted-foreground leading-relaxed">{sub}</p>
+  </div>
+);
 
 export default CreateListing;

@@ -1,11 +1,7 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Home, Shield, Sparkles, ChevronLeft, ChevronRight, MapPin, BedDouble,
-  ShieldCheck, User, Layers, Handshake, LogOut, ArrowRight,
-} from "lucide-react";
-import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, MapPin, User, LogOut } from "lucide-react";
 import { useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings } from "@/lib/api";
@@ -13,8 +9,10 @@ import { BRAND } from "@/lib/brand";
 import { useI18n } from "@/i18n";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
-
-const quickDistricts = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Sarıyer", "Ataşehir"];
+import Wordmark from "@/components/campus/Wordmark";
+import StudentCard from "@/components/campus/StudentCard";
+import PriceRuler from "@/components/campus/PriceRuler";
+import MapSketch from "@/components/campus/MapSketch";
 
 const median = (xs: number[]): number | null => {
   if (xs.length === 0) return null;
@@ -22,6 +20,10 @@ const median = (xs: number[]): number | null => {
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
 };
+
+// "Kira adil mi?" kartındaki cetvelin örnek değerleri. Gerçek bir ilan
+// değil; kartın üstünde "Örnek" yazar. Gerçek hesap ilan kartında görünür.
+const EXAMPLE = { low: 9800, mid: 11200, high: 12600, asking: 14000 };
 
 const Index = () => {
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ const Index = () => {
   });
   const houses = listings.filter(l => l.type === "ev_ilani").slice(0, 10);
 
-  // Semt kartları: fotoğraf yerine gerçek veri — ilan sayısı ve medyan oda payı
+  // Semt tablosu: ilan sayısı ve medyan oda payı, gerçek ilanlardan
   const districtStats = useMemo(() => {
     const acc = new Map<string, { count: number; rents: number[] }>();
     for (const l of listings) {
@@ -52,24 +54,22 @@ const Index = () => {
       .slice(0, 10);
   }, [listings]);
 
-  const scroll = (ref: React.RefObject<HTMLDivElement>, dir: "left" | "right") => {
-    ref.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
+  const browsePath = user?.is_admin ? "/listings" : "/swipe";
+
+  const scroll = (dir: "left" | "right") => {
+    listingsRef.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
   };
+
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ─── NAVBAR ─── */}
-      <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 cursor-pointer">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Home className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-xl text-foreground tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-              {BRAND}
-            </span>
+      {/* ─── Üst çubuk ─── */}
+      <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
+        <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between gap-4">
+          <Link to="/" aria-label={BRAND}>
+            <Wordmark />
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+          <div className="hidden lg:flex items-center gap-7 text-[15px] text-muted-foreground">
             {isLoggedIn && user?.is_admin && (
               <button onClick={() => navigate("/listings")} className="hover:text-foreground transition-colors">{t("landing.findHouse")}</button>
             )}
@@ -78,22 +78,26 @@ const Index = () => {
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
             <button onClick={() => document.getElementById("nasil-calisir")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-colors">{t("landing.howItWorks")}</button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <LanguageToggle />
             <ThemeToggle />
             {isLoggedIn ? (
               <>
-                <button onClick={() => navigate("/profile")} className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors">
-                  <User className="w-4 h-4 text-primary" />
+                <button
+                  onClick={() => navigate("/profile")}
+                  aria-label={t("nav.profile")}
+                  className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                >
+                  <User className="w-4 h-4" />
                 </button>
-                <Button variant="ghost" onClick={() => { logout(); }} className="text-sm font-medium hidden sm:inline-flex gap-1">
-                  <LogOut className="w-4 h-4" /> {t("landing.logout")}
+                <Button variant="ghost" onClick={() => { logout(); }} className="hidden sm:inline-flex">
+                  <LogOut /> {t("landing.logout")}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="ghost" onClick={() => navigate("/login")} className="text-sm font-medium hidden sm:inline-flex">{t("landing.login")}</Button>
-                <Button onClick={() => navigate("/onboarding")} className="bg-primary text-primary-foreground rounded-full text-sm font-bold px-5">
+                <Button variant="ghost" onClick={() => navigate("/login")} className="hidden sm:inline-flex">{t("landing.login")}</Button>
+                <Button onClick={() => navigate("/onboarding")} className="ml-1 px-5">
                   {t("landing.getStarted")}
                 </Button>
               </>
@@ -102,289 +106,220 @@ const Index = () => {
         </div>
       </nav>
 
-      {/* ─── HERO — editoryal, sakin ─── */}
-      <section className="relative overflow-hidden border-b border-border">
-        {/* Harita dokusu: tema rengine boyanmış, çok silik */}
-        <div className="absolute inset-0 opacity-[0.07] pointer-events-none">
-          <img src="/images/istanbul-map.png" alt="" className="w-full h-full object-cover" />
-        </div>
-
-        <div className="relative z-10 max-w-5xl mx-auto px-6 py-24 md:py-32 text-center space-y-8">
-          <motion.h1
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-4xl md:text-6xl font-semibold text-foreground leading-[1.1]"
-          >
-            {t("landing.heroLine1")}
-            <br />
-            <span className="italic text-secondary">{t("landing.heroFair")}</span> {t("landing.heroLine2")}
-          </motion.h1>
-
-          <motion.p
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.12, duration: 0.5 }}
-            className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto leading-relaxed"
-          >
+      {/* ─── Giriş: başlık solda, boş öğrenci kartı sağda ─── */}
+      <header className="max-w-6xl mx-auto px-5 md:px-8 pt-14 pb-16 md:pt-24 md:pb-24 grid lg:grid-cols-12 gap-14 lg:gap-10 items-center">
+        <div className="lg:col-span-7">
+          <h1 className="text-[2.75rem] leading-[1.02] sm:text-6xl lg:text-[4.6rem] font-medium tracking-[-0.025em] text-foreground max-w-[14ch]">
+            {t("landing.heroTitle")}
+          </h1>
+          <p className="mt-6 text-lg md:text-[1.2rem] leading-relaxed text-muted-foreground max-w-[34rem]">
             {t("landing.heroSub")}
-          </motion.p>
-
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.22, duration: 0.5 }}
-            className="flex flex-wrap items-center justify-center gap-3"
-          >
-            <Button
-              onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")}
-              className="rounded-full bg-primary text-primary-foreground font-bold px-8 py-3.5 text-base h-auto"
-            >
+          </p>
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <Button size="lg" onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")} className="h-12 px-7 text-base">
               {t(isLoggedIn ? "landing.ctaContinue" : "landing.ctaFree")}
-              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")}
-              className="rounded-full font-semibold px-8 py-3.5 text-base h-auto border-border"
-            >
+            <Button size="lg" variant="outline" onClick={() => navigate(browsePath)} className="h-12 px-7 text-base">
               {t("landing.ctaBrowse")}
             </Button>
-          </motion.div>
+          </div>
+          {/* İlan sayısı bilerek yok: yayının ilk günlerinde küçük bir sayı
+              siteyi boş gösteriyordu. */}
+          <p className="mt-8 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">968</span> {t("landing.statNeighborhoods")}
+            <span className="mx-3 text-border" aria-hidden="true">|</span>
+            <span className="font-semibold text-foreground">{t("landing.statErrorValue")}</span> {t("landing.statError")}
+          </p>
+        </div>
 
-          {/* Gerçek sayılar */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35, duration: 0.6 }}
-            className="flex flex-wrap justify-center gap-x-10 gap-y-3 pt-4 text-sm"
-          >
-            <div>
-              <span className="font-bold text-foreground text-lg tabular-nums">{listings.length > 0 ? fmtNum(listings.length) : "—"}</span>
-              <span className="text-muted-foreground"> {t("landing.statListings")}</span>
-            </div>
-            <div>
-              <span className="font-bold text-foreground text-lg tabular-nums">968</span>
-              <span className="text-muted-foreground"> {t("landing.statNeighborhoods")}</span>
-            </div>
-            <div>
-              <span className="font-bold text-foreground text-lg tabular-nums">{t("landing.statErrorValue")}</span>
-              <span className="text-muted-foreground"> {t("landing.statError")}</span>
-            </div>
-          </motion.div>
+        <div className="lg:col-span-5 relative max-w-[440px] w-full mx-auto lg:mx-0 lg:ml-auto">
+          <StudentCard name="" blank verified animateStamp className="lg:rotate-[1.5deg]" />
+          {/* Kenar notu: kartın altına kalemle yazılmış gibi */}
+          <div className="mt-5 flex items-start gap-2 text-secondary pl-3">
+            <svg width="38" height="30" viewBox="0 0 38 30" fill="none" aria-hidden="true" className="shrink-0 -mt-3">
+              <path d="M3 27C10 22 20 14 31 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M23 5.5L31.5 5L29.5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p className="font-hand text-[1.3rem] leading-tight">{t("landing.cardNote")}</p>
+          </div>
+        </div>
+      </header>
 
-          {/* Güven rozeti + hızlı semtler */}
-          <div className="space-y-4 pt-2">
-            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-lavender/60 text-foreground">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {t("landing.eduBadge")}
-            </span>
-            <div className="flex flex-wrap justify-center gap-2">
-              {quickDistricts.map(d => (
+      {/* ─── Öne çıkan evler — gerçek ilanlar ─── */}
+      {houses.length > 0 && (
+        <section className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-16">
+            <div className="flex items-end justify-between gap-4 mb-7">
+              <div>
+                <h2 className="text-3xl md:text-4xl text-foreground">{t("landing.featuredTitle")}</h2>
+                <p className="text-muted-foreground mt-1.5">{t("landing.featuredSub")}</p>
+              </div>
+              <div className="hidden sm:flex gap-2">
+                <button onClick={() => scroll("left")} aria-label={t("common.back")} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={() => scroll("right")} aria-label={t("landing.more")} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div ref={listingsRef} className="flex gap-5 overflow-x-auto scrollbar-hide pb-2 -mx-5 px-5 md:mx-0 md:px-0 snap-x">
+              {houses.map(l => (
                 <button
-                  key={d}
-                  onClick={() => navigate("/listings")}
-                  className="px-4 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                  key={l.id}
+                  onClick={() => navigate(browsePath)}
+                  className="flex-shrink-0 w-[260px] snap-start text-left group"
                 >
-                  {d}
+                  <div className="aspect-[4/5] rounded-2xl overflow-hidden bg-muted">
+                    {l.photos[0] && (
+                      <img src={l.photos[0]} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+                    )}
+                  </div>
+                  <h3 className="mt-3 font-display text-lg leading-snug text-foreground line-clamp-2">{l.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" /> {l.district}
+                    {l.room_count && <span className="ml-2">{l.room_count}</span>}
+                  </p>
+                  {l.rent != null && (
+                    <p className="mt-1.5 text-[15px]">
+                      <span className="marker font-semibold">{fmtNum(l.rent)} TL</span>
+                      <span className="text-muted-foreground text-sm">{t("common.roomShare")}</span>
+                    </p>
+                  )}
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ─── Öne çıkan evler — gerçek ilanlar ─── */}
-      {houses.length > 0 && (
-        <section className="max-w-7xl mx-auto px-6 py-16">
-          <div className="flex items-end justify-between mb-8">
-            <button onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")} className="group text-left">
-              <h2 className="text-2xl md:text-3xl font-semibold text-foreground inline-flex items-center gap-2">
-                {t("landing.featuredTitle")}
-                <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-              </h2>
-              <p className="text-muted-foreground mt-1">{t("landing.featuredSub")}</p>
-            </button>
-            <div className="flex gap-2">
-              <button onClick={() => scroll(listingsRef, "left")} className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronLeft className="w-4 h-4 text-foreground" />
-              </button>
-              <button onClick={() => scroll(listingsRef, "right")} className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronRight className="w-4 h-4 text-foreground" />
-              </button>
-            </div>
-          </div>
-          <div ref={listingsRef} className="flex gap-5 overflow-x-auto scrollbar-hide pb-4 -mx-2 px-2 snap-x">
-            {houses.map((l, i) => (
-              <motion.div
-                key={l.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: Math.min(i * 0.05, 0.3) }}
-                className="flex-shrink-0 w-72 snap-start"
-              >
-                <div onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")} className="card-listing overflow-hidden group cursor-pointer h-full">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                    {l.photos[0] ? (
-                      <img src={l.photos[0]} alt={l.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Home className="w-10 h-10 text-muted-foreground" />
-                      </div>
-                    )}
-                    <span className="absolute top-3 left-3 bg-secondary/90 text-secondary-foreground text-[10px] font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm">
-                      {t("common.houseListing")}
-                    </span>
-                  </div>
-                  <div className="p-4 space-y-1.5">
-                    <h3 className="font-bold text-foreground text-sm line-clamp-1">{l.title}</h3>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3" /> {l.district}
-                      {l.room_count && (
-                        <>
-                          <span>·</span>
-                          <BedDouble className="w-3 h-3" /> {l.room_count}
-                        </>
-                      )}
-                    </div>
-                    <div className="pt-1">
-                      <span className="font-bold text-foreground">
-                        {l.rent != null ? `${fmtNum(l.rent)} ₺` : "—"}
-                        <span className="font-normal text-muted-foreground text-xs">{t("common.roomShare")}</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
         </section>
       )}
 
-      {/* ─── Nasıl Çalışır? ─── */}
-      <section id="nasil-calisir" className="py-20 px-6 bg-card border-y border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 text-secondary">
-              {t("landing.stepsEyebrow")}
-            </p>
-            <h2 className="text-3xl md:text-4xl font-semibold text-foreground">{t("landing.stepsTitle")}</h2>
+      {/* ─── Nasıl çalışır: gerçek bir sıra, numaralar bu yüzden var ─── */}
+      <section id="nasil-calisir" className="border-t border-border bg-muted/50">
+        <div className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-20 grid lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-4">
+            <h2 className="text-3xl md:text-4xl text-foreground">{t("landing.howItWorks")}</h2>
+            <p className="mt-3 text-muted-foreground max-w-xs">{t("landing.stepsSub")}</p>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
+          <ol className="lg:col-span-8 divide-y divide-border border-y border-border">
             {[
-              { n: "01", icon: User, title: t("landing.step1Title"), desc: t("landing.step1Desc") },
-              { n: "02", icon: Layers, title: t("landing.step2Title"), desc: t("landing.step2Desc") },
-              { n: "03", icon: Handshake, title: t("landing.step3Title"), desc: t("landing.step3Desc") },
+              { title: t("landing.step1Title"), desc: t("landing.step1Desc") },
+              { title: t("landing.step2Title"), desc: t("landing.step2Desc") },
+              { title: t("landing.step3Title"), desc: t("landing.step3Desc") },
             ].map((step, i) => (
-              <motion.div
-                key={step.n}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="relative bg-background border border-border rounded-2xl p-8 hover:shadow-lg transition-shadow duration-300"
-              >
-                <span className="absolute -top-4 -left-2 text-7xl font-extrabold text-muted-foreground/10 select-none" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-                  {step.n}
-                </span>
-                <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center mb-5">
-                  <step.icon className="w-6 h-6 text-secondary-foreground" />
+              <li key={step.title} className="grid grid-cols-[3rem_1fr] gap-4 py-6">
+                <span className="font-display text-4xl leading-none text-secondary tabular-nums">{i + 1}</span>
+                <div>
+                  <h3 className="text-xl text-foreground">{step.title}</h3>
+                  <p className="mt-1.5 text-muted-foreground leading-relaxed max-w-[52ch]">{step.desc}</p>
                 </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-              </motion.div>
+              </li>
             ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="text-center mt-16 space-y-4"
-          >
-            <Button
-              onClick={() => navigate("/onboarding")}
-              className="rounded-full bg-primary text-primary-foreground font-bold px-8 py-4 text-base h-auto"
-            >
-              {t("landing.signupFree")} <ArrowRight className="w-4 h-4 ml-2" />
+          </ol>
+          <div className="lg:col-start-5 lg:col-span-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <Button size="lg" onClick={() => navigate("/onboarding")} className="h-12 px-7 text-base">
+              {t("landing.signupFree")}
             </Button>
-            <p className="text-xs text-muted-foreground">{t("landing.signupNote")}</p>
-          </motion.div>
+            <p className="text-sm text-muted-foreground">{t("landing.signupNote")}</p>
+          </div>
         </div>
       </section>
 
-      {/* ─── Semtler — gerçek verilerle ─── */}
+      {/* ─── Neden: Hinge'in soru-cevap kartları gibi; her cevabın kendi malzemesi var ─── */}
+      <section className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-20">
+        <h2 className="text-3xl md:text-4xl text-foreground mb-8">{t("landing.whyTitle")}</h2>
+        <div className="space-y-5">
+          {/* Kira adil mi? — kareli kâğıt, çünkü cevabı model hesaplıyor */}
+          <article className="rounded-2xl border border-border grid md:grid-cols-2 overflow-hidden">
+            <div className="p-6 md:p-8">
+              <p className="text-[15px] font-semibold text-foreground">{t("landing.why1Prompt")}</p>
+              <p className="mt-3 font-display text-2xl md:text-[1.75rem] leading-snug text-foreground">{t("landing.why1Answer")}</p>
+            </div>
+            <div className="paper-grid border-t md:border-t-0 md:border-l border-border p-6 md:p-8 flex flex-col justify-center">
+              <p className="text-[12px] text-muted-foreground mb-3">{t("landing.exampleLabel")}</p>
+              <PriceRuler low={EXAMPLE.low} mid={EXAMPLE.mid} high={EXAMPLE.high} asking={EXAMPLE.asking} />
+              <p className="mt-3 text-sm text-foreground">
+                {t("landing.exampleCaption", { asking: fmtNum(EXAMPLE.asking), low: fmtNum(EXAMPLE.low), high: fmtNum(EXAMPLE.high) })}
+              </p>
+            </div>
+          </article>
+
+          {/* Karşımdaki gerçekten öğrenci mi? — mühür */}
+          <article className="rounded-2xl border border-border grid md:grid-cols-2 overflow-hidden">
+            <div className="p-6 md:p-8">
+              <p className="text-[15px] font-semibold text-foreground">{t("landing.why2Prompt")}</p>
+              <p className="mt-3 font-display text-2xl md:text-[1.75rem] leading-snug text-foreground">{t("landing.why2Answer")}</p>
+            </div>
+            <div className="border-t md:border-t-0 md:border-l border-border p-8 flex items-center justify-center bg-muted/40">
+              <span className="stamp -rotate-[7deg] text-base px-4 py-2">
+                <span className="text-2xl">{t("card.stampTop")}</span>
+                <span className="font-semibold normal-case tracking-normal">{t("card.stampBottom")}</span>
+              </span>
+            </div>
+          </article>
+
+          {/* Bütçem hangi semte yeter? — harita */}
+          <article className="rounded-2xl border border-border grid md:grid-cols-2 overflow-hidden">
+            <div className="p-6 md:p-8">
+              <p className="text-[15px] font-semibold text-foreground">{t("landing.why3Prompt")}</p>
+              <p className="mt-3 font-display text-2xl md:text-[1.75rem] leading-snug text-foreground">{t("landing.why3Answer")}</p>
+              <Button variant="outline" onClick={() => navigate("/explore")} className="mt-6">
+                {t("landing.mapCta")}
+              </Button>
+            </div>
+            <button
+              onClick={() => navigate("/explore")}
+              aria-label={t("landing.mapCta")}
+              className="relative min-h-[260px] border-t md:border-t-0 md:border-l border-border overflow-hidden bg-muted/40"
+            >
+              <MapSketch />
+            </button>
+          </article>
+        </div>
+      </section>
+
+      {/* ─── Semtler: gerçek ilanlardan hesaplanmış küçük bir çizelge ─── */}
       {districtStats.length > 0 && (
-        <section className="max-w-7xl mx-auto px-6 py-16">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-semibold text-foreground">{t("landing.districtsTitle")}</h2>
-            <p className="text-muted-foreground mt-1">{t("landing.districtsSub")}</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            {districtStats.map((d, i) => (
-              <motion.button
-                key={d.name}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: Math.min(i * 0.03, 0.2) }}
-                onClick={() => navigate(user?.is_admin ? "/listings" : "/swipe")}
-                className="card-listing p-5 text-left hover:shadow-lg transition-shadow group"
-              >
-                <p className="text-lg font-bold text-foreground group-hover:text-secondary transition-colors" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-                  {d.name}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1.5">{t("landing.districtCount", { count: d.count })}</p>
-                {d.median != null && (
-                  <p className="text-xs font-semibold text-accent mt-0.5 tabular-nums">
-                    {t("landing.districtMedian", { price: fmtNum(d.median) })}
-                  </p>
-                )}
-              </motion.button>
-            ))}
+        <section className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-16 grid lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-4">
+              <h2 className="text-3xl md:text-4xl text-foreground">{t("landing.districtsTitle")}</h2>
+              <p className="text-muted-foreground mt-2 max-w-xs">{t("landing.districtsSub")}</p>
+            </div>
+            <div className="lg:col-span-8 paper-grid rounded-2xl border border-border overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-sm text-muted-foreground border-b border-border bg-card/80">
+                    <th className="font-medium py-3 px-5">{t("landing.colDistrict")}</th>
+                    <th className="font-medium py-3 px-5 text-right">{t("landing.colListings")}</th>
+                    <th className="font-medium py-3 px-5 text-right">{t("landing.colMedian")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {districtStats.map(d => (
+                    <tr key={d.name} className="border-b border-border/70 last:border-0">
+                      <td className="py-3 px-5">
+                        <button onClick={() => navigate(browsePath)} className="font-display text-lg text-foreground hover:text-secondary transition-colors">
+                          {d.name}
+                        </button>
+                      </td>
+                      <td className="py-3 px-5 text-right tabular-nums text-foreground">{d.count}</td>
+                      <td className="py-3 px-5 text-right tabular-nums text-foreground">
+                        {d.median != null ? `${fmtNum(d.median)} TL` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       )}
 
-      {/* ─── Neden evdes.tr ─── */}
-      <section className="max-w-5xl mx-auto px-6 py-16">
-        <div className="grid md:grid-cols-3 gap-10">
-          {[
-            { icon: Sparkles, title: t("landing.why1Title"), desc: t("landing.why1Desc") },
-            { icon: Shield, title: t("landing.why2Title"), desc: t("landing.why2Desc") },
-            { icon: MapPin, title: t("landing.why3Title"), desc: t("landing.why3Desc") },
-          ].map((f, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="text-center space-y-4"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                <f.icon className="w-7 h-7 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── FOOTER ─── */}
-      <footer className="bg-background border-t border-border">
-        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Home className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-foreground" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>{BRAND}</span>
-          </div>
-          <div className="flex gap-6 text-sm text-muted-foreground">
+      {/* ─── Alt bilgi ─── */}
+      <footer className="border-t border-border">
+        <div className="max-w-6xl mx-auto px-5 md:px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <Wordmark size="sm" />
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
             <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</button>
             <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">{t("landing.footerListings")}</button>
@@ -394,7 +329,7 @@ const Index = () => {
             <a href="/semt" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
             <button onClick={() => navigate("/privacy")} className="hover:text-foreground transition-colors">{t("landing.privacy")}</button>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 {BRAND}</p>
+          <p className="text-sm text-muted-foreground">© 2026 {BRAND}</p>
         </div>
       </footer>
     </div>

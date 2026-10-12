@@ -84,7 +84,7 @@ function breadcrumbs(steps) {
 }
 
 const nf = new Intl.NumberFormat("tr-TR");
-const money = v => `${nf.format(Math.round(v))} ₺`;
+const money = v => `${nf.format(Math.round(v))} TL`;
 
 /**
  * İlan sayısıyla AĞIRLIKLI medyan.
@@ -133,36 +133,51 @@ function layout({ title, description, canonical, jsonLd, body }) {
 <meta property="og:image:alt" content="evdes.tr — İstanbul'da ev arkadaşı bul">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${SITE}/og.jpg">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="alternate icon" href="/favicon.png" type="image/png">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Schibsted+Grotesk:wght@400;600&display=swap">
 <style>
-:root{color-scheme:light dark;--fg:#1c1914;--muted:#6b6459;--line:#e5e0d8;--bg:#faf7f2;--accent:#3f2d63}
-@media(prefers-color-scheme:dark){:root{--fg:#ece5da;--muted:#a39a8d;--line:#2a2622;--bg:#141210;--accent:#b9a3e8}}
+/* Uygulamayla aynı defter dili: src/index.css'teki renklerin düz karşılıkları.
+   Mürekkep yazı, tükenmez mavisi bağlantı, fosforlu kalem tek önemli rakam,
+   kareli kâğıt modelin hesapladığı tablo. Koyu temada kara tahta. */
+:root{color-scheme:light dark;--fg:#151a33;--muted:#5a5f72;--line:#dadde7;--bg:#ffffff;
+  --accent:#264bc5;--hl:#ffe83d;--grid:#dbe6f5}
+@media(prefers-color-scheme:dark){:root{--fg:#ebebe5;--muted:#a3a99e;--line:#313a37;--bg:#131b18;
+  --accent:#84a6f5;--hl:#fae338;--grid:#272f2d}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  font:16px/1.65 "Schibsted Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 main{max-width:52rem;margin:0 auto;padding:2.5rem 1.25rem 4rem}
-h1{font-size:1.9rem;line-height:1.2;margin:0 0 .5rem}
-h2{font-size:1.25rem;margin:2.5rem 0 .75rem}
+h1,h2,.big{font-family:Newsreader,Georgia,"Times New Roman",serif;font-weight:600}
+h1{font-size:2.3rem;line-height:1.12;margin:0 0 .6rem}
+h2{font-size:1.5rem;line-height:1.2;margin:2.75rem 0 .75rem}
 p{margin:.75rem 0}
 a{color:var(--accent)}
-.lead{font-size:1.05rem;color:var(--muted)}
-nav.crumbs{font-size:.85rem;color:var(--muted);margin-bottom:1rem}
+.lead{font-size:1.1rem;color:var(--muted)}
+nav.crumbs{font-size:.88rem;color:var(--muted);margin-bottom:1rem}
 nav.crumbs a{color:var(--muted)}
-.big{font-size:2.1rem;font-weight:700;letter-spacing:-.02em}
-table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.94rem}
-th,td{text-align:left;padding:.55rem .5rem;border-bottom:1px solid var(--line)}
-th{font-weight:600;color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.04em}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
+.big{font-size:2.3rem;line-height:1.2}
+.big mark{color:#151a33;background:linear-gradient(100deg,transparent .1em,var(--hl) .3em,var(--hl) calc(100% - .25em),transparent);
+  background-size:100% 72%;background-position:0 80%;background-repeat:no-repeat;padding:0 .2em;margin:0 -.2em}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.95rem;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:14px 14px;border:1px solid var(--line)}
+th,td{text-align:left;padding:.6rem .75rem;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:.88rem}
+td.num,th.num{text-align:right}
+td.num{font-variant-numeric:tabular-nums}
 .weak td{color:var(--muted)}
-.note{font-size:.85rem;color:var(--muted)}
-.cta{display:inline-block;margin:1.5rem 0;padding:.8rem 1.4rem;border-radius:999px;
+.note{font-size:.88rem;color:var(--muted)}
+.cta{display:inline-block;margin:1.5rem 0;padding:.8rem 1.5rem;border-radius:999px;
   background:var(--fg);color:var(--bg);text-decoration:none;font-weight:600}
 nav.links{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--line);
-  font-size:.9rem;line-height:2}
+  font-size:.92rem;line-height:2}
 footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--line);
-  font-size:.85rem;color:var(--muted)}
+  font-size:.88rem;color:var(--muted)}
 </style>
 </head>
 <body><main>
@@ -263,7 +278,7 @@ function districtPage(d, others) {
 <h1>${esc(d.name)}'de ev arkadaşı ve oda kiraları</h1>
 <p class="lead">${esc(d.list.length)} mahalle · ${nf.format(d.listings)} ilan · veriler ${esc(FACTOR.indexedTo)} düzeyinde</p>
 
-<p class="big">${money(roomShare(d.median))}<span style="font-size:1rem;font-weight:400;color:var(--muted)"> / ay kişi başı</span></p>
+<p class="big"><mark>${money(roomShare(d.median))}</mark><span style="font-family:'Schibsted Grotesk',sans-serif;font-size:1rem;font-weight:400;color:var(--muted)"> / ay kişi başı</span></p>
 <p>${esc(d.name)}'de kiralık dairelerin medyan kirası <strong>${money(d.median)}</strong>.
 İki yatak odalı bir evi iki kişi paylaştığında kişi başına düşen pay yaklaşık
 <strong>${money(roomShare(d.median))}</strong> oluyor.</p>

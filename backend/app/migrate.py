@@ -97,6 +97,16 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
         _Column("moderation_removed", "BOOLEAN", default=False),
         _Column("original_content", "TEXT"),
     ),
+    "swipes": (
+        # Hinge tarzı beğeni: hedef (fotoğraf/kart) ve yorum. Eski satırlar
+        # "ilanın tamamı, yorumsuz" sayılır.
+        _Column("target_kind", "VARCHAR(10)"),
+        _Column("target_ref", "VARCHAR(500)"),
+        _Column("comment", "TEXT"),
+        _Column("comment_flagged", "BOOLEAN", default=False),
+        _Column("comment_flag_reasons", "TEXT"),
+        _Column("comment_delivered", "BOOLEAN", default=False),
+    ),
     "reports": (
         # Raporu kimin, ne zaman kapattığı — eski satırlarda NULL.
         _Column("resolved_by", "INTEGER", references="users(id)"),

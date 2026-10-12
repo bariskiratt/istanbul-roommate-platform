@@ -5,26 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sayfa bulunamadı — evdes.tr</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="alternate icon" href="/favicon.png" type="image/png">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Schibsted+Grotesk:wght@400;600;700&display=swap">
 <style>
-:root{color-scheme:light dark;--fg:#1c1914;--muted:#6b6459;--bg:#faf7f2;--accent:#3f2d63}
-@media(prefers-color-scheme:dark){:root{--fg:#ece5da;--muted:#a39a8d;--bg:#141210;--accent:#b9a3e8}}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);
-  font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;padding:1.5rem}
-h1{font-size:3rem;margin:0}
-p{color:var(--muted);max-width:26rem}
+/* Uygulamanın 404'üyle aynı: defter sayfası, kırmızı kalem mührü.
+   Renkler src/index.css'teki açık (defter) ve koyu (kara tahta) temalar. */
+:root{color-scheme:light dark;--fg:#151a33;--muted:#5a5f72;--bg:#ffffff;--accent:#264bc5;--red:#d4252e}
+@media(prefers-color-scheme:dark){:root{--fg:#ebebe5;--muted:#a3a99e;--bg:#131b18;--accent:#84a6f5;--red:#ef6c69}}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);
+  font:16px/1.6 "Schibsted Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:36rem;margin:0 auto;padding:4rem 1.25rem}
+.logo{display:inline-block;font:600 1.4rem/1 Newsreader,Georgia,serif;color:var(--fg);text-decoration:none}
+.logo span{background:linear-gradient(100deg,transparent .1em,#ffe83d .3em,#ffe83d calc(100% - .25em),transparent);
+  background-size:100% 72%;background-position:0 80%;background-repeat:no-repeat;color:#151a33;padding:0 .15em;margin:0 -.15em}
+.code{position:relative;width:max-content;margin-top:3rem}
+h1{font:600 7rem/1 Newsreader,Georgia,serif;margin:0}
+.stamp{position:absolute;right:-5.5rem;bottom:.25rem;background:var(--bg);transform:rotate(-12deg);color:var(--red);
+  border:2px solid currentColor;outline:1px solid currentColor;outline-offset:2px;border-radius:6px;
+  padding:.2rem .6rem;font-weight:700;font-size:1.1rem;letter-spacing:.06em;text-transform:uppercase;opacity:.88}
+p{color:var(--muted);font-size:1.1rem}
 a{color:var(--accent)}
-.cta{display:inline-block;margin-top:1rem;padding:.8rem 1.4rem;border-radius:999px;
+.cta{display:inline-block;margin-top:1.5rem;padding:.8rem 1.5rem;border-radius:999px;
   background:var(--fg);color:var(--bg);text-decoration:none;font-weight:600}
 </style>
 </head>
 <body>
-<div>
-<h1>404</h1>
+<main>
+<a class="logo" href="/"><span>evdes</span>.tr</a>
+<div class="code"><h1>404</h1><span class="stamp" aria-hidden="true">Yanlış adres</span></div>
 <p>Aradığın sayfa bulunamadı. Adres yanlış yazılmış olabilir ya da sayfa kaldırılmış olabilir.</p>
-<p><a class="cta" href="/">Ana sayfaya dön</a></p>
-<p style="margin-top:2rem"><a href="/semt/">İstanbul semtlerinde oda kiraları</a></p>
-</div>
+<a class="cta" href="/">Ana sayfaya dön</a>
+<p style="margin-top:2.5rem;font-size:1rem"><a href="/semt/">İstanbul semtlerinde oda kiraları</a></p>
+</main>
 </body>
 </html>

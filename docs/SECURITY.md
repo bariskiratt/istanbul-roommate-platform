@@ -85,8 +85,9 @@ Wants to publish many listings or messages cheaply. This is the threat the audit
 found the platform least prepared for: findings **H2** and **H3** together let a
 single account write unbounded amounts of data through an endpoint that is then
 served to every anonymous visitor. Both are fixed: every stored list element
-has a length cap, and listings, messages, reports and photo uploads are
-rate-limited per account (`backend/app/content_limits.py:25-40`). The counters
+has a length cap, and listings, messages, reports, comments on likes and
+photo uploads are rate-limited per account
+(`backend/app/content_limits.py:25-44`). The counters
 live in process memory (section 4.5).
 
 ### 2.4 The scraper
@@ -100,6 +101,14 @@ endpoints still partly answer "is this address registered?" (**M3**):
 `ad.soyad@ogr.university.edu.tr` pattern used by Turkish universities, this was
 a real enumeration path; at 10 registration attempts per IP per hour
 (`backend/app/auth.py:72-73`) it is now a slow one.
+
+Logged-in callers see a little more about a listing's owner than anonymous
+ones: `owner_profile` carries the department, year, sleep schedule, the
+smoking/pets/alcohol answers and the first profile photo, because the deck
+shows them as profile cards (`Listing.owner_profile`, `backend/app/models.py`;
+hidden by `_hide_owner` in `backend/app/listings.py`). Anonymous callers get
+`null`. Budget, preferred districts and the bio are deliberately left out:
+they stay visible only to someone the person liked or matched.
 
 ### 2.5 The account-takeover attacker
 
@@ -316,8 +325,9 @@ Stale buckets are pruned and the table is capped at 10,000 keys
 (`backend/app/auth.py:87-113`).
 
 **Content endpoints** use `content_limits.check`, keyed by user id
-(`backend/app/content_limits.py:25-40`): 20 listings an hour, 30 messages a
-minute, 10 reports an hour, 100 photo uploads a day.
+(`backend/app/content_limits.py:25-44`): 20 listings an hour, 30 messages a
+minute, 10 reports an hour, 30 comments on likes an hour, 100 photo uploads a
+day. A like without a comment is not counted.
 
 **Stops:** online brute force of one account's password or OTP; bulk
 registration and address scanning from one IP; one account flooding listings,
@@ -451,8 +461,12 @@ category is capped at `_SCAM_MAX = 0.9` so that it can *never* block on its own
 
 Enforcement points: listings check title and description separately so the error
 can name the offending field (`backend/app/listings.py:100-132`); messages check
-the body (`backend/app/messages.py:141-149`). Blocked content returns 422;
-flagged content is published with `is_flagged=True` and lands in the admin queue.
+the body (`backend/app/messages.py:141-149`); a comment on a like is checked as
+a message (`_prepare_comment`, `backend/app/swipes.py:171-200`). Blocked content
+returns 422; flagged content is published with `is_flagged=True` and lands in
+the admin queue. A flagged comment keeps its flag on the swipe row and passes
+it to the chat message it becomes on a match, which is where the queue sees
+it. Until then the only reader is the listing owner it was written to.
 
 ### 6.2 Layer 2 — AI, optional and strictly-additive
 
@@ -539,6 +553,9 @@ Chat messages are encrypted before being written and decrypted on read:
   already contains plaintext rows from before the feature existed.
 - Applied at the write path (`backend/app/messages.py:154`) and both read paths
   (`backend/app/messages.py:39-46`, `backend/app/admin.py:381`).
+- Comments on likes are encrypted with the same function before they are stored
+  (`backend/app/swipes.py:200`). On a match the ciphertext is copied into the
+  message row unchanged, never decrypted and re-encrypted.
 - A row that fails to decrypt returns the sentinel `[unreadable]`
   (`backend/app/crypto.py:51`) rather than 500-ing the whole conversation. The
   sentinel is language-independent on purpose; the UI translates it.

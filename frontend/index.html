@@ -4,13 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>evdes.tr — İstanbul'da ev arkadaşı bul</title>
-    <meta name="theme-color" content="#161210" />
+    <meta name="theme-color" content="#ffffff" />
 
     <!-- Sekme ikonu. SVG önce gelir (her boyutta net); SVG desteklemeyen eski
          tarayıcılar PNG'ye düşer. favicon.ico ise link etiketi hiç okunmadan
-         istenen adres, dosya orada durmazsa her ilk yüklemede 404 üretir. -->
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="/favicon.png" type="image/png" />
+         istenen adres, dosya orada durmazsa her ilk yüklemede 404 üretir.
+         ?v= sürümü, ikon değişince artırılır: tarayıcılar sekme ikonunu
+         sayfadan ayrı ve uzun süre saklar, aynı adreste yeni ikonu görmez.
+         apple-touch-icon ve manifest, siteyi telefonun ana ekranına
+         ekleyenlerin göreceği ikon. -->
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon.png?v=2" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="description" content="Üniversite öğrencilerine özel ev arkadaşı bulma platformu: adil kira danışmanı, bütçe haritası ve eşleşme." />
 
     <meta property="og:type" content="website" />

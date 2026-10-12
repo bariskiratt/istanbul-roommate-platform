@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sparkles, TrendingUp, TrendingDown, Check } from "lucide-react";
+import { TrendingUp, TrendingDown, Check } from "lucide-react";
+import PriceRuler from "@/components/campus/PriceRuler";
 import { estimatePrice, type EstimateResponse } from "@/lib/api";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
@@ -36,9 +37,10 @@ function parseRooms(roomCount?: string): { room: number; living: number } {
 }
 
 const verdictStyles = {
-  fair: { cls: "bg-green-500/10 border-green-500/40 text-foreground", icon: Check, key: "fair.verdictFair" },
-  above: { cls: "bg-red-500/10 border-red-500/40 text-foreground", icon: TrendingUp, key: "fair.verdictAbove" },
-  below: { cls: "bg-yellow-500/10 border-yellow-500/40 text-foreground", icon: TrendingDown, key: "fair.verdictBelow" },
+  // Kalem renkleri, ilan kartındaki rozetle aynı (FairPriceBadge)
+  fair: { cls: "text-accent", icon: Check, key: "fair.verdictFair" },
+  above: { cls: "text-destructive", icon: TrendingUp, key: "fair.verdictAbove" },
+  below: { cls: "text-secondary", icon: TrendingDown, key: "fair.verdictBelow" },
 } as const;
 
 // "2026-01" -> "Oca 2026" / "Jan 2026"
@@ -102,15 +104,11 @@ const FairPriceCheck = ({
   if (!district) return null;
 
   return (
-    <div className="card-listing p-5 space-y-4 border-2 border-primary/20">
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h3 className="font-bold text-foreground">{t("fair.checkTitle")}</h3>
-          <p className="text-xs text-muted-foreground">{t("fair.checkSub")}</p>
-        </div>
+    // Modelin hesabı kareli kâğıtta: ilan kartındaki adil fiyat paneliyle aynı
+    <div className="paper-grid rounded-2xl border border-border p-4 space-y-4 text-foreground">
+      <div>
+        <h3 className="font-display text-xl font-semibold">{t("fair.checkTitle")}</h3>
+        <p className="text-[13px] text-muted-foreground mt-0.5 leading-relaxed">{t("fair.checkSub")}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -119,31 +117,31 @@ const FairPriceCheck = ({
             yapılmaz: sessizce bir mahalle varsaymak, yayınlanacak ilanın
             fiyatından farklı bir bant göstermek olurdu. */}
         <div className="col-span-2 space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t("fair.neighborhood")}</label>
-          <div className="h-11 rounded-xl bg-muted/50 border border-border px-3 flex items-center text-sm text-foreground">
+          <label className="text-[13px] font-semibold text-foreground">{t("fair.neighborhood")}</label>
+          <div className="h-11 rounded-xl bg-card border border-border px-3.5 flex items-center text-[15px] text-foreground">
             {neighborhood || (
               <span className="text-muted-foreground">{t("fair.pickNeighborhood")}</span>
             )}
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t("fair.area")}</label>
-          <Input type="number" value={area} onChange={(e) => setArea(e.target.value)} className="h-11 rounded-xl" />
+          <label className="text-[13px] font-semibold text-foreground">{t("fair.area")}</label>
+          <Input type="number" value={area} onChange={(e) => setArea(e.target.value)} className="h-11" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t("fair.buildingAge")}</label>
-          <Input type="number" value={age} onChange={(e) => setAge(e.target.value)} className="h-11 rounded-xl" />
+          <label className="text-[13px] font-semibold text-foreground">{t("fair.buildingAge")}</label>
+          <Input type="number" value={age} onChange={(e) => setAge(e.target.value)} className="h-11" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t("fair.floor")}</label>
-          <Input type="number" value={floor} onChange={(e) => setFloor(e.target.value)} className="h-11 rounded-xl" />
+          <label className="text-[13px] font-semibold text-foreground">{t("fair.floor")}</label>
+          <Input type="number" value={floor} onChange={(e) => setFloor(e.target.value)} className="h-11" />
         </div>
         <div className="flex items-end">
           <Button
             type="button"
             onClick={analyze}
             disabled={loading || !neighborhood}
-            className="w-full h-11 rounded-xl font-semibold"
+            className="w-full h-11"
           >
             {t(loading ? "fair.calculating" : "fair.submit")}
           </Button>
@@ -151,40 +149,47 @@ const FairPriceCheck = ({
       </div>
 
       {error && (
-        <p className="text-xs text-destructive">
+        <p className="text-[13px] text-destructive">
           {"key" in error ? t(error.key) : error.text}
         </p>
       )}
 
       {result && (
-        <div className="space-y-3 pt-1">
+        <div className="space-y-3 pt-1 border-t border-border">
           {/* Oda payı — ev arkadaşından istenecek adil kira */}
-          <div className="text-center">
-            <div className="text-2xl font-bold tabular-nums text-primary">
-              {fmt(result.room_low)} – {fmt(result.room_high)} {t("common.currency")}
-            </div>
-            <div className="text-xs text-muted-foreground">
+          <div className="pt-3">
+            <p className="text-2xl font-semibold">
+              <span className="marker">{fmt(result.room_low)}–{fmt(result.room_high)} TL</span>
+            </p>
+            <p className="text-[13px] text-muted-foreground mt-1">
               {t("fair.roomShareLabel", { mid: fmt(result.room_mid) })}
               {result.room_share > 1 &&
                 t("fair.roomShareSplit", { rooms: result.room_share })}
-            </div>
+            </p>
           </div>
 
+          <PriceRuler
+            low={result.room_low}
+            mid={result.room_mid}
+            high={result.room_high}
+            asking={result.asking_price}
+          />
+
           {/* Dairenin tamamı — referans */}
-          <div className="text-center text-xs text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             {t("fair.wholeFlat")}{" "}
-            <span className="font-semibold text-foreground tabular-nums">
-              {fmt(result.fair_low)} – {fmt(result.fair_high)} {t("common.currency")}
+            <span className="font-semibold text-foreground">
+              {fmt(result.fair_low)}–{fmt(result.fair_high)} TL
             </span>
-          </div>
+          </p>
 
           {result.verdict && (() => {
             const v = verdictStyles[result.verdict];
             const Icon = v.icon;
             const sign = (result.deviation_pct ?? 0) > 0 ? "+" : "";
             return (
-              <div className={`rounded-xl border px-3 py-2.5 text-sm flex items-start gap-2 ${v.cls}`}>
-                <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div className="text-[14px] leading-relaxed flex items-start gap-2">
+                <Icon className={`w-4 h-4 mt-1 flex-shrink-0 ${v.cls}`} />
                 <span>
                   {t(v.key)}{" "}
                   {t("fair.deviation", {
@@ -197,7 +202,7 @@ const FairPriceCheck = ({
             );
           })()}
 
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             {/* Endeksleme kapalıyken "bugüne güncellendi" demek yanlış olur;
                 tahmin veri döneminin fiyat düzeyinde kalır ve bu söylenir. */}
             {result.indexed

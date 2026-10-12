@@ -89,6 +89,20 @@ _FROZEN_DDL = (
         created_at DATETIME NOT NULL
     )
     """,
+    # swipes bu listeye, tabloya ilk kez sütun eklendiğinde (Hinge tarzı
+    # beğeni: hedef + yorum) girdi. Tanım o değişiklikten ÖNCEKİ, sahada
+    # duran hâlidir; diğerleri gibi dondurulmuştur.
+    """
+    CREATE TABLE swipes (
+        id INTEGER NOT NULL PRIMARY KEY,
+        swiper_id INTEGER NOT NULL REFERENCES users (id),
+        listing_id INTEGER NOT NULL REFERENCES listings (id),
+        direction VARCHAR(10) NOT NULL,
+        responded BOOLEAN NOT NULL,
+        created_at DATETIME NOT NULL,
+        UNIQUE (swiper_id, listing_id)
+    )
+    """,
     """
     CREATE TABLE reports (
         id INTEGER NOT NULL PRIMARY KEY,
@@ -116,6 +130,8 @@ _SEED = (
     " VALUES (1, 1, 1, 1, '2024-01-01 00:00:00')",
     "INSERT INTO messages (id, match_id, sender_id, content, created_at) VALUES"
     " (1, 1, 1, 'eski düz metin mesaj', '2024-01-01 00:00:00')",
+    "INSERT INTO swipes (id, swiper_id, listing_id, direction, responded,"
+    " created_at) VALUES (1, 1, 1, 'like', 0, '2024-01-01 00:00:00')",
     "INSERT INTO reports (id, reporter_id, target_type, target_id, reason,"
     " created_at, resolved) VALUES"
     " (1, 1, 'listing', 1, 'spam', '2024-01-01 00:00:00', 0)",
@@ -188,6 +204,7 @@ def test_eksik_sutunlar_eklenir_ve_eski_veri_durur(legacy_db):
     user = _row(path, "SELECT * FROM users WHERE id=1")
     listing = _row(path, "SELECT * FROM listings WHERE id=1")
     message = _row(path, "SELECT * FROM messages WHERE id=1")
+    swipe = _row(path, "SELECT * FROM swipes WHERE id=1")
 
     assert user["email"] == "eski@ornek.com"
     assert listing["title"] == "Eski ilan"
@@ -202,6 +219,13 @@ def test_eksik_sutunlar_eklenir_ve_eski_veri_durur(legacy_db):
     # Kaldırmadan önceki yayın durumu eski kayıtlarda BİLİNMİYOR; False
     # yazsaydık geri alma o ilanları sessizce kapalı bırakırdı.
     assert listing["active_before_removal"] is None
+    # Eski beğeni "ilanın tamamı, yorumsuz" kalır; teslim edilmemiş bir yorum
+    # da yoktur.
+    assert swipe["direction"] == "like"
+    assert swipe["target_kind"] is None
+    assert swipe["comment"] is None
+    assert swipe["comment_flagged"] == 0
+    assert swipe["comment_delivered"] == 0
 
 
 def test_ikinci_calistirma_bos_doner(legacy_db):

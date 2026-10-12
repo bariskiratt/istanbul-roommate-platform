@@ -1,111 +1,124 @@
 /* @import, CSS gereği tüm kurallardan önce gelmeli; @tailwind'in altında kalırsa
    derleyici bu satırı atıyor ve üretim derlemesinde yazı tipleri hiç yüklenmiyordu. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&family=Schibsted+Grotesk:wght@400..800&family=Kalam:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
- * Tasarım dili: Hinge esinli, iki tema.
- * :root  — açık: sıcak krem zemin, mürekkep birincil düğmeler.
- * .dark  — koyu: espresso zemin, krem birincil düğmeler.
+ * Tasarım dili: Hinge'in sadeliği, kampüsün malzemesi. İki tema:
+ * :root  — "defter": beyaz kâğıt, lacivert mürekkep, tükenmez kalem mavisi,
+ *          fosforlu sarı ve defter kenarının kırmızı çizgisi.
+ * .dark  — "kara tahta": koyu yeşil-siyah tahta, tebeşir beyazı yazı.
+ *
+ * Malzemenin bir anlamı var, süs değil:
+ * - Çizgili kâğıt (.paper-ruled): bir öğrencinin KENDİ yazdığı metin
+ *   (ilan açıklaması, bio). Okuyan, bunun kişinin sözü olduğunu görür.
+ * - Kareli kâğıt (.paper-grid): modelin HESAPLADIĞI şey (adil fiyat).
+ * - Fosforlu kalem (.marker): ekrandaki en önemli tek rakam.
+ * - Öğrenci kimliği (StudentCard): bir kişiyi temsil eden kart.
  * Tema next-themes ile <html class="dark"> üzerinden değişir (Ayarlar).
  */
 @layer base {
   :root {
-    --background: 36 30% 96%;
-    --foreground: 24 12% 10%;
+    --background: 0 0% 100%;
+    /* Mürekkep: düz siyah yerine tükenmez kalemin koyu laciverti */
+    --foreground: 230 42% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 24 12% 10%;
+    --card-foreground: 230 42% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 24 12% 10%;
+    --popover-foreground: 230 42% 14%;
 
-    /* Mürekkep — açık temada birincil düğmeler koyu */
-    --primary: 24 12% 12%;
-    --primary-foreground: 36 30% 97%;
+    /* Birincil düğmeler mürekkep renginde (Hinge'in siyah düğmeleri) */
+    --primary: 230 42% 14%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 263 45% 34%;
-    --secondary-foreground: 36 30% 97%;
+    /* Tükenmez kalem mavisi: bağlantılar, odak, gönderilen mesaj */
+    --secondary: 226 68% 46%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 36 14% 90%;
-    --muted-foreground: 28 7% 44%;
+    --muted: 225 30% 96%;
+    --muted-foreground: 228 12% 40%;
 
-    --accent: 160 30% 40%;
-    --accent-foreground: 36 30% 97%;
+    /* Öğretmenin yeşil kalemi: "adil", onay, başarı */
+    --accent: 156 62% 28%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 4 62% 52%;
-    --destructive-foreground: 36 30% 97%;
+    /* Kırmızı kalem: hata, geç, sil */
+    --destructive: 357 70% 49%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 32 14% 87%;
-    --input: 32 14% 85%;
-    --ring: 24 12% 12%;
+    --border: 225 20% 88%;
+    --input: 225 18% 82%;
+    --ring: 226 68% 46%;
 
-    --radius: 0.8rem;
+    --radius: 0.75rem;
 
-    --lavender: 263 30% 92%;
-    --sand: 33 24% 89%;
-    --coral: 4 62% 58%;
-    --mint: 160 30% 40%;
-    --indigo: 263 45% 34%;
+    /* Kâğıt ve kalem */
+    --highlighter: 53 100% 62%;
+    --highlighter-foreground: 230 42% 14%;
+    --rule: 214 72% 87%;
+    --redline: 357 85% 80%;
+    --grid: 214 55% 91%;
 
-    --sidebar-background: 36 30% 96%;
-    --sidebar-foreground: 24 12% 10%;
-    --sidebar-primary: 24 12% 12%;
-    --sidebar-primary-foreground: 36 30% 97%;
-    --sidebar-accent: 36 20% 93%;
-    --sidebar-accent-foreground: 24 12% 10%;
-    --sidebar-border: 32 14% 87%;
-    --sidebar-ring: 24 12% 12%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 230 42% 14%;
+    --sidebar-primary: 230 42% 14%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 225 30% 96%;
+    --sidebar-accent-foreground: 230 42% 14%;
+    --sidebar-border: 225 20% 88%;
+    --sidebar-ring: 226 68% 46%;
   }
 
   .dark {
-    --background: 24 9% 8%;
-    --foreground: 36 20% 92%;
+    --background: 162 16% 9%;
+    --foreground: 60 12% 91%;
 
-    --card: 24 7% 12%;
-    --card-foreground: 36 20% 92%;
+    --card: 162 13% 12.5%;
+    --card-foreground: 60 12% 91%;
 
-    --popover: 24 7% 12%;
-    --popover-foreground: 36 20% 92%;
+    --popover: 162 13% 12.5%;
+    --popover-foreground: 60 12% 91%;
 
-    /* Krem — koyu zeminde birincil düğmeler aydınlık */
-    --primary: 36 26% 91%;
-    --primary-foreground: 24 10% 10%;
+    /* Tebeşir: koyu tahtada birincil düğmeler aydınlık */
+    --primary: 60 12% 91%;
+    --primary-foreground: 162 16% 9%;
 
-    /* Aydınlatılmış mor — koyu zeminde kontrast için yükseltildi */
-    --secondary: 263 45% 62%;
-    --secondary-foreground: 0 0% 100%;
+    /* Mavi tebeşir */
+    --secondary: 222 85% 74%;
+    --secondary-foreground: 162 16% 9%;
 
-    --muted: 24 6% 17%;
-    --muted-foreground: 32 8% 62%;
+    --muted: 162 10% 16%;
+    --muted-foreground: 90 6% 64%;
 
-    --accent: 160 32% 52%;
-    --accent-foreground: 24 10% 8%;
+    --accent: 150 45% 56%;
+    --accent-foreground: 162 16% 9%;
 
-    --destructive: 4 70% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 2 78% 66%;
+    --destructive-foreground: 162 16% 9%;
 
-    --border: 26 6% 20%;
-    --input: 26 6% 22%;
-    --ring: 36 26% 91%;
+    --border: 162 9% 21%;
+    --input: 162 9% 25%;
+    --ring: 222 85% 74%;
 
-    --lavender: 263 30% 24%;
-    --sand: 28 8% 20%;
-    --coral: 4 70% 60%;
-    --mint: 160 32% 52%;
-    --indigo: 263 45% 62%;
+    --highlighter: 53 95% 60%;
+    --highlighter-foreground: 162 16% 9%;
+    --rule: 162 9% 20%;
+    --redline: 2 50% 38%;
+    --grid: 162 9% 17%;
 
-    --sidebar-background: 24 9% 8%;
-    --sidebar-foreground: 36 20% 92%;
-    --sidebar-primary: 36 26% 91%;
-    --sidebar-primary-foreground: 24 10% 10%;
-    --sidebar-accent: 24 6% 14%;
-    --sidebar-accent-foreground: 36 20% 92%;
-    --sidebar-border: 26 6% 20%;
-    --sidebar-ring: 36 26% 91%;
+    --sidebar-background: 162 16% 9%;
+    --sidebar-foreground: 60 12% 91%;
+    --sidebar-primary: 60 12% 91%;
+    --sidebar-primary-foreground: 162 16% 9%;
+    --sidebar-accent: 162 10% 16%;
+    --sidebar-accent-foreground: 60 12% 91%;
+    --sidebar-border: 162 9% 21%;
+    --sidebar-ring: 222 85% 74%;
   }
 }
 
@@ -116,123 +129,148 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
   }
 
-  /* Editoryal serif başlıklar — Hinge'in dergi havası */
+  /* Başlıklar Newsreader: Hinge'in cevap kartlarındaki serif, ders
+     kitabının sayfa başlığı. Optik boyut tarayıcıya bırakılır. */
   h1, h2, h3 {
-    font-family: 'Fraunces', Georgia, serif;
-    letter-spacing: -0.01em;
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.012em;
   }
 
   h4, h5, h6 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+  }
+
+  /* Klavye odağı her yerde görünür: kalem mavisiyle çizilmiş bir çerçeve */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: hsl(var(--highlighter));
+    color: hsl(var(--highlighter-foreground));
   }
 }
 
 @layer components {
-  /* Navigation — shadow only, no border */
+  /* Üst çubuk: kâğıt rengi, altında tek ince çizgi */
   .nav-header {
-    @apply bg-card/80 backdrop-blur-lg text-foreground;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
-  }
-  .dark .nav-header {
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    @apply bg-background/90 backdrop-blur-md text-foreground border-b border-border;
   }
 
-  /* Cards — ince çizgi + temaya göre yumuşak gölge */
+  /* Kartlar: gölge yok, ince kenar. Hinge'deki gibi şekil ayırır. */
   .card-listing {
-    @apply bg-card rounded-xl overflow-hidden border border-border;
-    box-shadow: 0 1px 3px rgba(28, 25, 20, 0.05);
-  }
-  .dark .card-listing {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    @apply bg-card rounded-2xl overflow-hidden border border-border;
   }
 
-  /* Swipe action buttons — large circles with colored shadows */
-  .btn-swipe-like {
-    @apply bg-card text-accent rounded-full transition-all duration-200 active:scale-95;
-    box-shadow: 0 4px 16px hsl(var(--mint) / 0.3);
-  }
-  .btn-swipe-like:hover {
-    box-shadow: 0 6px 24px hsl(var(--mint) / 0.4);
-  }
-
+  /* Kaydırma düğmeleri: geç = kırmızı kalemli beyaz daire,
+     beğen = mürekkep dolu daire */
   .btn-swipe-pass {
-    @apply bg-card text-destructive rounded-full transition-all duration-200 active:scale-95;
-    box-shadow: 0 4px 16px hsl(var(--coral) / 0.3);
-  }
-  .btn-swipe-pass:hover {
-    box-shadow: 0 6px 24px hsl(var(--coral) / 0.4);
+    @apply bg-card text-destructive border-2 border-border rounded-full transition-transform duration-150 active:scale-95 hover:border-destructive/50;
   }
 
-  /* Tags */
-  .tag-lifestyle {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-lavender/40 text-foreground;
+  .btn-swipe-like {
+    @apply bg-primary text-primary-foreground rounded-full transition-transform duration-150 active:scale-95 hover:bg-primary/90;
   }
 
-  .tag-lifestyle-active {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary;
-  }
-
-  /* Badge */
-  .badge-unread {
-    @apply absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center;
-  }
-
-  /* Progress — thin animated bar */
-  .progress-step {
-    @apply h-[3px] rounded-full bg-muted transition-all duration-500;
-  }
-
-  .progress-step-active {
-    @apply h-[3px] rounded-full bg-primary transition-all duration-500;
-  }
-
-  /* Messages — gönderilen mürekkep, alınan sıcak gri */
+  /* Mesajlar: gönderilen tükenmez mavisi, alınan kâğıt */
   .message-sent {
-    @apply bg-primary text-primary-foreground rounded-[18px] rounded-br-md px-4 py-3;
+    @apply bg-secondary text-secondary-foreground rounded-[20px] rounded-br-md px-4 py-2.5;
   }
 
   .message-received {
-    @apply bg-card border border-border text-foreground rounded-[18px] rounded-bl-md px-4 py-3;
+    @apply bg-muted text-foreground rounded-[20px] rounded-bl-md px-4 py-2.5;
   }
 
-  /* Bottom nav — shadow, no border */
-  .bottom-nav-item {
-    @apply flex flex-col items-center gap-1 text-muted-foreground transition-colors duration-200;
+  /* ─── Kâğıt ve kalem ─── */
+
+  .font-display {
+    font-family: 'Newsreader', Georgia, serif;
   }
 
-  .bottom-nav-item-active {
-    @apply flex flex-col items-center gap-1 text-primary font-semibold transition-colors duration-200;
+  /* El yazısı: yalnızca kenar notları. Bir ekranda birden fazla olmaz. */
+  .font-hand {
+    font-family: 'Kalam', 'Comic Sans MS', cursive;
   }
 
-  /* Glass card */
-  .glass-card {
-    @apply bg-card/60 backdrop-blur-xl rounded-2xl;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  }
-  .dark .glass-card {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  /* Çizgili defter kâğıdı: öğrencinin kendi yazdığı metin. Satır aralığı
+     çizgi aralığına eşit, böylece yazı çizgilerin üstüne oturur. Soldaki
+     kırmızı çizgi defterin kenar boşluğu. */
+  .paper-ruled {
+    --line: 1.75rem;
+    --margin-x: 1.125rem;
+    position: relative;
+    line-height: var(--line);
+    padding: calc(var(--line) / 2) 1rem calc(var(--line) / 2) calc(var(--margin-x) + 0.875rem);
+    background-color: hsl(var(--card));
+    background-image:
+      linear-gradient(to right, transparent calc(var(--margin-x) - 1px), hsl(var(--redline)) calc(var(--margin-x) - 1px), hsl(var(--redline)) var(--margin-x), transparent var(--margin-x)),
+      linear-gradient(to bottom, transparent calc(var(--line) - 1px), hsl(var(--rule)) calc(var(--line) - 1px));
+    background-size: 100% 100%, 100% var(--line);
+    /* Çizgiler 0.3rem yukarı kayar: yazı çizginin arasında değil üstünde durur */
+    background-position: 0 0, 0 calc(var(--line) / 2 - 0.3rem);
   }
 
-  /* Gradient hero for match popup */
-  .gradient-hero {
-    background: radial-gradient(ellipse at center, hsl(var(--lavender)) 0%, hsl(var(--background)) 70%);
+  /* Kareli kâğıt: modelin hesapladığı şey */
+  .paper-grid {
+    background-color: hsl(var(--card));
+    background-image:
+      linear-gradient(hsl(var(--grid)) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--grid)) 1px, transparent 1px);
+    background-size: 14px 14px;
+    background-position: -1px -1px;
   }
 
-  /* Floating action button */
-  .floating-action {
-    @apply rounded-full flex items-center justify-center transition-all duration-200 active:scale-95;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  /* Fosforlu kalem: kalemin eğik başı gibi hafif yatık, satır kırılınca
+     her satırda ayrı çizilir. Ekranda en önemli tek rakam için. */
+  .marker {
+    color: hsl(var(--highlighter-foreground));
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--highlighter) / 0) 0.1em,
+      hsl(var(--highlighter) / 0.9) 0.3em,
+      hsl(var(--highlighter)) 60%,
+      hsl(var(--highlighter) / 0.85) calc(100% - 0.25em),
+      hsl(var(--highlighter) / 0) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 100% 72%;
+    background-position: 0 80%;
+    padding: 0 0.22em;
+    margin: 0 -0.08em;
+    border-radius: 0.15em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* Lastik mühür: çift çerçeve, mürekkep lekesi gibi hafif şeffaf */
+  .stamp {
+    @apply inline-flex flex-col items-center justify-center text-center font-bold;
+    color: hsl(var(--secondary));
+    border: 2px solid currentColor;
+    outline: 1px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.05;
+    opacity: 0.88;
+    mix-blend-mode: multiply;
+  }
+  .dark .stamp {
+    mix-blend-mode: normal;
+  }
+  .stamp-red {
+    color: hsl(var(--destructive));
   }
 }
 
 @layer utilities {
-  .hover-scale {
-    @apply transition-transform duration-200 hover:scale-105;
-  }
-
   .swipe-card {
     @apply touch-none select-none;
   }
@@ -243,5 +281,33 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Bütçe haritasının açılır kutuları: varsayılan beyaz kutu kara tahtada
+   parlıyordu; kartla aynı zemin ve yazı rengini alır. */
+.leaflet-container {
+  font-family: inherit;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 0 0 1px hsl(var(--border)), 0 8px 24px -12px hsl(var(--foreground) / 0.3);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Hareket istemeyen için kendiliğinden oynayan hiçbir şey oynamaz */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

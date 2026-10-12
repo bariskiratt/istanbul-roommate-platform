@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { I18nProvider } from "@/i18n";
 import PageMeta from "@/components/PageMeta";
+import OnboardingRedirect from "@/components/OnboardingRedirect";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import SwipeScreen from "./pages/SwipeScreen";
@@ -30,7 +31,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="dark">
+  <ThemeProvider attribute="class" defaultTheme="light">
   <I18nProvider>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -40,6 +41,7 @@ const App = () => (
         <BrowserRouter>
           {/* Rota değişiminde sekme başlığını ve meta açıklamasını günceller. */}
           <PageMeta />
+          <OnboardingRedirect />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/onboarding" element={<Onboarding />} />

@@ -1,14 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="evdes.tr">
-  <!-- Uygulama içindeki logo işaretinin aynısı: yuvarlatılmış kare + lucide
-       "home" ikonu. Zemin, temanın secondary rengi (hsl 263 45% 34%);
-       primary neredeyse siyah olduğu için koyu tema sekme çubuğunda
-       görünmez olurdu. XML yorumunda çift tire yasak, o yüzden CSS
-       değişkenleri burada tiresiz yazıldı. -->
-  <rect width="64" height="64" rx="14" fill="#4E307E"/>
-  <g transform="translate(12.8 12.8) scale(1.6)"
-     fill="none" stroke="#FFFFFF" stroke-width="2.5"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-    <path d="M9 22V12h6v10"/>
-  </g>
+  <!-- Logonun kısaltması "e.": evdes.tr'nin ilk harfi ve .tr'nin noktası.
+       Lacivert mürekkep zemin, beyaz serif e, fosforlu kalem sarısı nokta.
+       Harf Newsreader Bold'un küçük boy kesiminden (optik boyut 16) çizim
+       olarak alındı: sekme ikonu dış yazı tipi yükleyemez, bu kesimde de
+       ince çizgiler kalın tutulduğu için harf 16 pikselde dağılmıyor.
+       Renkler index.css ile aynı: mürekkep hsl(230 42% 14%), fosforlu kalem
+       hsl(53 100% 62%). Koyu sekme çubuğunda zemin kaybolsa da beyaz e ve
+       sarı nokta okunuyor.
+       favicon.png, favicon.ico ve icon 192/512 bu dosyadan çizildi; işaret
+       değişirse onlar da yeniden üretilmeli. Ana ekran ikonlarının kaynağı
+       scripts/app-icon.svg. -->
+  <rect width="64" height="64" rx="14" fill="#151a33"/>
+  <path fill="#ffffff" d="M26.03 11Q31.58 11 35.4 13.24Q39.22 15.48 41.33 19.79Q43.44 24.1 43.84 30.31H14.58V26.05L37 25.03L31.58 27.47Q31.45 23.52 30.69 20.99Q29.94 18.46 28.54 17.22Q27.14 15.97 25.06 15.97Q22.88 15.97 21.24 17.17Q19.59 18.37 18.66 21.21Q17.73 24.05 17.73 29.07Q17.73 34 19.39 37.31Q21.06 40.61 24.17 42.28Q27.28 43.94 31.63 43.94Q33.67 43.94 35.49 43.63Q37.31 43.32 39.04 42.63Q40.77 41.95 42.55 40.84L43.84 43.59Q41.08 46.43 38.22 48.56Q35.36 50.69 32.29 51.85Q29.23 53 25.85 53Q19.68 53 15.11 50.38Q10.54 47.76 8.05 43.19Q5.56 38.62 5.56 32.67Q5.56 26.63 7.94 21.7Q10.32 16.77 14.89 13.89Q19.46 11 26.03 11Z"/>
+  <circle cx="51.64" cy="46.25" r="5.60" fill="#ffe83d"/>
 </svg>
