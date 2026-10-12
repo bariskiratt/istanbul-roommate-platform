@@ -134,10 +134,8 @@ async def lifespan(_app: FastAPI):
         STATE["access"] = AccessibilityIndex(
             network, geojson.get("features", []), prices_by_id
         )
-        walkable = sum(
-            1 for p in STATE["access"].places.values() if p["walk_km"] <= 1.2
-        )
-        print(f"✅ Toplu taşıma ağı yüklendi ({len(network.stations)} istasyon; "
+        walkable = sum(1 for p in STATE["access"].places.values() if p["stations"])
+        print(f"✅ Toplu taşıma ağı yüklendi ({len(network.served)} istasyon; "
               f"{walkable} mahalle yürüme mesafesinde).")
     else:
         print(f"⚠️  Toplu taşıma verisi yok ({TRANSIT_PATH.name}) — "
@@ -654,11 +652,11 @@ async def alternatives(
             ),
         )
     result = access.recommend(neighborhood_id, budget)
-    # transit.py metinleri Türkçe üretir; isteğin diline burada çevrilir.
+    # transit.py metni Türkçe üretir; isteğin diline burada çevrilir. Hedef
+    # raylı sisteme uzaksa yanıt metin değil `reason` kodu taşır, cümleyi
+    # istemci kendi dilinde kurar.
     if "error" in result:
         raise HTTPException(status_code=404, detail=localized(result["error"]))
-    if "message" in result:
-        result["message"] = localized(result["message"])
     return result
 
 

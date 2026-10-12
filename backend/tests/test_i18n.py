@@ -246,10 +246,8 @@ def test_degiskenle_cevrilen_metinlerin_ingilizcesi_var():
         "Yorumda",
         "askıya alamazsın",
         "silemezsin",
-        # transit.py'nin ürettiği, /api/alternatives'te çevrilen metinler.
+        # transit.py'nin ürettiği, /api/alternatives'te çevrilen metin.
         "Mahalle bulunamadı.",
-        "Bu mahalle raylı sisteme yürüme mesafesinde değil; ulaşım tabanlı "
-        "öneri üretilemiyor.",
     ]
     assert [s for s in sources if s not in EN] == []
 
@@ -258,7 +256,6 @@ def test_transit_metinleri_sozlukle_ayni():
     """transit.py'deki metin değişirse sözlükteki anahtar da değişmeli."""
     source = (APP_DIR / "transit.py").read_text(encoding="utf-8")
     assert '"Mahalle bulunamadı."' in source
-    assert "Bu mahalle raylı sisteme yürüme mesafesinde değil; " in source
 
 
 # ---- uçtan uca ----
