@@ -44,6 +44,7 @@ env:
 jobs:
   # Yayına alınacak bir şey var mı? Sırrı yoktur, yalnızca okur.
   check:
+    name: Yayına alınabilir mi
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' &&
@@ -67,6 +68,7 @@ jobs:
         run: .github/scripts/frontend-release-check.sh
 
   deploy:
+    name: Vercel üretim yayını
     needs: check
     if: needs.check.outputs.sha != ''
     runs-on: ubuntu-latest
