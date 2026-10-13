@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { matchRoute } from "../components/PageMeta";
+import { matchRoute } from "../lib/routeMeta";
 import { translations } from "../i18n/translations";
 
 const { tr, en } = translations;

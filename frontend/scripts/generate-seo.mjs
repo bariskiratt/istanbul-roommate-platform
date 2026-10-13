@@ -436,6 +436,7 @@ const urls = [
   // 308'liyor, sitemap'te yönlendirilen adres listelemek Search Console'da
   // "yönlendirmesi olan sayfa" uyarısı üretir.
   { loc: `${SITE}/semt`, pri: "0.9" },
+  { loc: `${SITE}/explore`, pri: "0.7" },
   { loc: `${SITE}/safety`, pri: "0.5" },
   { loc: `${SITE}/privacy`, pri: "0.3" },
   { loc: `${SITE}/onboarding`, pri: "0.6" },

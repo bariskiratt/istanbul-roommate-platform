@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/onboarding",
-      "destination": "/index.html"
+      "destination": "/onboarding/index.html"
     },
     {
       "source": "/swipe",
@@ -47,19 +47,19 @@
     },
     {
       "source": "/explore",
-      "destination": "/index.html"
+      "destination": "/explore/index.html"
     },
     {
       "source": "/safety",
-      "destination": "/index.html"
+      "destination": "/safety/index.html"
     },
     {
       "source": "/privacy",
-      "destination": "/index.html"
+      "destination": "/privacy/index.html"
     },
     {
       "source": "/login",
-      "destination": "/index.html"
+      "destination": "/login/index.html"
     },
     {
       "source": "/settings",
