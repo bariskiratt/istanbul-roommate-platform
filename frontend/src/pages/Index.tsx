@@ -6,6 +6,7 @@ import { useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchListings } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
+import { LINKED_DISTRICT_PAGES } from "@/lib/districts";
 import { useI18n } from "@/i18n";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -330,14 +331,25 @@ const Index = () => {
             <Link to="/safety" className="hover:text-foreground transition-colors">{t("landing.safety")}</Link>
             <Link to="/explore" className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</Link>
             <Link to="/swipe" className="hover:text-foreground transition-colors">{t("landing.footerListings")}</Link>
-            {/* Gerçek <a>: semt sayfaları SPA rotası değil, derleme anında
-                üretilen statik HTML. Buradaki bağlantı arama motorunun ana
-                sayfadan onlara ulaşmasını sağlar (iç bağlantı). */}
-            <a href="/semt" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
             <Link to="/privacy" className="hover:text-foreground transition-colors">{t("landing.privacy")}</Link>
           </div>
           <p className="text-sm text-muted-foreground">© 2026 {BRAND}</p>
         </div>
+        {/* Gerçek <a>: semt sayfaları SPA rotası değil, derleme anında
+            üretilen statik HTML. Ana sayfadan doğrudan bağlantı, arama
+            motorunun onları daha önce taramasını sağlar (bkz.
+            LINKED_DISTRICT_PAGES). */}
+        <nav
+          aria-label={t("landing.districtPrices")}
+          className="max-w-6xl mx-auto px-5 md:px-8 pb-10 -mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground"
+        >
+          <a href="/semt" className="text-foreground font-medium hover:text-secondary transition-colors">
+            {t("landing.districtPrices")}
+          </a>
+          {LINKED_DISTRICT_PAGES.map(([name, slug]) => (
+            <a key={slug} href={`/semt/${slug}`} className="hover:text-foreground transition-colors">{name}</a>
+          ))}
+        </nav>
       </footer>
     </div>
   );
