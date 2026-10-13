@@ -1138,10 +1138,12 @@ Honest list, all verified against the current tree.
   build, and `@typescript-eslint/no-unused-vars` is switched off entirely
   (`frontend/eslint.config.js:23`). (Keeping the Render backend awake is an
   external uptime monitor, DEPLOY.md §5, not CI.)
-- Vercel, as set up for this project, deploys `main` without waiting for CI;
-  only Render waits (`render.yaml`, `autoDeployTrigger: checksPass`). A broken frontend is kept
-  out of production by requiring the CI checks before merging into `main`, which
-  is a GitHub branch-protection setting, not something in this repository.
+- Vercel does not deploy `main` on its own (`frontend/vercel.json`,
+  `git.deploymentEnabled`). `.github/workflows/frontend-deploy.yml` deploys it
+  once CI is green and Render is serving the same `backend/` code, so a new
+  frontend never runs against the old backend (DEPLOY.md §2.1). Merging into
+  `main` also requires the CI checks, a GitHub ruleset setting outside this
+  repository.
 - No accessibility audit. `aria-label` is used on icon buttons, `ReportDialog`
   restores focus to the trigger on close (`src/components/ReportDialog.tsx:45-48`)
   and the `LocationPicker` menu supports keyboard navigation

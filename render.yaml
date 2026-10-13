@@ -3,6 +3,9 @@
 
 services:
   - type: web
+    # Render GitHub'da bu adla ("main - roommatch-api") deployment açar;
+    # frontend-deploy.yml frontend'i yayına almadan önce ona bakar. Adı
+    # değiştirirsen oradaki RENDER_ENVIRONMENT'ı da değiştir.
     name: roommatch-api
     runtime: docker
     rootDir: backend
