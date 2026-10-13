@@ -878,9 +878,11 @@ const tr = {
   // Tarayıcı sekmesinde, geçmişte ve yer imlerinde görünür. "/", "/onboarding",
   // "/explore", "/safety" ve "/login" robots.txt'de açık, yani bunlar arama
   // sonucunda da çıkıyor; gerisi yalnızca kullanıcı için.
-  "meta.home": "evdes.tr — İstanbul'da ev arkadaşı bul",
+  // meta.home arama sonucunun başlığı: aranan kelimeler ("ev arkadaşı",
+  // "kiralık oda", "İstanbul") önde, marka sonda.
+  "meta.home": "İstanbul'da ev arkadaşı ve kiralık oda bul — evdes.tr",
   "meta.homeDesc":
-    "Üniversite öğrencilerine özel ev arkadaşı bulma platformu: adil kira danışmanı, bütçe haritası ve eşleşme.",
+    "İstanbul'daki üniversite öğrencileri için ev arkadaşı ve oda ilanları: okul e-postasıyla doğrulanmış öğrenciler, adil kira hesabı ve semt semt bütçe haritası.",
   "meta.onboarding": "Ücretsiz kayıt ol",
   "meta.onboardingDesc":
     "Okul e-postanla dakikalar içinde kayıt ol, İstanbul'da sana uygun ev arkadaşını bul.",
@@ -1930,9 +1932,9 @@ const en: Record<TranslationKey, string> = {
   "admin.emptyActionsFilteredDesc": "No entry matches this filter.",
 
   // ---- tab titles (see components/PageMeta.tsx) ----
-  "meta.home": "evdes.tr — find a roommate in Istanbul",
+  "meta.home": "Find a roommate or a room in Istanbul — evdes.tr",
   "meta.homeDesc":
-    "A roommate platform for university students: fair-rent guidance, a budget map and matching.",
+    "Roommates and rooms for university students in Istanbul: students verified by university email, fair-rent checks and a neighbourhood-by-neighbourhood budget map.",
   "meta.onboarding": "Sign up free",
   "meta.onboardingDesc":
     "Sign up with your university email in minutes and find the right roommate in Istanbul.",
