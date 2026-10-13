@@ -200,7 +200,8 @@ npm run dev
 88) · `npm run typecheck` · `npm run lint`. GitHub Actions runs all of them,
 plus `npm run build`, on every pull request and every push to `main`
 (`.github/workflows/ci.yml`); Render deploys a `main` commit only after they
-pass.
+pass, and the frontend goes to Vercel production only after that backend is
+live (`.github/workflows/frontend-deploy.yml`, DEPLOY.md §2.1).
 
 ## 🚀 Deployment
 

@@ -412,6 +412,51 @@ choice.
 4. Deploy. Put the resulting address into `CORS_ORIGINS` on Render
    (section 1, step 4).
 
+### 2.1 Production deploys wait for CI and the backend
+
+Vercel does **not** deploy `main` by itself: `frontend/vercel.json` sets
+`git.deploymentEnabled.main` to `false`. Pull request previews are unchanged.
+Production goes out through `.github/workflows/frontend-deploy.yml` instead,
+and only when both hold for the newest `main` commit:
+
+- CI (`ci.yml`) is green on it, and
+- the backend Render is serving has the same `backend/` code as that commit.
+
+So a frontend change never goes live next to the old backend. A commit that
+does not touch `backend/` goes out as soon as CI is green (Render does not
+redeploy for it). A commit that does touch `backend/` goes out right after
+Render reports that deploy as live. If CI is red or the Render deploy fails, the
+frontend stays where it was.
+
+Before, Vercel went live about 20 seconds after a merge, minutes before CI
+finished and Render deployed.
+
+**One-time setup.** The workflow deploys with the Vercel CLI, so it needs a
+Vercel token and two IDs, kept in a GitHub environment that only `main` can use:
+
+1. Vercel → avatar → **Account Settings → Tokens** → create a token. Scope: the
+   team the project is in. Copy it (it is shown once).
+2. Vercel → the project → **Settings → General** → copy **Project ID**
+   (`prj_…`).
+3. Vercel → the team → **Settings → General** → copy **Team ID** (`team_…`).
+   On an older personal account with no team, use **Account Settings →
+   General → Vercel ID** instead.
+4. GitHub → the repo → **Settings → Environments → New environment**, name it
+   `vercel-production`.
+   - **Deployment branches and tags** → *Selected branches and tags* → add
+     `main`.
+   - **Environment secrets** → add `VERCEL_TOKEN` (step 1),
+     `VERCEL_PROJECT_ID` (step 2) and `VERCEL_ORG_ID` (step 3).
+
+**Check it worked.** After the next merge, GitHub → **Actions → Frontend
+yayını** shows a green run, and Vercel → **Deployments** shows a new Production
+deployment for that commit. Missing secrets make the run red with a message
+naming the missing one; the site keeps the previous version. After fixing it,
+**Run workflow** on that page deploys the current `main` (same checks).
+
+If the token expires or is revoked, the same red run appears; create a new one
+and replace `VERCEL_TOKEN`.
+
 ## 3) Checklist
 
 - [ ] `https://YOUR-API/` → returns the endpoint list

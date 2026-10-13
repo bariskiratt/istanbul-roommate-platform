@@ -1,0 +1,117 @@
+# Frontend'i (Vercel) üretime alan iş akışı.
+#
+# Neden: Vercel eskiden main'e gelen her commit'i CI'ı beklemeden ~20 saniyede
+# yayına alıyordu; Render ise backend'i ancak CI yeşil olunca, birkaç dakika
+# sonra alıyor. Arada yeni frontend eski backend'le konuşuyordu. Artık
+# frontend/vercel.json main için Vercel'in kendi üretim yayınını kapatıyor
+# (git.deploymentEnabled) ve üretim yayınını bu iş akışı yapıyor: main'in son
+# commit'i CI'dan geçtiyse VE o commit'in backend'i Render'da yayındaysa.
+# PR önizlemeleri (Preview) eskisi gibi Vercel'in kendisinde.
+#
+# Ne zaman koşar:
+#   - CI main'de yeşil bitince. backend/'e dokunmayan commit'lerde Render bir
+#     şey yayınlamaz, frontend hemen çıkar; dokunanlarda bu koşu bekle der.
+#   - Render backend'i yayına alınca (GitHub'daki deployment'ı "success" olunca).
+#   - Elle: Actions → Frontend yayını → Run workflow.
+#
+# Hiçbir adım Render'ı beklemez ya da yoklamaz, bu bilerek: render.yaml'daki
+# checksPass, Render'ın commit'teki TÜM kontrollerin bitmesini beklemesi
+# demek. Render'ı bekleyen bir kontrol olsaydı ikisi birbirini sonsuza dek
+# beklerdi.
+#
+# Vercel token'ı yalnızca main'den koşan işlere açık bir GitHub ortamında
+# (vercel-production) durur. Kurulum: DEPLOY.md §2.1.
+name: Frontend yayını
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+env:
+  # Render'ın GitHub'da açtığı deployment ortamının adı ("<dal> - <servis adı>").
+  # render.yaml'da servis adı değişirse bunu VE aşağıdaki `if`'teki aynı adı değiştir.
+  RENDER_ENVIRONMENT: main - roommatch-api
+
+jobs:
+  # Yayına alınacak bir şey var mı? Sırrı yoktur, yalnızca okur.
+  check:
+    name: Yayına alınabilir mi
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'main - roommatch-api')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/frontend-release-check.sh
+
+  deploy:
+    name: Vercel üretim yayını
+    needs: check
+    if: needs.check.outputs.sha != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: vercel-production
+    # Üretim yayınları sırayla, biri bitmeden diğeri başlamaz. Sıradaki koşu
+    # kontrolü baştan yapar ve main'in O ANKİ son commit'ini yayınlar; böylece
+    # geç kalan eski bir koşu yeni frontend'in üstüne eskisini yazamaz.
+    concurrency:
+      group: vercel-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/frontend-release-check.sh
+      - name: Vercel'e yükle (üretim)
+        if: steps.check.outputs.sha != ''
+        env:
+          SHA: ${{ steps.check.outputs.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=0
+          for v in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::$v tanımlı değil. GitHub → Settings → Environments → vercel-production → Environment secrets (DEPLOY.md §2.1)."
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+
+          git checkout --quiet --detach "$SHA"
+          # Repo kökünden: Vercel projesinin Root Directory ayarı (frontend)
+          # uzakta, Vercel'in kendi derlemesinde uygulanır; prebuild adımı
+          # backend/data'yı okuduğu için tüm repo yüklenmeli.
+          url=$(npx --yes vercel@60.1.3 deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "Üretimde: $url (commit ${SHA:0:7})" | tee -a "$GITHUB_STEP_SUMMARY"

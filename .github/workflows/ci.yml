@@ -5,6 +5,9 @@
 # yakalandığı kapıdır. render.yaml'daki `autoDeployTrigger: checksPass` da
 # Render'ın main'deki commit'i ancak buradaki işler geçince yayına almasını
 # sağlar; bu yüzden main'deki her push'ta da koşar ve yol filtresi YOKTUR.
+# Frontend de bunu bekler: frontend-deploy.yml bu iş akışı main'de yeşil
+# bitince (ve backend Render'da yayındayken) Vercel'e üretim yayını yapar.
+# Bu dosyanın adı ("CI") orada geçiyor; değiştirirsen orayı da değiştir.
 name: CI
 
 on:
