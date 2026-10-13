@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>evdes.tr — İstanbul'da ev arkadaşı bul</title>
+    <title>İstanbul'da ev arkadaşı ve kiralık oda bul — evdes.tr</title>
     <meta name="theme-color" content="#ffffff" />
 
     <!-- Sekme ikonu. SVG önce gelir (her boyutta net); SVG desteklemeyen eski
@@ -17,12 +17,12 @@
     <link rel="alternate icon" href="/favicon.png?v=2" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="description" content="Üniversite öğrencilerine özel ev arkadaşı bulma platformu: adil kira danışmanı, bütçe haritası ve eşleşme." />
+    <meta name="description" content="İstanbul'daki üniversite öğrencileri için ev arkadaşı ve oda ilanları: okul e-postasıyla doğrulanmış öğrenciler, adil kira hesabı ve semt semt bütçe haritası." />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="evdes.tr — İstanbul'da ev arkadaşı bul" />
+    <meta property="og:title" content="İstanbul'da ev arkadaşı ve kiralık oda bul — evdes.tr" />
     <meta property="og:site_name" content="evdes.tr" />
-    <meta property="og:description" content="Üniversite öğrencilerine özel ev arkadaşı bulma platformu." />
+    <meta property="og:description" content="İstanbul'daki üniversite öğrencileri için ev arkadaşı ve oda ilanları: okul e-postasıyla doğrulanmış öğrenciler, adil kira hesabı ve semt semt bütçe haritası." />
     <meta property="og:url" content="https://evdes.tr/" />
     <meta property="og:locale" content="tr_TR" />
 
@@ -34,7 +34,36 @@
     <meta property="og:image:alt" content="evdes.tr — İstanbul'da ev arkadaşı bul" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://evdes.tr/og.jpg" />
+    <!-- Başlık, açıklama, canonical ve og:* derlemede arama motoruna açık her
+         rota için yeniden yazılır (scripts/route-heads.ts); metinler
+         src/i18n/translations.ts'teki "meta.*" anahtarlarından gelir. -->
     <link rel="canonical" href="https://evdes.tr/" />
+
+    <!-- Google'ın arama sonucunda adresin üstünde gösterdiği site adı ve
+         logo. Ad bilerek "evdes.tr": yalnız "evdes" Enerji Bakanlığı'nın
+         EVDES sistemiyle çakışıyor (bkz. src/lib/brand.ts). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://evdes.tr/#website",
+            "name": "evdes.tr",
+            "url": "https://evdes.tr/",
+            "inLanguage": "tr-TR",
+            "publisher": { "@id": "https://evdes.tr/#organization" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://evdes.tr/#organization",
+            "name": "evdes.tr",
+            "url": "https://evdes.tr/",
+            "logo": "https://evdes.tr/icon-512.png"
+          }
+        ]
+      }
+    </script>
   </head>
 
   <body>

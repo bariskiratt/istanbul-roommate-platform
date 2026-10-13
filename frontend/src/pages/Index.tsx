@@ -66,6 +66,9 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* ─── Üst çubuk ─── */}
+      {/* Gezinme öğeleri düğme değil <Link> (gerçek <a href>): Google yalnızca
+          href'i olan bağlantıyı izler. onClick'li düğmeler yüzünden ana
+          sayfadan /explore, /safety ve /privacy'ye hiçbir yol görünmüyordu. */}
       <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between gap-4">
           <Link to="/" aria-label={BRAND}>
@@ -73,11 +76,11 @@ const Index = () => {
           </Link>
           <div className="hidden lg:flex items-center gap-7 text-[15px] text-muted-foreground">
             {isLoggedIn && user?.is_admin && (
-              <button onClick={() => navigate("/listings")} className="hover:text-foreground transition-colors">{t("landing.findHouse")}</button>
+              <Link to="/listings" className="hover:text-foreground transition-colors">{t("landing.findHouse")}</Link>
             )}
-            <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">{t("landing.findRoommate")}</button>
-            <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</button>
-            <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
+            <Link to="/swipe" className="hover:text-foreground transition-colors">{t("landing.findRoommate")}</Link>
+            <Link to="/explore" className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</Link>
+            <Link to="/safety" className="hover:text-foreground transition-colors">{t("landing.safety")}</Link>
             <button onClick={() => document.getElementById("nasil-calisir")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-colors">{t("landing.howItWorks")}</button>
           </div>
           <div className="flex items-center gap-1">
@@ -98,9 +101,11 @@ const Index = () => {
               </>
             ) : (
               <>
-                <Button variant="ghost" onClick={() => navigate("/login")} className="hidden sm:inline-flex">{t("landing.login")}</Button>
-                <Button onClick={() => navigate("/onboarding")} className="ml-1 px-5">
-                  {t("landing.getStarted")}
+                <Button asChild variant="ghost" className="hidden sm:inline-flex">
+                  <Link to="/login">{t("landing.login")}</Link>
+                </Button>
+                <Button asChild className="ml-1 px-5">
+                  <Link to="/onboarding">{t("landing.getStarted")}</Link>
                 </Button>
               </>
             )}
@@ -118,11 +123,13 @@ const Index = () => {
             {t("landing.heroSub")}
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Button size="lg" onClick={() => navigate(isLoggedIn ? "/swipe" : "/onboarding")} className="h-12 px-7 text-base">
-              {t(isLoggedIn ? "landing.ctaContinue" : "landing.ctaFree")}
+            <Button asChild size="lg" className="h-12 px-7 text-base">
+              <Link to={isLoggedIn ? "/swipe" : "/onboarding"}>
+                {t(isLoggedIn ? "landing.ctaContinue" : "landing.ctaFree")}
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate(browsePath)} className="h-12 px-7 text-base">
-              {t("landing.ctaBrowse")}
+            <Button asChild size="lg" variant="outline" className="h-12 px-7 text-base">
+              <Link to={browsePath}>{t("landing.ctaBrowse")}</Link>
             </Button>
           </div>
           {/* İlan sayısı bilerek yok: yayının ilk günlerinde küçük bir sayı
@@ -218,8 +225,8 @@ const Index = () => {
             ))}
           </ol>
           <div className="lg:col-start-5 lg:col-span-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <Button size="lg" onClick={() => navigate("/onboarding")} className="h-12 px-7 text-base">
-              {t("landing.signupFree")}
+            <Button asChild size="lg" className="h-12 px-7 text-base">
+              <Link to="/onboarding">{t("landing.signupFree")}</Link>
             </Button>
             <p className="text-sm text-muted-foreground">{t("landing.signupNote")}</p>
           </div>
@@ -264,17 +271,17 @@ const Index = () => {
             <div className="p-6 md:p-8">
               <p className="text-[15px] font-semibold text-foreground">{t("landing.why3Prompt")}</p>
               <p className="mt-3 font-display text-2xl md:text-[1.75rem] leading-snug text-foreground">{t("landing.why3Answer")}</p>
-              <Button variant="outline" onClick={() => navigate("/explore")} className="mt-6">
-                {t("landing.mapCta")}
+              <Button asChild variant="outline" className="mt-6">
+                <Link to="/explore">{t("landing.mapCta")}</Link>
               </Button>
             </div>
-            <button
-              onClick={() => navigate("/explore")}
+            <Link
+              to="/explore"
               aria-label={t("landing.mapCta")}
               className="relative min-h-[260px] border-t md:border-t-0 md:border-l border-border overflow-hidden bg-muted/40"
             >
               <MapSketch />
-            </button>
+            </Link>
           </article>
         </div>
       </section>
@@ -320,14 +327,14 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-5 md:px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <Wordmark size="sm" />
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <button onClick={() => navigate("/safety")} className="hover:text-foreground transition-colors">{t("landing.safety")}</button>
-            <button onClick={() => navigate("/explore")} className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</button>
-            <button onClick={() => navigate("/swipe")} className="hover:text-foreground transition-colors">{t("landing.footerListings")}</button>
+            <Link to="/safety" className="hover:text-foreground transition-colors">{t("landing.safety")}</Link>
+            <Link to="/explore" className="hover:text-foreground transition-colors">{t("landing.budgetMap")}</Link>
+            <Link to="/swipe" className="hover:text-foreground transition-colors">{t("landing.footerListings")}</Link>
             {/* Gerçek <a>: semt sayfaları SPA rotası değil, derleme anında
                 üretilen statik HTML. Buradaki bağlantı arama motorunun ana
                 sayfadan onlara ulaşmasını sağlar (iç bağlantı). */}
             <a href="/semt" className="hover:text-foreground transition-colors">{t("landing.districtPrices")}</a>
-            <button onClick={() => navigate("/privacy")} className="hover:text-foreground transition-colors">{t("landing.privacy")}</button>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">{t("landing.privacy")}</Link>
           </div>
           <p className="text-sm text-muted-foreground">© 2026 {BRAND}</p>
         </div>

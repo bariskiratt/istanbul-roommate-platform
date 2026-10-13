@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { locative } from "./locative.mjs";
 import { slug, slugDropsCharacters } from "./slug.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -250,7 +251,7 @@ function districtPage(d, others) {
   const url = `${SITE}/semt/${d.slug}`;
   const title = `${d.name} ev arkadaşı ve oda kiraları — evdes.tr`;
   const description =
-    `${d.name}'de kiralık daire medyanı ${money(d.median)}, iki yatak odalı bir evde ` +
+    `${locative(d.name)} kiralık daire medyanı ${money(d.median)}, iki yatak odalı bir evde ` +
     `kişi başı yaklaşık ${money(roomShare(d.median))}. ${d.list.length} mahallenin ` +
     `güncel verisi ve ev arkadaşı ilanları.`;
 
@@ -275,11 +276,11 @@ function districtPage(d, others) {
   const body = `
 <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a> ›
 <a href="/semt">Semtler</a> › <span aria-current="page">${esc(d.name)}</span></nav>
-<h1>${esc(d.name)}'de ev arkadaşı ve oda kiraları</h1>
+<h1>${esc(locative(d.name))} ev arkadaşı ve oda kiraları</h1>
 <p class="lead">${esc(d.list.length)} mahalle · ${nf.format(d.listings)} ilan · veriler ${esc(FACTOR.indexedTo)} düzeyinde</p>
 
 <p class="big"><mark>${money(roomShare(d.median))}</mark><span style="font-family:'Schibsted Grotesk',sans-serif;font-size:1rem;font-weight:400;color:var(--muted)"> / ay kişi başı</span></p>
-<p>${esc(d.name)}'de kiralık dairelerin medyan kirası <strong>${money(d.median)}</strong>.
+<p>${esc(locative(d.name))} kiralık dairelerin medyan kirası <strong>${money(d.median)}</strong>.
 İki yatak odalı bir evi iki kişi paylaştığında kişi başına düşen pay yaklaşık
 <strong>${money(roomShare(d.median))}</strong> oluyor.</p>
 
@@ -308,7 +309,7 @@ dönemine ait ilanlardan gelir ve TÜİK konut endeksiyle bugüne taşınır
 (×${FACTOR.factor}); endeksleme enflasyonu izler, semtin kendi hareketini değil.
 Bu bir tahmindir, ekspertiz değildir.</p>
 
-<h2>${esc(d.name)}'de ev arkadaşı bul</h2>
+<h2>${esc(locative(d.name))} ev arkadaşı bul</h2>
 <p>evdes.tr üniversite öğrencilerine özel bir ev arkadaşı platformu. Kayıt yalnızca
 <strong>.edu.tr</strong> uzantılı okul e-postasıyla yapılır. İlanları kaydırarak
 gezersin, karşılıklı beğeni eşleşme yaratır, mesajlaşma eşleşmeden sonra açılır.
@@ -436,6 +437,7 @@ const urls = [
   // 308'liyor, sitemap'te yönlendirilen adres listelemek Search Console'da
   // "yönlendirmesi olan sayfa" uyarısı üretir.
   { loc: `${SITE}/semt`, pri: "0.9" },
+  { loc: `${SITE}/explore`, pri: "0.7" },
   { loc: `${SITE}/safety`, pri: "0.5" },
   { loc: `${SITE}/privacy`, pri: "0.3" },
   { loc: `${SITE}/onboarding`, pri: "0.6" },

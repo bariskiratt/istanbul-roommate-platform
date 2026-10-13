@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -9,24 +10,31 @@ import { I18nProvider } from "@/i18n";
 import PageMeta from "@/components/PageMeta";
 import OnboardingRedirect from "@/components/OnboardingRedirect";
 import Index from "./pages/Index";
-import Onboarding from "./pages/Onboarding";
-import SwipeScreen from "./pages/SwipeScreen";
-import Notifications from "./pages/Notifications";
-import Matches from "./pages/Matches";
-import Messages from "./pages/Messages";
-import ChatScreen from "./pages/ChatScreen";
-import Profile from "./pages/Profile";
-import ProfileEdit from "./pages/ProfileEdit";
-import AccountSettings from "./pages/AccountSettings";
-import CreateListing from "./pages/CreateListing";
-import Listings from "./pages/Listings";
-import Explore from "./pages/Explore";
-import Safety from "./pages/Safety";
-import Privacy from "./pages/Privacy";
-import Login from "./pages/Login";
-import Settings from "./pages/Settings";
-import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+
+// Ana sayfa dışındaki sayfalar ayrı parçalar halinde, açıldıklarında
+// yüklenir. Tek parça hâlinde ana sayfa ziyaretçisi haritayı (Leaflet),
+// yönetim panelini ve sohbeti de indiriyordu: ~290 kB yerine ~190 kB
+// (gzip). Google mobil yükleme hızını sıralamada kullanıyor; asıl kazanan da
+// mobil veriyle giren öğrenci. Eski bir sekmedeki kopuk parça için bkz.
+// main.tsx.
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const SwipeScreen = lazy(() => import("./pages/SwipeScreen"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Matches = lazy(() => import("./pages/Matches"));
+const Messages = lazy(() => import("./pages/Messages"));
+const ChatScreen = lazy(() => import("./pages/ChatScreen"));
+const Profile = lazy(() => import("./pages/Profile"));
+const ProfileEdit = lazy(() => import("./pages/ProfileEdit"));
+const AccountSettings = lazy(() => import("./pages/AccountSettings"));
+const CreateListing = lazy(() => import("./pages/CreateListing"));
+const Listings = lazy(() => import("./pages/Listings"));
+const Explore = lazy(() => import("./pages/Explore"));
+const Safety = lazy(() => import("./pages/Safety"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Login = lazy(() => import("./pages/Login"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const queryClient = new QueryClient();
 
@@ -42,6 +50,7 @@ const App = () => (
           {/* Rota değişiminde sekme başlığını ve meta açıklamasını günceller. */}
           <PageMeta />
           <OnboardingRedirect />
+          <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/onboarding" element={<Onboarding />} />
@@ -66,6 +75,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

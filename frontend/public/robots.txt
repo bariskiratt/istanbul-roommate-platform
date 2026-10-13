@@ -5,6 +5,7 @@ User-agent: *
 Allow: /
 Disallow: /swipe
 Disallow: /matches
+Disallow: /notifications
 Disallow: /messages
 Disallow: /chat/
 Disallow: /profile

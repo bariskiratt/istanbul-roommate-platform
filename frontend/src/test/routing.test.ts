@@ -17,6 +17,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { INDEXABLE_ROUTES } from "../lib/routeMeta";
+
 const root = join(__dirname, "../..");
 
 function appRoutes(): string[] {
@@ -38,11 +40,14 @@ describe("rota yönlendirmeleri", () => {
   });
 
   it("uygulama rewrite'ları index.html'e gidiyor", () => {
+    // Arama motoruna açık rotalar derlemede kendi kopyasını alır
+    // (scripts/route-heads.ts), gerisi ortak index.html'i.
     const routes = new Set(appRoutes());
+    const indexable = new Set<string>(INDEXABLE_ROUTES);
     for (const r of vercelRewrites()) {
       if (!routes.has(r.source)) continue;
       expect(r.destination, `${r.source} yanlış hedefe gidiyor`).toBe(
-        "/index.html",
+        indexable.has(r.source) ? `${r.source}/index.html` : "/index.html",
       );
     }
   });
