@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
@@ -13,26 +13,28 @@ import ProfileTimeline from "@/components/campus/ProfileTimeline";
 import LikeContext from "@/components/LikeContext";
 import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { blockUser, fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+import { blockUser, fetchReceivedLikes, respondToLike } from "@/lib/api";
+import { groupLikesByPerson, type LikeGroup } from "@/lib/likeGroups";
 import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
 
-// API beğenisini kart bileşeninin beklediği görünüme çevirir
-const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
-  id: String(r.swipe_id),
-  swipeId: r.swipe_id,
-  listingTitle: r.listing_title,
-  // Sunucudaki hâli: neyin beğenildiği, yorum ve kartların kaynağı.
-  raw: r,
+// Kişinin beğenilerini (bkz. lib/likeGroups.ts) kartın beklediği görünüme
+// çevirir. Kuyrukta her kişi BİR kez görünür.
+const toLikeCard = (g: LikeGroup, unnamed: string) => ({
+  id: String(g.user.id),
+  swipeId: g.swipeId,
+  // Sunucudaki hâli: neyin beğenildiği, yorumlar; en yeni önce.
+  likes: g.likes,
+  rawUser: g.user,
   user: {
-    id: r.user.id,
+    id: g.user.id,
     // Ham üniversite: öğrenci kartındaki mühür yalnızca bu doluysa basılır
-    rawUniversity: r.user.university,
-    rawDepartment: r.user.department,
-    name: r.user.name || unnamed,
-    year: r.user.year ?? 0,
-    bio: r.user.bio,
-    photos: r.user.photos,
+    rawUniversity: g.user.university,
+    rawDepartment: g.user.department,
+    name: g.user.name || unnamed,
+    year: g.user.year ?? 0,
+    bio: g.user.bio,
+    photos: g.user.photos,
   },
 });
 
@@ -59,11 +61,12 @@ const Matches = () => {
   });
 
   const unnamed = t("messages.unnamed");
+  const groups = useMemo(() => groupLikesByPerson(received), [received]);
   useEffect(() => {
-    setQueue(received.map(r => toLikeCard(r, unnamed)));
-  }, [received, unnamed]);
+    setQueue(groups.map(g => toLikeCard(g, unnamed)));
+  }, [groups, unnamed]);
 
-  const total = received.length;
+  const total = groups.length;
   const remaining = queue.length;
 
   const handleDecision = useCallback((direction: "left" | "right") => {
@@ -297,7 +300,7 @@ interface ProfileCardProps {
 }
 
 const ProfileCard = ({ notification, onSwipe, direction, onReport, onBlock }: ProfileCardProps) => {
-  const { user, raw } = notification;
+  const { user, rawUser, likes } = notification;
   const { t, n, locale } = useI18n();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
@@ -305,7 +308,7 @@ const ProfileCard = ({ notification, onSwipe, direction, onReport, onBlock }: Pr
   const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   // Kapak fotoğrafı öğrenci kartında; kalanlar kartların arasına girer.
-  const timeline = interleave(raw.user.photos.slice(1), personPrompts(raw.user, { t, n, locale }), 1);
+  const timeline = interleave(rawUser.photos.slice(1), personPrompts(rawUser, { t, n, locale }), 1);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 100) onSwipe("right");
@@ -335,7 +338,12 @@ const ProfileCard = ({ notification, onSwipe, direction, onReport, onBlock }: Pr
       {/* İç kaydırıcı dikey kayar, kart yatay sürüklenir (touch-pan-y). */}
       <div className="h-full rounded-2xl border border-border bg-card p-3 space-y-4 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
         <div className="px-1 pt-1">
-          <LikeContext like={raw} />
+          {/* Birden çok ilanını beğendiyse hepsi burada, en yeni önce. */}
+          <div className="space-y-4 divide-y divide-border [&>*+*]:pt-4">
+            {likes.map(like => (
+              <LikeContext key={like.swipe_id} like={like} />
+            ))}
+          </div>
         </div>
 
         <StudentCard

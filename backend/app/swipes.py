@@ -424,7 +424,13 @@ def received_likes(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """İlanlarımı beğenen, henüz cevaplamadığım kullanıcılar (en yeni önce)."""
+    """İlanlarımı beğenen, henüz cevaplamadığım kullanıcılar (en yeni önce).
+
+    Satır başına bir BEĞENİ döner (hangi ilan, neyi, yorum). Arayüz bunları
+    kişiye göre gruplar (frontend/src/lib/likeGroups.ts) ve kararı kişiye
+    verir; respond_to_like da kararı o kişinin bütün bekleyen beğenilerine
+    uygular.
+    """
     rows = db.scalars(
         select(models.Swipe)
         .options(  # kart başına ekstra sorgu atılmasın (N+1)
@@ -500,9 +506,28 @@ def respond_to_like(
     if payload.accept:
         match, _ = _get_or_create_match(db, user.id, row.swiper_id, row.listing_id)
         # Yorum, beğeni yanıtlanmış sayılmadan ÖNCE taşınır; bkz.
-        # _deliver_comments (yanıtlanmış beğeninin yorumu taşınmaz).
+        # _deliver_comments (yanıtlanmış beğeninin yorumu taşınmaz). Kişinin
+        # diğer ilanlarına yazdığı yorumlar da bu çağrıyla gelir.
         _deliver_comments(db, match, user.id, row.swiper_id)
         matched, match_id = True, match.id
+
+    # KARAR KİŞİYE VERİLİR, KAYDIRMAYA DEĞİL. Beğeniler ekranı aynı kişinin
+    # birden çok ilanına verdiği beğenileri tek kartta gösterir; karar o
+    # kişinin bu sahibin ilanlarına verdiği bütün bekleyen beğenilere
+    # uygulanır. Eskiden kuyruk kaydırmaları listeliyordu: üç ilanını beğenen
+    # kişi üç kez çıkıyor, birini kabul etmek diğer ikisini bekletiyordu
+    # (eşleşme zaten kişi çifti başına tek).
+    for other in db.scalars(
+        select(models.Swipe)
+        .join(models.Listing, models.Swipe.listing_id == models.Listing.id)
+        .where(
+            models.Listing.owner_id == user.id,
+            models.Swipe.swiper_id == row.swiper_id,
+            models.Swipe.direction == "like",
+            models.Swipe.responded.is_(False),
+        )
+    ):
+        other.responded = True
     row.responded = True
 
     db.commit()

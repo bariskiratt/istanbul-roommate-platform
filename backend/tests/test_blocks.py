@@ -100,10 +100,8 @@ def test_engel_begeniyi_ve_desteyi_iki_yonde_gizler(pair):
         "/api/blocks", headers=ayse["headers"], json={"user_id": ali["id"]}
     ).status_code == 204
 
-    # Ayşe'nin kuyruğunda Ali yok, eski beğeni kabul edilemez.
+    # Ayşe'nin kuyruğunda Ali yok.
     assert _received(client, ayse["headers"]) == []
-    swipe_id = client.get("/api/swipes/received", headers=ayse["headers"]).json()
-    assert swipe_id == []
     # İki taraf da birbirinin ilanını göremez ve kaydıramaz.
     assert ali_lid not in _deck(client, ayse["headers"])
     assert lid not in _deck(client, ali["headers"])

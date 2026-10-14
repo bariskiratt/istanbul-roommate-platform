@@ -461,8 +461,8 @@ into local queue state so a card can animate out before the server confirms
 (`src/pages/Matches.tsx:57-59`). Because it *does* invalidate after the server
 answers
 (`src/pages/Matches.tsx:71-72`), the effect re-seeds the queue from the fresh
-list, which is the correct outcome there — the decided like is gone from the
-server's response.
+list, which is the correct outcome there — the decided person's likes are gone
+from the server's response.
 
 ---
 
@@ -862,10 +862,12 @@ which would trap a `position: fixed` panel inside it (`:213-229`).
 Reads `GET /api/swipes/received` and answers with
 `POST /api/swipes/{id}/respond` (`Matches.tsx:50-54`, `:68-72`). The old
 `/notifications` page showed the same data and was unreachable; it now
-redirects here. Each like opens with what it was
-for (`src/components/LikeContext.tsx`): the liked photo, or the liked card
-rebuilt from the receiver's own current data, and the comment on ruled paper.
-Below that, Matches shows the person as
+redirects here. The queue is one card per person, not per like
+(`src/lib/likeGroups.ts`): someone who liked three of your listings appears
+once, and the decision covers all three. The card opens with what each like
+was for (`src/components/LikeContext.tsx`), newest first: the liked photo, or
+the liked card rebuilt from the receiver's own current data, and the comment on
+ruled paper. Below that, Matches shows the person as
 a timeline: student card, prompt cards and photos, then the bio. When the like
 is accepted, the server turns its comment into the first chat message. The end
 of the card has "Report" and "Block"; blocking drops the person's likes from
