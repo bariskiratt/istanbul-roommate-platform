@@ -867,7 +867,9 @@ for (`src/components/LikeContext.tsx`): the liked photo, or the liked card
 rebuilt from the receiver's own current data, and the comment on ruled paper.
 Below that, Matches shows the person as
 a timeline: student card, prompt cards and photos, then the bio. When the like
-is accepted, the server turns its comment into the first chat message.
+is accepted, the server turns its comment into the first chat message. The end
+of the card has "Report" and "Block"; blocking drops the person's likes from
+the queue (`POST /api/blocks`).
 
 **`Messages`** (`src/pages/Messages.tsx`).
 Conversation list from `GET /api/matches` (`:32-36`). Last-message previews go
@@ -881,7 +883,11 @@ One thread: `GET /api/messages/{matchId}` polled every 4 s (`:52-61`),
 handling: a send rejected by moderation or a suspended counterpart puts the text
 **back in the input** so it is not lost (`:70-80`); and a match missing from
 `/api/matches` is not enough to claim "no such conversation", because the server
-still allows reading history — the code distinguishes the two (`:102-112`).
+still allows reading history — the code distinguishes the two. The header
+menu reports the person or unmatches them (a block, `POST /api/blocks`, after
+a confirm), and each of the other person's messages has a small flag that
+reports that single message. Account settings lists blocked people with an
+unblock button (`GET`/`DELETE /api/blocks`).
 
 **`Listings` — admin listing console** (`src/pages/Listings.tsx`).
 Admin-only (`:942-954`). Server-side search with a 300 ms debounce (`:842-846`),

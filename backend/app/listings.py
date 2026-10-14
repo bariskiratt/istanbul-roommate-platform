@@ -16,6 +16,7 @@ from sqlalchemy.orm import joinedload
 
 from app import content_limits, models, moderation
 from app.auth import get_current_user, get_optional_user
+from app.blocks import blocked_ids, is_blocked
 from app.db import get_db
 from app.i18n import localized
 from app.uploads import (
@@ -465,6 +466,13 @@ def list_listings(
         )
     else:
         stmt = stmt.where(models.Listing.is_active)
+        # Engel iki yönlüdür: engellediğin ve seni engelleyen kişinin
+        # ilanları sana görünmez (bkz. app/blocks.py).
+        if user is not None:
+            stmt = stmt.where(
+                models.Listing.owner_id.is_(None)
+                | models.Listing.owner_id.not_in(blocked_ids(user.id))
+            )
     if unswiped and user is not None:
         # Karar verilmiş ilanlar desteye geri gelmesin; kendi ilanları da çıkar
         swiped = select(models.Swipe.listing_id).where(
@@ -502,6 +510,8 @@ def get_listing(
 ):
     row = db.get(models.Listing, listing_id)
     if row is None or not row.is_active or _owner_suspended(row):
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
+    if user is not None and row.owner_id is not None and is_blocked(db, user.id, row.owner_id):
         raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     # Liste ucuyla aynı kural: girişsiz istemci sahibin adını/üniversitesini
     # görmez, yoksa tek tek id gezerek aynı listeyi toplamak yeterdi.

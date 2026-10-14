@@ -175,6 +175,11 @@ const tr = {
   "account.deleting": "Siliniyor…",
   "account.deleted": "Hesabın silindi",
   "account.deleteFailed": "Hesap silinemedi",
+  "account.blockedTitle": "Engellediğin kişiler",
+  "account.blockedDesc": "Engellediğin kişiyle birbirinizin ilanını, beğenisini ve sohbetini görmezsiniz. Engeli kaldırırsan eşleşmeniz ve mesajlarınız geri gelir.",
+  "account.blockedEmpty": "Kimseyi engellemedin.",
+  "account.unblock": "Engeli kaldır",
+  "account.unblocked": "Engel kaldırıldı",
 
   // ---- profil düzenleme ----
   "pedit.loginRequired": "Profilini düzenlemek için giriş yap",
@@ -252,6 +257,13 @@ const tr = {
   "chat.loadFailed": "Mesajlar yüklenemedi.",
   "chat.sendFailed": "Mesaj gönderilemedi",
   "chat.closedTitle": "Bu sohbet şu an kapalı",
+  "chat.menu": "Diğer seçenekler",
+  "chat.reportMessage": "Bu mesajı şikâyet et",
+  "chat.unmatch": "Eşleşmeyi kaldır ve engelle",
+  "chat.unmatchConfirm": "{name} ile eşleşmen kaldırılsın mı? Sohbet ikinizden de kalkar ve birbirinizi bir daha görmezsiniz. Engeli Hesap bilgileri sayfasından kaldırabilirsin.",
+  "chat.unmatched": "Eşleşme kaldırıldı",
+  "chat.unmatchedDesc": "Bu kişiyi bir daha görmeyeceksin.",
+  "chat.unmatchFailed": "Eşleşme kaldırılamadı",
   "chat.closedDesc":
     "Karşı taraf şu anda erişilebilir değil. Geçmiş mesajları okuyabilirsin ama yeni mesaj gönderemezsin.",
 
@@ -297,6 +309,10 @@ const tr = {
   "likes.keepExploring": "Keşfetmeye devam et",
   "likes.year": "{year}. sınıf",
   "likes.responseFailed": "Cevap kaydedilemedi",
+  "likes.block": "Engelle",
+  "likes.blockConfirm": "{name} engellensin mi? Beğenisi kuyruktan kalkar ve ikiniz birbirinizi destede görmezsiniz.",
+  "likes.blocked": "{name} engellendi",
+  "likes.blockedDesc": "Engeli Hesap bilgileri sayfasından kaldırabilirsin.",
 
   // ---- profil ----
   "profile.title": "Profil",
@@ -674,10 +690,10 @@ const tr = {
     "Sunucuda şifreleme anahtarı yapılandırıldığında mesajların veritabanına AES-256-GCM ile şifrelenerek yazılır; anahtar tanımlı değilse düz metin olarak saklanır ve anahtar sonradan tanımlansa bile o mesajlar düz metin kalır. İletim her durumda HTTPS üzerinden yapılır. Bu uçtan uca şifreleme değildir: çözme anahtarı sunucuda durur, yani sunucuya erişebilen taraf mesajları okuyabilir.",
   "safety.card5Title": "Bildir, yönetici incelesin",
   "safety.card5Desc":
-    "Uygunsuz bir ilanı ya da kullanıcıyı tek dokunuşla bildirebilirsin. Bildirimini yalnızca platform yöneticileri görür ve inceler; karşı tarafa iletilmez.",
+    "Uygunsuz bir ilanı, kullanıcıyı ya da sohbetteki tek bir mesajı tek dokunuşla bildirebilirsin. Bildirimini yalnızca platform yöneticileri görür ve inceler; karşı tarafa iletilmez. Rahatsız olduğun kişiyi engelleyebilir ya da eşleşmeni kaldırabilirsin: birbirinizin ilanını, beğenisini ve sohbetini bir daha görmezsiniz.",
   "safety.card6Title": "Hesabın senin kontrolünde",
   "safety.card6Desc":
-    "İlanını istediğin an yayından kaldırabilirsin: ilan aramalarda ve profilinde görünmez olur, ancak kaydı veritabanında durmaya devam eder. Hesabını silmek ise kalıcıdır — profilin, ilanların, eşleşmelerin ve mesajların veritabanından tamamen silinir ve geri alınamaz. Şifreler geri döndürülemez biçimde saklanır; şifreni değiştirdiğinde tüm cihazlardaki oturumlar kapanır.",
+    "İlanını istediğin an düzenleyebilir ya da kapatabilirsin: kapalı ilan destede görünmez, kaydı veritabanında durur ve istediğinde yeniden yayınlayabilirsin. Hesabını silmek ise kalıcıdır — profilin, ilanların, eşleşmelerin ve mesajların veritabanından tamamen silinir ve geri alınamaz. Şifreler geri döndürülemez biçimde saklanır; şifreni değiştirdiğinde tüm cihazlardaki oturumlar kapanır.",
   "safety.tipsTitle": "Buluşurken",
   "safety.tips":
     "İlk görüşmeyi gündüz ve kalabalık bir yerde yap, eve tek başına gitme, nereye gittiğini bir arkadaşına söyle. Kaporayı ya da depozitoyu evi görmeden ve yazılı bir anlaşma olmadan gönderme.",
@@ -935,7 +951,7 @@ const tr = {
   // hiç olmamasından kötüdür.
   "landing.privacy": "Gizlilik",
   "privacy.title": "Gizlilik ve KVKK aydınlatma metni",
-  "privacy.updated": "Son güncelleme: 12 Ekim 2026",
+  "privacy.updated": "Son güncelleme: 15 Ekim 2026",
   "privacy.intro":
     "Bu metin, evdes.tr'yi kullandığında hangi kişisel verilerinin işlendiğini, neden işlendiğini ve bunlar üzerinde hangi haklara sahip olduğunu anlatır. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında hazırlanmıştır.",
 
@@ -951,7 +967,7 @@ const tr = {
   "privacy.dataListing":
     "İlan: başlık, açıklama, ilçe, mahalle, bütçe ve ilan fotoğrafları.",
   "privacy.dataActivity":
-    "Etkinlik: hangi ilanları beğendiğin veya geçtiğin, eşleşmelerin, gönderdiğin mesajlar ve açtığın bildirimler.",
+    "Etkinlik: hangi ilanları beğendiğin veya geçtiğin, eşleşmelerin, gönderdiğin mesajlar, engellediğin kişiler ve açtığın bildirimler.",
   "privacy.dataTechnical":
     "Teknik: giriş denemelerini sınırlamak için IP adresin. Bu sayaç yalnızca sunucunun belleğinde tutulur, veritabanına yazılmaz ve sunucu her yeniden başladığında sıfırlanır.",
   "privacy.dataNoTracking":
@@ -1265,6 +1281,11 @@ const en: Record<TranslationKey, string> = {
   "account.deleting": "Deleting…",
   "account.deleted": "Your account was deleted",
   "account.deleteFailed": "Account couldn't be deleted",
+  "account.blockedTitle": "People you've blocked",
+  "account.blockedDesc": "You and someone you've blocked don't see each other's listings, likes or chat. If you unblock them, your match and messages come back.",
+  "account.blockedEmpty": "You haven't blocked anyone.",
+  "account.unblock": "Unblock",
+  "account.unblocked": "Unblocked",
 
   // ---- profile editing ----
   "pedit.loginRequired": "Log in to edit your profile",
@@ -1342,6 +1363,13 @@ const en: Record<TranslationKey, string> = {
   "chat.loadFailed": "The messages could not be loaded.",
   "chat.sendFailed": "Message not sent",
   "chat.closedTitle": "This chat is closed for now",
+  "chat.menu": "More options",
+  "chat.reportMessage": "Report this message",
+  "chat.unmatch": "Unmatch and block",
+  "chat.unmatchConfirm": "Unmatch {name}? The chat disappears for both of you and you won't see each other again. You can unblock them on the Account details page.",
+  "chat.unmatched": "Unmatched",
+  "chat.unmatchedDesc": "You won't see this person again.",
+  "chat.unmatchFailed": "Couldn't unmatch",
   "chat.closedDesc":
     "The other person is not reachable right now. You can read the past messages but cannot send new ones.",
 
@@ -1386,6 +1414,10 @@ const en: Record<TranslationKey, string> = {
   "likes.keepExploring": "Keep exploring",
   "likes.year": "Year {year}",
   "likes.responseFailed": "Couldn't save your response",
+  "likes.block": "Block",
+  "likes.blockConfirm": "Block {name}? Their like leaves your queue and you won't see each other in the deck.",
+  "likes.blocked": "{name} is blocked",
+  "likes.blockedDesc": "You can unblock them on the Account details page.",
 
   // ---- profile ----
   "profile.title": "Profile",
@@ -1761,10 +1793,10 @@ const en: Record<TranslationKey, string> = {
     "When an encryption key is configured on the server, your messages are written to the database encrypted with AES-256-GCM. Without a key they are stored as plain text, and messages written that way stay plain text even if a key is added later. Transport always runs over HTTPS. This is not end-to-end encryption: the decryption key lives on the server, so anyone with access to the server can read the messages.",
   "safety.card5Title": "Report it, an admin reviews it",
   "safety.card5Desc":
-    "You can report an inappropriate listing or user in a single tap. Only platform admins see and review your report; it is never passed on to the person you reported.",
+    "You can report an inappropriate listing, a user or a single chat message in one tap. Only platform admins see and review your report; it is never passed on to the person you reported. You can also block someone or unmatch them: you stop seeing each other's listings, likes and chat.",
   "safety.card6Title": "Your account stays yours",
   "safety.card6Desc":
-    "You can unpublish your listing whenever you want: it disappears from search and from your profile, but the record stays in the database. Deleting your account is permanent — your profile, listings, matches and messages are removed from the database for good, with no way back. Passwords are stored irreversibly hashed, and changing yours signs you out on every device.",
+    "You can edit or close your listing whenever you want: a closed listing leaves the deck, its record stays in the database, and you can republish it later. Deleting your account is permanent — your profile, listings, matches and messages are removed from the database for good, with no way back. Passwords are stored irreversibly hashed, and changing yours signs you out on every device.",
   "safety.tipsTitle": "When you meet",
   "safety.tips":
     "Meet for the first time during the day in a busy place, don't go to the flat alone, and tell a friend where you are. Never send a deposit or down payment before you've seen the place and have something in writing.",
@@ -2002,7 +2034,7 @@ const en: Record<TranslationKey, string> = {
   // ---- privacy / KVKK ----
   "landing.privacy": "Privacy",
   "privacy.title": "Privacy and data protection notice",
-  "privacy.updated": "Last updated: 12 October 2026",
+  "privacy.updated": "Last updated: 15 October 2026",
   "privacy.intro":
     "This notice explains which of your personal data evdes.tr processes when you use it, why, and what rights you have over it. It is written under Turkish data protection law (KVKK, law no. 6698).",
 
@@ -2018,7 +2050,7 @@ const en: Record<TranslationKey, string> = {
   "privacy.dataListing":
     "Listing: title, description, district, neighbourhood, budget and listing photos.",
   "privacy.dataActivity":
-    "Activity: which listings you liked or passed, your matches, the messages you send and the notifications you open.",
+    "Activity: which listings you liked or passed, your matches, the messages you send, the people you block and the notifications you open.",
   "privacy.dataTechnical":
     "Technical: your IP address, used to rate-limit sign-in attempts. That counter lives only in the server's memory, is never written to the database and resets whenever the server restarts.",
   "privacy.dataNoTracking":

@@ -653,6 +653,28 @@ export const postReport = (
     ...(note?.trim() ? { note: note.trim() } : {}),
   });
 
+// ---- Engelleme ----
+//
+// Engel iki yönlüdür: iki kişi birbirinin ilanını, beğenisini ve aradaki
+// sohbeti görmez. "Eşleşmeyi kaldır" da bir engeldir. Satırlar silinmez;
+// engel kalkınca sohbet geri gelir (backend/app/blocks.py).
+
+export interface BlockedUser {
+  user_id: number;
+  name: string;
+  university: string | null;
+  photo: string | null;
+  created_at: string;
+}
+
+export const blockUser = (userId: number) =>
+  postJSON<void>("/api/blocks", { user_id: userId });
+
+export const unblockUser = (userId: number) =>
+  request<void>(`/api/blocks/${userId}`, { method: "DELETE" });
+
+export const fetchBlocks = () => getJSON<BlockedUser[]>("/api/blocks");
+
 // ---- Yönetim paneli ----
 // Tüm /api/admin/* uçları sunucuda require_admin ile korunur: girişsiz 401,
 // yönetici olmayan 403 alır. Arayüz ayrıca sayfayı is_admin ile kapatır.

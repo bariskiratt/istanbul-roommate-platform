@@ -1455,8 +1455,14 @@ are findings; they are the boundaries of the current design.
    rules (blocked text gets 422, a scam pattern goes to review) and the call
    counts against the listing-create quota. Listings an admin removed can't
    be edited or republished by the owner.
-9. **No user-level block or mute.** The only remedies are report and admin
-   suspension.
+9. **Blocking hides, it doesn't delete.** A user can block someone (or unmatch,
+   which is the same block) from the chat or the Likes card
+   (`backend/app/blocks.py`). It works both ways: neither sees the other's
+   listings, likes or chat, and no new match can form. Rows stay, so an admin
+   can still read reported messages, and unblocking brings the match back.
+   Blocking someone by an id that doesn't exist returns the same 204 so the
+   endpoint can't count accounts. Single chat messages can be reported from
+   the thread.
 10. **Visitors' IP addresses reach Google and OpenStreetMap.** Fonts load
     from Google Fonts and map tiles from OpenStreetMap. The privacy notice
     discloses both (section 8.4); self-hosting the fonts would remove one.

@@ -605,6 +605,18 @@ it — otherwise the easiest way to erase your moderation history would be to
 delete your own account (`backend/app/models.py:294-301`, and the sweep that
 relies on it at `backend/app/auth.py:598-607`).
 
+### `blocks` — hiding instead of deleting
+
+`Block(blocker_id, blocked_id)` is one row per direction, unique per pair
+(`backend/app/models.py`). Unmatching is the same row: like Hinge or Bumble,
+an unmatched person doesn't come back. The effect is applied where data is
+read, in both directions, through `blocks.blocked_ids(user_id)`: the deck and
+`GET /api/listings/{id}`, the swipe endpoint, the Likes queue and its respond
+endpoint, the match list, and the message endpoints (404, as if the match
+didn't exist). Nothing is deleted, so unblocking restores the conversation and
+a harassment report keeps its evidence. Account deletion removes the user's
+blocks in both directions (`purge_user`).
+
 ### The deletion order problem
 
 `purge_user` (`backend/app/auth.py:503-617`) is the most intricate function in

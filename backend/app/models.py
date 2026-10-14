@@ -391,3 +391,26 @@ class Report(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])
+
+
+class Block(Base):
+    """Bir kullanıcının başka birini engellemesi (ya da eşleşmeyi kaldırması).
+
+    Etki İKİ YÖNLÜDÜR: engelleyen de engellenen de birbirinin ilanını
+    destede görmez, birbirinin beğenisi kuyruğa düşmez, aralarındaki eşleşme
+    ikisinin listesinden de kalkar ve yeni eşleşme doğmaz (bkz. app/blocks.py).
+
+    Satırlar SİLİNMEZ, gizlenir: mesajlar ve eşleşme yerinde durur. Engel
+    kaldırılırsa sohbet geri gelir; taciz şikâyeti varsa yönetici kanıtı
+    hâlâ görebilir.
+    """
+
+    __tablename__ = "blocks"
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    blocker_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    blocked_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    blocked: Mapped[User] = relationship(foreign_keys=[blocked_id])

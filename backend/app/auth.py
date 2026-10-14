@@ -1262,6 +1262,11 @@ def purge_user(db: Session, user: models.User) -> dict[str, int]:
     db.query(models.AuthToken).filter_by(user_id=uid).delete(
         synchronize_session=False
     )
+    # Engeller iki yönde de gider: hesabı olmayan birini engellemenin ya da
+    # silinen hesabın koyduğu engelin anlamı kalmadı.
+    db.query(models.Block).filter(
+        (models.Block.blocker_id == uid) | (models.Block.blocked_id == uid)
+    ).delete(synchronize_session=False)
 
     # Son adım: kullanıcıya işaret eden nullable yabancı anahtarları boşalt.
     # Bunlar denetim izi alanlarıdır (kim askıya aldı / kim inceledi / kim

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, GraduationCap, ShieldCheck, Calendar, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,10 @@ import { newPasswordReady } from "@/lib/password";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
-import { changePassword, deleteAccount, requestOtp, resetPassword } from "@/lib/api";
+import UserAvatar from "@/components/UserAvatar";
+import {
+  changePassword, deleteAccount, fetchBlocks, requestOtp, resetPassword, unblockUser,
+} from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
 
@@ -33,6 +37,26 @@ const AccountSettings = () => {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteCode, setDeleteCode] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Engellediğin kişiler. Engel kalkınca aradaki eşleşme ve mesajlar geri
+  // gelir (sunucuda hiçbiri silinmedi).
+  const queryClient = useQueryClient();
+  const { data: blocks = [] } = useQuery({
+    queryKey: ["blocks"],
+    queryFn: fetchBlocks,
+    enabled: me !== null,
+  });
+  const unblock = useMutation({
+    mutationFn: unblockUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      toast.success(t("account.unblocked"));
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : t("common.error")),
+  });
 
   if (!me) {
     return (
@@ -208,6 +232,35 @@ const AccountSettings = () => {
             {t(usingCode ? "account.useCurrentPassword" : "account.forgotCurrent")}
           </button>
           <p className="text-[13px] text-muted-foreground leading-relaxed">{t("account.passwordNote")}</p>
+        </section>
+
+        {/* Engellenen kişiler */}
+        <section className="space-y-3">
+          <h2 className="text-xl text-foreground">{t("account.blockedTitle")}</h2>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">{t("account.blockedDesc")}</p>
+          {blocks.length === 0 ? (
+            <p className="text-[14px] text-muted-foreground">{t("account.blockedEmpty")}</p>
+          ) : (
+            <div className="rounded-2xl border border-border divide-y divide-border">
+              {blocks.map(b => (
+                <div key={b.user_id} className="flex items-center gap-3 p-3">
+                  <UserAvatar name={b.name} photo={b.photo ?? undefined} className="w-9 h-9 text-xs" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] text-foreground truncate">{b.name || t("messages.unnamed")}</p>
+                    {b.university && <p className="text-[12px] text-muted-foreground truncate">{b.university}</p>}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={unblock.isPending}
+                    onClick={() => unblock.mutate(b.user_id)}
+                  >
+                    {t("account.unblock")}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Tehlikeli bölge */}

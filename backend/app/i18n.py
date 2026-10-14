@@ -105,6 +105,7 @@ EN: dict[str, str | tuple[str, str]] = {
     "Yalnızca ev ilanları için hesaplanır.":
         "Only calculated for room-offered listings.",
     "İlan zaten yayında.": "This listing is already live.",
+    "Kendini engelleyemezsin.": "You can't block yourself.",
     "İlan zaten yönetici onayı bekliyor.":
         "This listing is already waiting for an admin's approval.",
     "Adil fiyat modeli yüklü değil.": "The fair price model isn't loaded.",

@@ -1,16 +1,24 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, Home, ArrowLeft, Flag } from "lucide-react";
+import { Send, Home, ArrowLeft, Flag, MoreVertical, UserX } from "lucide-react";
 import { toast } from "sonner";
 import BottomNav from "@/components/layout/BottomNav";
 import ReportDialog from "@/components/ReportDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ApiError,
   REMOVED_CONTENT,
   UNREADABLE_CONTENT,
+  blockUser,
   fetchMatches,
   fetchMessages,
   sendMessage,
@@ -32,7 +40,17 @@ const ChatScreen = () => {
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
+  // Şikâyet hedefi: kişinin kendisi ya da tek bir mesajı. Mesaj şikâyetini
+  // API hep destekliyordu ama arayüz göndermiyordu; yönetici tacizin hangi
+  // mesajda olduğunu ancak kişi tarif ederse bulabiliyordu.
+  const [reportTarget, setReportTarget] = useState<
+    { type: "user" | "message"; id: number; label: string } | null
+  >(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const openReport = (target: { type: "user" | "message"; id: number; label: string }) => {
+    setReportTarget(target);
+    setReportOpen(true);
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const id = Number(matchId);
@@ -77,6 +95,24 @@ const ChatScreen = () => {
         description: err instanceof Error ? err.message : t("common.error"),
       });
     },
+  });
+
+  // Eşleşmeyi kaldırmak karşı tarafı engellemektir: sohbet iki taraftan da
+  // kalkar, ikisi birbirini destede ve Beğeniler'de bir daha görmez. Engel
+  // Hesap ayarlarından kaldırılabilir; mesajlar silinmez, geri gelir.
+  const unmatch = useMutation({
+    mutationFn: (userId: number) => blockUser(userId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ["messages", id] });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      toast.success(t("chat.unmatched"), { description: t("chat.unmatchedDesc") });
+      navigate("/messages");
+    },
+    onError: err =>
+      toast.error(err instanceof Error ? err.message : t("chat.unmatchFailed")),
   });
 
   useEffect(() => {
@@ -144,16 +180,37 @@ const ChatScreen = () => {
           </p>
           <p className="text-[12px] text-muted-foreground truncate">{other?.university ?? ""}</p>
         </div>
-        {/* Karşı kullanıcıyı bildir; eşleşme yüklenmeden hedef id bilinmez */}
+        {/* Şikâyet ve eşleşmeyi kaldırma; eşleşme yüklenmeden hedef id bilinmez */}
         {other && (
-          <button
-            onClick={() => setReportOpen(true)}
-            aria-label={t("report.reportUser")}
-            title={t("report.reportUser")}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors shrink-0"
-          >
-            <Flag className="w-4 h-4" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={t("chat.menu")}
+              title={t("chat.menu")}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+            >
+              <MoreVertical className="w-5 h-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem
+                onSelect={() =>
+                  openReport({ type: "user", id: other.id, label: other.name || t("messages.unnamed") })
+                }
+              >
+                <Flag className="w-4 h-4" /> {t("report.reportUser")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={unmatch.isPending}
+                className="text-destructive focus:text-destructive"
+                onSelect={() => {
+                  const name = other.name || t("messages.unnamed");
+                  if (window.confirm(t("chat.unmatchConfirm", { name }))) unmatch.mutate(other.id);
+                }}
+              >
+                <UserX className="w-4 h-4" /> {t("chat.unmatch")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -187,8 +244,25 @@ const ChatScreen = () => {
                 <p className={`text-[15px] leading-relaxed${placeholder ? " italic opacity-70" : ""}`}>
                   {removed ? t("chat.removed") : unreadable ? t("chat.unreadable") : msg.content}
                 </p>
-                <p className={`text-[11px] mt-1 ${isMine ? "text-secondary-foreground/70" : "text-muted-foreground"}`}>
+                <p className={`text-[11px] mt-1 flex items-center gap-2 ${isMine ? "text-secondary-foreground/70" : "text-muted-foreground"}`}>
                   {parseUtc(msg.created_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
+                  {/* Yalnızca karşı tarafın okunabilir mesajı şikâyet edilir. */}
+                  {!isMine && !placeholder && (
+                    <button
+                      onClick={() =>
+                        openReport({
+                          type: "message",
+                          id: msg.id,
+                          label: msg.content.length > 80 ? `${msg.content.slice(0, 80)}…` : msg.content,
+                        })
+                      }
+                      aria-label={t("chat.reportMessage")}
+                      title={t("chat.reportMessage")}
+                      className="-my-1 p-1 rounded-full hover:text-destructive transition-colors"
+                    >
+                      <Flag className="w-3 h-3" />
+                    </button>
+                  )}
                 </p>
               </div>
             </div>
@@ -227,13 +301,13 @@ const ChatScreen = () => {
       </div>
       )}
 
-      {other && (
+      {reportTarget && (
         <ReportDialog
           open={reportOpen}
           onClose={() => setReportOpen(false)}
-          targetType="user"
-          targetId={other.id}
-          targetLabel={other.name || t("messages.unnamed")}
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+          targetLabel={reportTarget.label}
         />
       )}
 
