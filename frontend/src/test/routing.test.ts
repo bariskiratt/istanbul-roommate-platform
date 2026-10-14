@@ -12,6 +12,9 @@
  * bozarken. İkisi de elle yakalandı.
  */
 
+// Vitest 4 Node tiplerini artık kendiliğinden getirmiyor; bu test dosyaları
+// diskten okuduğu için tipler buradan eklenir.
+/// <reference types="node" />
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

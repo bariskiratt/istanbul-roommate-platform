@@ -5,4 +5,6 @@
 -r requirements.txt
 
 pytest==9.1.1
-httpx==0.28.1      # FastAPI TestClient
+# Starlette'in TestClient'ı httpx yerine httpx2 istiyor; httpx ile çalışınca
+# her test oturumunda kullanımdan kalkma uyarısı basıyordu.
+httpx2==2.13.1     # FastAPI TestClient
