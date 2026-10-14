@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BRAND } from "@/lib/brand";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -9,8 +8,8 @@ import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Camera, Check, Cigarette, Dog, Wine, Moon, Sun, Clock, X } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError, fetchLocations, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
-import { filterByQuery } from "@/lib/search";
+import { ApiError, registerUser, requestOtp, verifyOtp, updateMe } from "@/lib/api";
+import { isStudentEmail } from "@/lib/studentEmail";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import {
   clearOnboardingDraft,
@@ -20,6 +19,7 @@ import {
 } from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
+import DistrictMultiSelect from "@/components/DistrictMultiSelect";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
 import { useI18n } from "@/i18n";
@@ -55,7 +55,6 @@ const Onboarding = () => {
   const [year, setYear] = useState(draft.year);
   const [budget, setBudget] = useState(draft.budget);
   const [district, setDistrict] = useState<string[]>(draft.district);
-  const [districtSearch, setDistrictSearch] = useState("");
   const [lifestyle, setLifestyle] = useState(draft.lifestyle);
   const [photos, setPhotos] = useState<string[]>(draft.photos);
   const [password, setPassword] = useState("");
@@ -95,26 +94,6 @@ const Onboarding = () => {
       setCurrentStep(registeredEmail && email === registeredEmail ? 1 : 0);
     }
   }, [isLoggedIn, currentStep, email, registeredEmail]);
-
-  // Tercih edilen semtler: liste sabit değil, /api/locations'tan gelir.
-  // Aynı queryKey konum seçicide de kullanılıyor; istek bir kez atılır.
-  const {
-    data: locations = [],
-    isLoading: locationsLoading,
-    isError: locationsError,
-    refetch: refetchLocations,
-  } = useQuery({
-    queryKey: ["locations"],
-    queryFn: fetchLocations,
-    staleTime: 24 * 60 * 60 * 1000,
-    retry: 2,
-  });
-
-  // Türkçe karaktersiz arama ("besiktas" -> Beşiktaş), bkz. lib/search.ts.
-  const visibleDistricts = useMemo(
-    () => filterByQuery(locations.map(l => l.district), districtSearch, d => d),
-    [locations, districtSearch],
-  );
 
   const handleOtpChange = (index: number, value: string) => {
     // Yapıştırma: "123456" gibi çok haneli girdiyi kutulara dağıt
@@ -165,7 +144,7 @@ const Onboarding = () => {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 0: return email.includes("@") && email.includes(".edu.tr") && passwordValid && passwordsMatch;
+      case 0: return isStudentEmail(email) && passwordValid && passwordsMatch;
       case 1: return otp.every(d => d !== "");
       case 2: return name && gender && birthYear;
       case 3: return department && year;  // üniversite otomatik; zorunlu değil
@@ -332,7 +311,7 @@ const Onboarding = () => {
                   autoComplete="email"
                   className="h-12 text-base"
                 />
-                {email.length > 3 && !email.includes(".edu.tr") && (
+                {email.length > 3 && !isStudentEmail(email) && (
                   <p className="text-xs text-destructive pt-1">
                     {t("ob.eduOnly")}
                   </p>
@@ -516,52 +495,7 @@ const Onboarding = () => {
               </div>
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">{t("ob.districts")}</p>
-                <Input
-                  placeholder={t("ob.districtSearch")}
-                  value={districtSearch}
-                  onChange={e => setDistrictSearch(e.target.value)}
-                  // Esc aramayı temizler; seçilen semtler korunur.
-                  onKeyDown={e => { if (e.key === "Escape") setDistrictSearch(""); }}
-                  className="h-11 text-[15px]"
-                />
-                <div className="max-h-[240px] overflow-y-auto pr-1">
-                  {locationsLoading && (
-                    <p className="py-4 text-sm text-muted-foreground">{t("loc.loading")}</p>
-                  )}
-                  {!locationsLoading && (locationsError || locations.length === 0) && (
-                    <div className="py-4 space-y-2">
-                      <p className="text-sm text-muted-foreground">{t("loc.loadFailed")}</p>
-                      <button
-                        type="button"
-                        onClick={() => refetchLocations()}
-                        className="text-sm font-semibold text-secondary hover:underline"
-                      >
-                        {t("common.retry")}
-                      </button>
-                    </div>
-                  )}
-                  {locations.length > 0 && visibleDistricts.length === 0 && (
-                    <p className="py-4 text-sm text-muted-foreground">{t("loc.noDistrictMatch")}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {visibleDistricts.map(d => (
-                      <button
-                        key={d}
-                        onClick={() => setDistrict(prev =>
-                          prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
-                        )}
-                        aria-pressed={district.includes(d)}
-                        className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
-                          district.includes(d)
-                            ? "bg-foreground text-background border-foreground"
-                            : "bg-card border-input text-foreground hover:border-foreground/40"
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <DistrictMultiSelect selected={district} onChange={setDistrict} />
                 {district.length > 0 && (
                   <p className="text-xs text-muted-foreground">{t("ob.districtsSelected", { count: district.length })}</p>
                 )}

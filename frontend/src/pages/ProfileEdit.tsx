@@ -12,9 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { type ApiUser, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import DepartmentPicker from "@/components/DepartmentPicker";
+import DistrictMultiSelect from "@/components/DistrictMultiSelect";
 import { useI18n } from "@/i18n";
-
-const DISTRICTS = ["Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Bakırköy", "Beyoğlu", "Sarıyer", "Fatih", "Eyüpsultan", "Maltepe", "Ataşehir", "Pendik", "Kartal", "Bahçelievler", "Zeytinburnu", "Küçükçekmece", "Başakşehir"];
 
 /**
  * Form, kullanıcı yüklendikten SONRA kurulur. Eskiden alanlar ilk render'da
@@ -185,20 +184,7 @@ const ProfileEditForm = ({ me }: { me: ApiUser }) => {
         {/* Semtler */}
         <section className="space-y-3">
           <h2 className="text-xl text-foreground">{t("pedit.districts")}</h2>
-          <div className="flex flex-wrap gap-2">
-            {DISTRICTS.map(d => (
-              <button
-                key={d}
-                onClick={() =>
-                  setDistricts(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]))
-                }
-                aria-pressed={districts.includes(d)}
-                className={`h-9 px-3.5 rounded-full border text-[14px] font-semibold transition-colors ${choice(districts.includes(d))}`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
+          <DistrictMultiSelect selected={districts} onChange={setDistricts} />
         </section>
 
         {/* Yaşam tarzı */}

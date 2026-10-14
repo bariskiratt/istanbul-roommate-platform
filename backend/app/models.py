@@ -165,6 +165,11 @@ class Listing(Base):
     # İçerik denetimi "flag" dediğinde işaretlenir; ilan yayında kalır ama
     # yönetici incelemesine düşer.
     is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Dolandırıcılık kalıbı (moderation.HOLD_FOR_REVIEW) taşıyan ilan yayına
+    # GİRMEDEN yönetici onayı bekler: is_active False, bu alan True. Onay
+    # (işareti temizle ya da yayına al) ikisini birlikte çevirir. Sahibinin
+    # kendi kapattığı ilandan (is_active False, bu alan False) bu yüzden ayrı.
+    pending_review: Mapped[bool] = mapped_column(Boolean, default=False)
     # Denetimin verdiği sebep kodları, virgülle ayrılmış ("kufur,taciz:tehdit").
     # İşaretlemenin gerekçesi kaydedilmezse yönetici neye baktığını bilemez.
     # Bu sütun eklenmeden önce işaretlenmiş kayıtlarda NULL kalır.

@@ -346,6 +346,18 @@ The first sweep after this was added also removes photos left over from
 before a database reset, since no record points at them any more. Each sweep
 costs one list request (Class A) per 1,000 photos; deletes are free.
 
+**Photo metadata.** Every upload is decoded and re-encoded with Pillow
+(`sanitize_photo` in `app/uploads.py`): EXIF (GPS position, date, device),
+XMP and comments are dropped, the EXIF orientation is applied to the pixels,
+and the long edge is capped at 2048 px. Photos uploaded before this existed
+are cleaned once: about two minutes after startup a background job reads
+every photo, rewrites the ones that still carry metadata under the same
+name, then writes a `uploads/_metadata-scrub-v1` marker so it never runs
+again. The log line is `🧽 Eski fotoğraflardan meta veri silindi: N dosya
+yeniden yazıldı.` If it stops halfway (bucket error, the service fell
+asleep) the marker is not written and the next startup finishes the job.
+`PHOTO_SCRUB=0` turns it off.
+
 **Cost.** R2 has no spending cap: usage beyond the free tier is charged to the
 card on file. Beyond the free tier the prices are $0.015 per GB-month of
 storage, $4.50 per million uploads (Class A) and $0.36 per million photo reads
@@ -564,3 +576,4 @@ already delivering 10% of the requested schedule.
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
 | `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
 | `PHOTO_SWEEP` | `1` | `0` stops the background job that deletes uploaded photos no record uses (section 1.5). It never runs when `S3_BUCKET` is set and `DATABASE_URL` is not. |
+| `PHOTO_SCRUB` | `1` | `0` stops the one-time background job that removes location and other metadata from photos uploaded before uploads were re-encoded (section 1.5). Same guard as `PHOTO_SWEEP`. |

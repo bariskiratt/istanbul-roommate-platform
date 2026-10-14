@@ -808,6 +808,24 @@ def is_system_marker(text: str | None) -> bool:
     return text.strip().casefold() in _SYSTEM_MARKERS_FOLDED
 
 
+# İlanı YAYINA ALMADAN yönetici onayına bekleten bulgular. Türkiye'de oda
+# ilanı dolandırıcılığının asıl kalıbı tam olarak bunlar: IBAN'la birlikte
+# acele / para / kapora ve "evi görmeden kapora gönder". İkisi de en az iki
+# bağımsız sinyalin birleşmesini ister (bkz. _check_scam), yani masum bir
+# "depozito havaleyle alınır" cümlesi buraya düşmez. Kategori yine "block"
+# üretmez: ilan reddedilmez, yönetici bakana kadar desteye girmez.
+# Mesajlara uygulanmaz; sohbette işaretlenip yönetici kuyruğuna düşmeye
+# devam eder.
+HOLD_FOR_REVIEW = frozenset(
+    {f"{DOLANDIRICILIK}:iban_aciliyet", f"{DOLANDIRICILIK}:gormeden_kapora"}
+)
+
+
+def holds_for_review(result: ModerationResult) -> bool:
+    """İlan yayına girmeden yönetici onayı beklemeli mi?"""
+    return any(reason in HOLD_FOR_REVIEW for reason in result.reasons)
+
+
 def reasons_csv(result: ModerationResult) -> str | None:
     """İşaretleme gerekçelerini tek sütuna yazılacak biçime getirir.
 

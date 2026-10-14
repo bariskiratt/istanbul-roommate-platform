@@ -9,7 +9,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
@@ -363,6 +363,10 @@ class ListingOut(BaseModel):
     budget_min: int | None
     budget_max: int | None
     is_active: bool
+    # Yayına girmeden yönetici onayı bekliyor (bkz. models.Listing). Yalnızca
+    # sahibinin kendi listesinde (mine=1) görünür; genel listeler yalnız
+    # yayındaki ilanları döndürür.
+    pending_review: bool = False
     created_at: datetime
     owner_id: int | None = None
     owner_name: str | None = None
@@ -400,11 +404,17 @@ def create_listing(
     content_limits.check("listing_create", user.id)
 
     result = _moderate(payload.title, payload.description)
+    # Dolandırıcılık kalıbı taşıyan ilan reddedilmez ama yönetici onaylayana
+    # kadar yayına da girmez (bkz. moderation.HOLD_FOR_REVIEW). Yanıttaki
+    # pending_review arayüze "incelemeye alındı" dedirtir.
+    held = moderation.holds_for_review(result)
     row = models.Listing(
         **payload.model_dump(),
         owner_id=user.id,
         is_flagged=result.flagged,
         flag_reasons=moderation.reasons_csv(result),
+        is_active=not held,
+        pending_review=held,
     )
     db.add(row)
     db.commit()
@@ -430,11 +440,14 @@ def list_listings(
     db: Session = Depends(get_db),
     user: models.User | None = Depends(get_optional_user),
 ):
-    """Aktif ilanlar, en yeni önce."""
+    """Aktif ilanlar, en yeni önce.
+
+    mine=1 ayrıca sahibinin onay bekleyen ilanlarını da döndürür: ilan
+    açıp "İlanlarım"da göremeyen kişi ilanının kaybolduğunu sanırdı.
+    """
     stmt = (
         select(models.Listing)
         .options(joinedload(models.Listing.owner))  # owner_name için N+1 önlemi
-        .where(models.Listing.is_active)
         .order_by(models.Listing.created_at.desc(), models.Listing.id.desc())
     )
     # Askıdaki kullanıcının ilanları hiçbir listede görünmez.
@@ -444,7 +457,15 @@ def list_listings(
             raise HTTPException(
                 status_code=401, detail=localized("Giriş yapman gerekiyor.")
             )
-        stmt = stmt.where(models.Listing.owner_id == user.id)
+        stmt = stmt.where(
+            models.Listing.owner_id == user.id,
+            or_(
+                models.Listing.is_active.is_(True),
+                models.Listing.pending_review.is_(True),
+            ),
+        )
+    else:
+        stmt = stmt.where(models.Listing.is_active)
     if unswiped and user is not None:
         # Karar verilmiş ilanlar desteye geri gelmesin; kendi ilanları da çıkar
         swiped = select(models.Swipe.listing_id).where(
@@ -592,6 +613,12 @@ def update_listing(
         result = _moderate(new_title, new_description)
         row.is_flagged = result.flagged
         row.flag_reasons = moderation.reasons_csv(result)
+        # Yayındaki ilana sonradan dolandırıcılık kalıbı eklenirse o da
+        # onaya düşer; yoksa kural, ilanı önce temiz açıp sonra düzenleyerek
+        # atlatılırdı.
+        if moderation.holds_for_review(result):
+            row.is_active = False
+            row.pending_review = True
 
     old_photos = list(row.photos or [])
     for key, value in updates.items():
@@ -629,11 +656,14 @@ def deactivate_listing(
     silinemez, gerekirse veritabanından temizlenir.
     """
     row = db.get(models.Listing, listing_id)
-    if row is None or not row.is_active:
+    # Onay bekleyen ilanı sahibi geri çekebilir: beklemekten vazgeçmek de
+    # kapatmaktır.
+    if row is None or not (row.is_active or row.pending_review):
         raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.owner_id is None or user.id != row.owner_id:
         raise HTTPException(
             status_code=403, detail=localized("Bu ilan sana ait değil.")
         )
     row.is_active = False
+    row.pending_review = False
     db.commit()

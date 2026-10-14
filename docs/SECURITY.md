@@ -1460,8 +1460,13 @@ are findings; they are the boundaries of the current design.
     discloses both (section 8.4); self-hosting the fonts would remove one.
 11. **Moderation is intentionally lenient.** `block` is reserved for
     unambiguous violations; fraud heuristics can never block on their own
-    (`backend/app/moderation.py:70-72`). Scam listings *will* get published and
-    depend on user reports.
+    (`backend/app/moderation.py:70-72`). Since October 2026 the two strong
+    scam combinations (`moderation.HOLD_FOR_REVIEW`: IBAN with urgency, money
+    or deposit; a deposit before viewing) hold a listing out of the deck
+    until an admin approves it (`Listing.pending_review`). Weaker scam
+    signals, and every scam signal in chat, still only flag, so scam
+    listings phrased another way *will* get published and depend on user
+    reports.
 
 ---
 

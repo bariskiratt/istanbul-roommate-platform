@@ -85,6 +85,7 @@ async def lifespan(_app: FastAPI):
     init_db()
     uploads.report_photo_storage()
     uploads.start_orphan_sweeper()
+    uploads.start_photo_scrub()
     with NEIGHBORHOOD_GEOJSON.open(encoding="utf-8") as f:
         geojson = json.load(f)
 

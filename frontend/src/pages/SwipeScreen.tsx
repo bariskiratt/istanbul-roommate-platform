@@ -6,7 +6,6 @@ import {
   fetchListings,
   postSwipe,
   resetMyDeck,
-  LISTING_FEATURES,
   type ApiListing,
   type LikeTarget,
   type ListingFeature,
@@ -23,38 +22,19 @@ import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { Button } from "@/components/ui/button";
 import AuthGate from "@/components/AuthGate";
-import FilterModal, { defaultFilters, type ListingFilters } from "@/components/FilterModal";
+import FilterModal from "@/components/FilterModal";
+import { isDefaultFilters, listingPrice, matchesFilters, type ListingFilters } from "@/lib/deckFilters";
 import FairPriceBadge from "@/components/FairPriceBadge";
 import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 import { BRAND } from "@/lib/brand";
 
-// Kartın altındaki profil şeridi: ilan sahibi.
-interface UserProfile {
+// Deste kartı: sunucudaki ilanın (ApiListing) kart için düzleştirilmiş hâli.
+// Filtreler bu düz alanlara değil `source`a bakar (bkz. lib/deckFilters.ts).
+interface DeckListing {
   id: string;
-  name: string;
-  gender: "erkek" | "kadın" | "belirtmek_istemiyorum";
-  birthYear: number;
-  university: string;
-  department: string;
-  year: number;
-  budgetMin: number;
-  budgetMax: number;
-  smoking: boolean;
-  pets: boolean;
-  alcohol: boolean;
-  sleepSchedule: "erken" | "gece" | "esnek";
-  preferredDistrict: string;
-  bio: string;
-  photos: string[];
-}
-
-// Destedeki kart. Sunucudaki ilan (ApiListing) toDeckListing ile buna çevrilir.
-interface Listing {
-  id: string;
-  userId: string;
-  type: "ev_ilani" | "kisisel_ilan";
+  type: ApiListing["type"];
   title: string;
   description: string;
   rent?: number;
@@ -62,20 +42,11 @@ interface Listing {
   budgetMax?: number;
   district: string;
   roomCount?: string;
-  smokingAllowed?: boolean;
-  petsAllowed?: boolean;
   photos: string[];
-  isActive: boolean;
-  createdAt: string;
-  user: UserProfile;
-}
-
-// Deste kartı: kart tipine ek olarak gerçek ilanın ev özelliklerini ve
-// sunucudan gelen hâlini taşır (kartlar ve sahibin profili ondan üretilir).
-type DeckListing = Listing & {
-  features?: Partial<Record<ListingFeature, boolean>>;
+  /** Kartta görünen ad (girişsizken sunucu adı göndermez, yer tutucu). */
+  ownerName: string;
   source: ApiListing;
-};
+}
 
 /** Kalbe basılan şey: sunucuya giden hedef ve paneldeki önizleme. */
 interface LikeDraft {
@@ -85,92 +56,8 @@ interface LikeDraft {
   recipient: string;
 }
 
-const matchesFilters = (l: DeckListing, f: ListingFilters): boolean => {
-  if (f.listingType === "Ev İlanı" && l.type !== "ev_ilani") return false;
-  if (f.listingType === "Kişisel İlan" && l.type !== "kisisel_ilan") return false;
-
-  // Ev ilanında kira, kişisel ilanda bütçe aralığı kesişimi.
-  // Varsayılan aralığa (1000-30000) dokunulmadıysa "filtre yok" demektir;
-  // aksi halde aralık dışındaki ilanlar kullanıcı istemeden elenirdi.
-  const [min, max] = f.priceRange;
-  const rangeTouched =
-    min !== defaultFilters.priceRange[0] || max !== defaultFilters.priceRange[1];
-  if (rangeTouched) {
-    if (l.type === "ev_ilani") {
-      if (l.rent != null && (l.rent < min || l.rent > max)) return false;
-    } else if (l.budgetMin != null && l.budgetMax != null) {
-      if (l.budgetMax < min || l.budgetMin > max) return false;
-    }
-  }
-
-  if (f.rooms > 0 && (!l.roomCount || parseInt(l.roomCount) < f.rooms)) return false;
-
-  // Ev özellikleri: yalnızca ilanda açıkça "var" diyen alanlar geçer;
-  // bilinmeyen (null) alan eşleşme sayılmaz — sunucudaki `features`
-  // filtresiyle aynı kural. Koşul yalnızca ev ilanlarına uygulanır: kişisel
-  // ilanda (ev arayan kişi) asansör/otopark gibi alanlar hiç olamayacağı için
-  // filtre onları elemek yerine kapsam dışı bırakır — sunucu da böyle yapıyor.
-  if (l.type === "ev_ilani") {
-    for (const key of f.features) {
-      if (l.features?.[key] !== true) return false;
-    }
-  }
-
-  // API ilanlarında kullanıcı profili yer tutucu ("anon"); bilinmeyen alan
-  // üzerinden eleme yapılmaz, yoksa cinsiyet filtresi tüm desteyi boşaltır.
-  const profileKnown = l.user.id !== "anon";
-  if (profileKnown) {
-    if (f.gender === "Kadın" && l.user.gender !== "kadın") return false;
-    if (f.gender === "Erkek" && l.user.gender !== "erkek") return false;
-  }
-
-  for (const chip of f.lifestyle) {
-    if (chip === "Sigara İçmez" && (l.type === "ev_ilani" ? l.smokingAllowed !== false : profileKnown && l.user.smoking)) return false;
-    if (chip === "Hayvan Dostu" && (l.type === "ev_ilani" ? !l.petsAllowed : profileKnown && !l.user.pets)) return false;
-    if (!profileKnown) continue;
-    if (chip === "Alkol Kullanmaz" && l.user.alcohol) return false;
-    if (chip === "Erken Kalkar" && l.user.sleepSchedule !== "erken") return false;
-    if (chip === "Gece Kuşu" && l.user.sleepSchedule !== "gece") return false;
-  }
-
-  return true;
-};
-
-/** Seçim varsayılanla aynı mı (yani gerçekte hiçbir filtre yok mu)? */
-const isDefaultFilters = (f: ListingFilters): boolean =>
-  f.listingType === defaultFilters.listingType &&
-  f.priceRange[0] === defaultFilters.priceRange[0] &&
-  f.priceRange[1] === defaultFilters.priceRange[1] &&
-  f.rooms === defaultFilters.rooms &&
-  f.gender === defaultFilters.gender &&
-  f.lifestyle.length === 0 &&
-  f.features.length === 0;
-
-// API ilanı sahibinin yalnızca adını ve üniversitesini taşır; kart altındaki
-// profil şeridinin geri kalanı için nötr bir yer tutucu kullanılır. Fotoğrafı
-// yok: şeritte sahibin adının baş harfleri görünür (UserAvatar).
-const anonUser: UserProfile = {
-  id: "anon",
-  name: "",
-  gender: "belirtmek_istemiyorum",
-  birthYear: 2000,
-  university: "",
-  department: "",
-  year: 0,
-  budgetMin: 0,
-  budgetMax: 0,
-  smoking: false,
-  pets: false,
-  alcohol: false,
-  sleepSchedule: "esnek",
-  preferredDistrict: "",
-  bio: "",
-  photos: [],
-};
-
 const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
   id: `api-${a.id}`,
-  userId: "anon",
   type: a.type,
   title: a.title,
   description: a.description,
@@ -179,21 +66,8 @@ const toDeckListing = (a: ApiListing, ownerFallback: string): DeckListing => ({
   budgetMax: a.budget_max ?? undefined,
   district: a.district,
   roomCount: a.room_count ?? undefined,
-  smokingAllowed: a.smoking_allowed ?? undefined,
-  petsAllowed: a.pets_allowed ?? undefined,
-  // Sunucu belirtilmemiş özellikler için null döner; yalnızca true "var"dır.
-  features: Object.fromEntries(
-    LISTING_FEATURES.map(key => [key, a[key] === true]),
-  ) as Partial<Record<ListingFeature, boolean>>,
   photos: a.photos,
-  isActive: a.is_active,
-  createdAt: a.created_at,
-  user: {
-    ...anonUser,
-    name: a.owner_name ?? ownerFallback,
-    university: a.owner_university ?? "",
-    photos: a.owner_profile?.photo ? [a.owner_profile.photo] : [],
-  },
+  ownerName: a.owner_name ?? ownerFallback,
   source: a,
 });
 
@@ -263,10 +137,19 @@ const SwipeScreen = () => {
 
   useEffect(() => {
     const base = activeFilters
-      ? allListings.filter(l => matchesFilters(l, activeFilters))
+      ? allListings.filter(l => matchesFilters(l.source, activeFilters))
       : allListings;
     setCards([...base].reverse());
   }, [allListings, activeFilters]);
+
+  // Filtredeki fiyat dağılımı destedeki gerçek ilanlardan çizilir.
+  const deckPrices = useMemo(
+    () =>
+      allListings
+        .map(l => listingPrice(l.source))
+        .filter((p): p is number => p !== null),
+    [allListings],
+  );
 
   // Hiçbir şey seçilmemişse (ör. modaldaki "Temizle") filtre yok sayılır;
   // boş deste metni ve "filtreleri temizle" düğmesi böylece doğru çıkar.
@@ -448,7 +331,7 @@ const SwipeScreen = () => {
       )}
 
       <AuthGate show={!isLoggedIn} onClose={() => {}} />
-      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} onApply={applyFilters} />
+      <FilterModal open={filterOpen} onClose={() => setFilterOpen(false)} onApply={applyFilters} prices={deckPrices} />
       {reportTarget && (
         <ReportDialog
           open={reportOpen}
@@ -497,7 +380,7 @@ const SwipeCard = ({
   const apiId = listing.id.startsWith("api-") ? Number(listing.id.slice(4)) : null;
   const src = listing.source;
   const owner = src.owner_profile ?? null;
-  const ownerName = listing.user.name;
+  const ownerName = listing.ownerName;
 
   const prompts = listingPrompts(src, { t, n, locale });
   const timeline = interleave(listing.photos.slice(1), prompts, 1);
@@ -611,7 +494,7 @@ const SwipeCard = ({
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
-              <UserAvatar name={ownerName} photo={listing.user.photos[0]} className="w-7 h-7 text-[11px]" />
+              <UserAvatar name={ownerName} photo={owner?.photo ?? undefined} className="w-7 h-7 text-[11px]" />
               <p className="text-[13px] text-muted-foreground truncate">{ownerName}</p>
             </div>
           )

@@ -3,12 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { I18nProvider } from "@/i18n";
 import PageMeta from "@/components/PageMeta";
 import OnboardingRedirect from "@/components/OnboardingRedirect";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -20,7 +21,6 @@ import NotFound from "./pages/NotFound";
 // main.tsx.
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SwipeScreen = lazy(() => import("./pages/SwipeScreen"));
-const Notifications = lazy(() => import("./pages/Notifications"));
 const Matches = lazy(() => import("./pages/Matches"));
 const Messages = lazy(() => import("./pages/Messages"));
 const ChatScreen = lazy(() => import("./pages/ChatScreen"));
@@ -50,12 +50,17 @@ const App = () => (
           {/* Rota değişiminde sekme başlığını ve meta açıklamasını günceller. */}
           <PageMeta />
           <OnboardingRedirect />
+          {/* Çizim hatası beyaz ekran yerine yenileme düğmeli bir sayfa
+              gösterir; tembel yüklenen sayfanın parçası gelmezse de. */}
+          <ErrorBoundary>
           <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/swipe" element={<SwipeScreen />} />
-            <Route path="/notifications" element={<Notifications />} />
+            {/* Eski "Bildirimler" sayfası Beğeniler'in kopyasıydı ve menüden
+                erişilemiyordu; kaldırıldı. Yer imindeki adres boşa düşmesin. */}
+            <Route path="/notifications" element={<Navigate to="/matches" replace />} />
             <Route path="/matches" element={<Matches />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/chat/:matchId" element={<ChatScreen />} />
@@ -76,6 +81,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>
+          </ErrorBoundary>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

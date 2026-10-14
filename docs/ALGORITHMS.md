@@ -712,6 +712,11 @@ Verified (measured): `s1kt1r git`, `s i k t i r`, `siiiktir`, `oros pu cocugu`,
 | Off-site redirection in a listing | 0.5 | `:664` | flag |
 | Contact details in a listing | 0.4 | `:670-674` | flag |
 
+The two strong scam combinations are the only flags that change what
+happens to a listing: they hold it out of the deck until an admin approves it
+(`moderation.HOLD_FOR_REVIEW`, `Listing.pending_review`; the owner sees "in
+review"). Messages are never held.
+
 Because the score is a maximum, **no accumulation of heuristics can ever reach
 block**. Three independent 0.6 signals still score 0.6. This is not an
 oversight; it is the §3.2 principle made structural. `_SCAM_MAX = 0.9` exists

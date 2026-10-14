@@ -198,7 +198,7 @@ const CreateListing = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createListing(
+      const created = await createListing(
         buildListingPayload({
           listingType: listingType!,
           title,
@@ -214,10 +214,13 @@ const CreateListing = () => {
         }),
       );
       queryClient.invalidateQueries({ queryKey: ["listings"] });
-      toast({
-        title: t("create.successTitle"),
-        description: t("create.successDesc", { title }),
-      });
+      // Dolandırıcılık kalıbı taşıyan ilan yayına girmeden onay bekler;
+      // "yayınlandı" demek yalan olurdu.
+      toast(
+        created.pending_review
+          ? { title: t("create.pendingTitle"), description: t("create.pendingDesc") }
+          : { title: t("create.successTitle"), description: t("create.successDesc", { title }) },
+      );
       // /listings yalnızca yöneticiye açık; öğrenci orada "Bu sayfa şu an
       // kapalı" görüyordu. Yeni ilanı "İlanlarım" sekmesinde gösteriyoruz.
       navigate("/profile", { state: { tab: "listings" } });
