@@ -254,6 +254,7 @@ def test_ozet_sayilari(client):
     assert body == {
         "open_reports": 1,
         "flagged_listings": 1,
+        "pending_listings": 0,
         "flagged_messages": 0,
         "suspended_users": 0,
         "total_users": 2,
@@ -1376,3 +1377,136 @@ def test_askida_olmayan_kullaniciya_unsuspend_iz_uydurmaz(client):
     assert body["unsuspended_at"] is None
     assert body["unsuspended_by"] is None
     assert body["last_suspension_reason"] is None
+
+
+# ---------------------------------------------------------------------------
+# Dolandırıcılık kalıbı: ilan yayına girmeden onay bekler
+# ---------------------------------------------------------------------------
+
+SCAM_LISTING_TEXT = "Evi görmeden kapora gönder, anahtarı kargoyla yollarım."
+
+
+def _deck(client, headers=None) -> list[int]:
+    return [row["id"] for row in client.get("/api/listings", headers=headers).json()]
+
+
+def test_dolandiricilik_kalibi_ilani_onaya_bekletir(client):
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    ayse = _make_user(client, "ayse@uni.edu.tr", "Ayşe")
+    res = client.post(
+        "/api/listings",
+        headers=ali["headers"],
+        json=_listing_payload(description=SCAM_LISTING_TEXT),
+    )
+    assert res.status_code == 201
+    body = res.json()
+    assert body["is_active"] is False and body["pending_review"] is True
+    held = body["id"]
+
+    # Ne destede ne tek ilan ucunda; ama sahibinin listesinde "bekliyor".
+    assert held not in _deck(client, ayse["headers"])
+    assert client.get(f"/api/listings/{held}", headers=ayse["headers"]).status_code == 404
+    mine = client.get("/api/listings?mine=1", headers=ali["headers"]).json()
+    assert [(r["id"], r["pending_review"]) for r in mine] == [(held, True)]
+    assert held not in [r["id"] for r in client.get(
+        "/api/listings?mine=1", headers=ayse["headers"]).json()]
+
+
+def test_tek_sinyal_ilani_bekletmez(client):
+    """İletişim bilgisi gibi zayıf işaretler yayını durdurmaz (eski davranış)."""
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    res = client.post(
+        "/api/listings",
+        headers=ali["headers"],
+        json=_listing_payload(description=FLAGGED_LISTING_TEXT),
+    ).json()
+    assert res["is_active"] is True and res["pending_review"] is False
+
+
+def test_onay_bekleyen_ilan_ozet_ve_kuyrukta_gorunur(client):
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
+
+    summary = client.get("/api/admin/summary", headers=admin["headers"]).json()
+    assert summary["pending_listings"] == 1
+    assert summary["flagged_listings"] == 1
+    rows = client.get("/api/admin/flagged?kind=listing", headers=admin["headers"]).json()
+    assert [(r["id"], r["pending_review"], r["is_active"]) for r in rows] == [(held, True, False)]
+
+
+def test_clear_onay_bekleyen_ilani_yayina_alir(client):
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
+
+    res = client.post(
+        f"/api/admin/flagged/listing/{held}/review",
+        headers=admin["headers"],
+        json={"action": "clear", "note": "Sahibiyle konuşuldu, gerçek ilan."},
+    ).json()
+    assert res["is_active"] is True and res["is_flagged"] is False
+    assert held in _deck(client)
+    mine = client.get("/api/listings?mine=1", headers=ali["headers"]).json()
+    assert mine[0]["pending_review"] is False
+
+
+def test_remove_onay_bekleyeni_kaldirir_restore_onaylar(ctx):
+    client, TestSession = ctx
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
+
+    _remove(client, admin, "listing", held)
+    with TestSession() as db:
+        row = db.get(models.Listing, held)
+        assert (row.is_active, row.pending_review, row.moderation_removed) == (False, False, True)
+        # Geri almak kaldırma kararından vazgeçmektir: ilan yayına döner.
+        assert row.active_before_removal is True
+    assert client.get("/api/listings?mine=1", headers=ali["headers"]).json() == []
+
+    res = client.post(f"/api/admin/listing/{held}/restore", headers=admin["headers"])
+    assert res.status_code == 200, res.text
+    assert held in _deck(client)
+
+
+def test_yayina_al_onay_bekleyeni_onaylar(client):
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
+
+    res = client.post(f"/api/admin/listings/{held}/publish", headers=admin["headers"]).json()
+    assert res["is_active"] is True and res["changed"] is True
+    assert client.get("/api/admin/summary", headers=admin["headers"]).json()["pending_listings"] == 0
+
+
+def test_sahibi_onay_bekleyen_ilani_geri_cekebilir(client):
+    admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
+
+    assert client.delete(f"/api/listings/{held}", headers=ali["headers"]).status_code == 204
+    assert client.get("/api/listings?mine=1", headers=ali["headers"]).json() == []
+    # Kayıt kuyruğa düşmüş bir işaret olarak kalır, ama artık bekleyen değil:
+    # "clear" onu yayına ALMAZ (sahibinin geri çekme kararı korunur).
+    client.post(
+        f"/api/admin/flagged/listing/{held}/review",
+        headers=admin["headers"],
+        json={"action": "clear"},
+    )
+    assert held not in _deck(client)
+
+
+def test_yayindaki_ilana_sonradan_eklenen_kalip_da_onaya_duser(client):
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    listing_id = _make_listing(client, ali["headers"])
+    assert listing_id in _deck(client)
+
+    res = client.patch(
+        f"/api/listings/{listing_id}",
+        headers=ali["headers"],
+        json={"description": SCAM_LISTING_TEXT},
+    )
+    assert res.status_code == 200
+    assert res.json()["is_active"] is False and res.json()["pending_review"] is True
+    assert listing_id not in _deck(client)

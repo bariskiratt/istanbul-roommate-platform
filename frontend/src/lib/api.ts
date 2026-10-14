@@ -289,6 +289,12 @@ export interface ApiListing extends ListingPayload {
   owner_university: string | null;
   /** Yalnızca giriş yapmış istekte dolu. Eski sunucu alanı hiç göndermeyebilir. */
   owner_profile?: OwnerProfile | null;
+  /**
+   * Dolandırıcılık kalıbı (IBAN + acele, görmeden kapora) taşıdığı için
+   * yayına girmeden yönetici onayı bekliyor. Yalnızca sahibinin kendi
+   * listesinde (mine) ve ilan açma yanıtında true olabilir.
+   */
+  pending_review?: boolean;
 }
 
 export const createListing = (payload: ListingPayload) =>
@@ -644,6 +650,8 @@ export const UNREADABLE_CONTENT = "[unreadable]";
 export interface AdminSummary {
   open_reports: number;
   flagged_listings: number;
+  /** İşaretli ilanlardan yayına girmeden onay bekleyenler (eski sunucu göndermez). */
+  pending_listings?: number;
   flagged_messages: number;
   suspended_users: number;
   total_users: number;
@@ -744,6 +752,11 @@ export interface FlaggedItem {
    * önce kaldırılmış kayıtlarda null gelir (önceki durum bilinmiyor).
    */
   active_before_removal: boolean | null;
+  /**
+   * Yalnız ilan: dolandırıcılık kalıbı yüzünden yayına girmeden onay
+   * bekliyor. Bu ilanda "Temiz" demek onu YAYINA ALIR.
+   */
+  pending_review?: boolean;
   /** Denetimin gerekçe kodları ("iletisim_bilgisi:telefon" gibi). Eski kayıtlarda boş. */
   flag_reasons: string[];
   /** Sunucunun ürettiği Türkçe cümle; İngilizce arayüz kodlardan kendi metnini üretir. */

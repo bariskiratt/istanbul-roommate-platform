@@ -202,6 +202,11 @@ const Profile = () => {
                     <p className="text-[12px] text-muted-foreground">
                       {t(listing.type === "ev_ilani" ? "profile.house" : "profile.personal")}
                       {listing.is_active && <span className="ml-2 text-accent font-semibold">{t("profile.active")}</span>}
+                      {listing.pending_review && (
+                        <span className="ml-2 font-semibold text-foreground" title={t("profile.pendingHint")}>
+                          {t("profile.pending")}
+                        </span>
+                      )}
                     </p>
                     <p className="font-display text-[17px] leading-snug text-foreground truncate">{listing.title}</p>
                     <p className="text-[13px] text-muted-foreground">

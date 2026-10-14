@@ -83,6 +83,8 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
         # önceki durum gerçekten bilinmiyor. False yazsaydık o ilanlar geri
         # alındığında sessizce kapalı kalırdı.
         _Column("active_before_removal", "BOOLEAN"),
+        # Yayın öncesi yönetici onayı — eski ilanların hiçbiri beklemiyor.
+        _Column("pending_review", "BOOLEAN", default=False),
     ),
     "messages": (
         _Column("is_flagged", "BOOLEAN", default=False),

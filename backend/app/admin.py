@@ -110,6 +110,9 @@ def _utcnow() -> datetime:
 class SummaryOut(BaseModel):
     open_reports: int
     flagged_listings: int
+    # İşaretli ilanların, yayına girmeden onay bekleyen kısmı (sahibi
+    # beklerken ilan desteye girmiyor; önce bunlara bakılmalı).
+    pending_listings: int = 0
     flagged_messages: int
     suspended_users: int
     total_users: int
@@ -194,6 +197,9 @@ class FlaggedOut(BaseModel):
     # None = mesaj satırı, ya da bu sütun eklenmeden önce kaldırılmış eski
     # ilan (önceki durum bilinmiyor; geri alma yayına alır).
     active_before_removal: bool | None = None
+    # Yalnız ilan: yayına girmeden onay bekliyor. "clear" bu ilanı YAYINA
+    # ALIR; arayüz düğmeyi buna göre adlandırır.
+    pending_review: bool = False
     flag_reasons: list[str]
     flag_reasons_text: str | None
     # Kaldırma kararının izi (status=removed kuyruğunda dolu olur).
@@ -551,6 +557,7 @@ def _admin_listing_row(row: models.Listing) -> dict:
             else bool(row.active_before_removal)
         ),
         "is_flagged": bool(row.is_flagged),
+        "pending_review": bool(row.pending_review),
         "flag_reasons": codes,
         "flag_reasons_text": text,
         "reviewed_by": row.reviewed_by,
@@ -575,6 +582,10 @@ def admin_summary(
         ),
         "flagged_listings": _count(
             db, select(models.Listing.id).where(models.Listing.is_flagged.is_(True))
+        ),
+        "pending_listings": _count(
+            db,
+            select(models.Listing.id).where(models.Listing.pending_review.is_(True)),
         ),
         "flagged_messages": _count(
             db, select(models.Message.id).where(models.Message.is_flagged.is_(True))
@@ -711,6 +722,7 @@ def admin_flagged(
                         if row.active_before_removal is None
                         else bool(row.active_before_removal)
                     ),
+                    "pending_review": bool(row.pending_review),
                     "flag_reasons": codes,
                     "flag_reasons_text": text,
                     "reviewed_by": row.reviewed_by,
@@ -806,15 +818,25 @@ def review_flagged(
     note = payload.note.strip() if payload.note else None
     content_removed = False
 
+    if payload.action == "clear" and kind == "listing" and row.pending_review:
+        # Onay bekleyen ilan: işareti temizlemek onaylamaktır, ilan yayına
+        # girer. Sahibi bu arada geri çektiyse pending_review zaten False'tur
+        # ve buraya girilmez.
+        row.is_active = True
+        row.pending_review = False
+
     if payload.action == "remove":
         if kind == "listing":
             # Kaldırmadan ÖNCEKİ yayın durumunu sakla; geri alma buraya döner.
             # İkinci kez "remove" gelirse (çift tıklama) ilk kaydı EZMEMEK
             # için bayrak kontrolü şart — yoksa ikinci çağrı "kaldırmadan önce
             # de kapalıydı" yazar ve geri alma ilanı yayına getiremezdi.
+            # Onay bekleyen ilan "yayında" sayılır: kaldırmayı geri almak
+            # kaldırma kararından vazgeçmek, yani onaylamaktır.
             if not row.moderation_removed:
-                row.active_before_removal = bool(row.is_active)
+                row.active_before_removal = bool(row.is_active or row.pending_review)
             row.is_active = False
+            row.pending_review = False
         elif not row.moderation_removed:
             # İkinci kez "remove" gelirse (çift tıklama) sabit metnin
             # original_content'i EZMEMESİ için bayrak kontrolü şart.
@@ -1138,6 +1160,8 @@ def publish_listing(
     changed = not row.is_active
     if changed:
         row.is_active = True
+        # Onay bekleyen ilanı yayına almak onu onaylamaktır.
+        row.pending_review = False
         _record_action(db, admin, "listing_publish", "listing", row.id)
         db.commit()
         db.refresh(row)

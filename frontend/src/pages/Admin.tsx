@@ -519,6 +519,9 @@ const FlaggedCard = ({
   // gönderemiyor (sunucu 422 ile reddediyor, bkz. moderation.SYSTEM_MARKERS).
   const textUnrecoverable =
     removed && item.kind === "message" && item.content === REMOVED_CONTENT;
+  // Dolandırıcılık kalıbı yüzünden yayına hiç girmemiş, onay bekleyen ilan:
+  // "Temiz" onu yayına alır, düğme de bunu söyler.
+  const pending = !removed && item.kind === "listing" && item.pending_review === true;
 
   return (
     <div className="card-listing p-5 space-y-3">
@@ -528,7 +531,11 @@ const FlaggedCard = ({
             <Chip>{t(item.kind === "listing" ? "admin.targetListing" : "admin.targetMessage")}</Chip>
             {/* Rozet her iki kuyrukta da gösterilir: "Kaldırılanlar"da ilanın
                 yayında olmadığını görmek kararın kendisi kadar önemli. */}
-            {item.is_active === false && <Chip tone="danger">{t("admin.badgeUnpublished")}</Chip>}
+            {pending ? (
+              <Chip tone="warn">{t("admin.badgePending")}</Chip>
+            ) : (
+              item.is_active === false && <Chip tone="danger">{t("admin.badgeUnpublished")}</Chip>
+            )}
           </div>
           {item.title && <p className="font-semibold text-sm text-foreground break-words">{item.title}</p>}
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -549,6 +556,12 @@ const FlaggedCard = ({
       {/* Kaldırılan içerik denetim işareti taşımayabilir (karar rapordan da
           verilebiliyor); gerekçe yoksa "kaydedilmemiş" demek yanıltıcı olur. */}
       {(!removed || item.flag_reasons.length > 0) && <FlagReasons reasons={item.flag_reasons} />}
+
+      {pending && (
+        <div className="rounded-2xl border border-border bg-muted/50 px-3 py-2">
+          <p className="text-xs text-foreground">{t("admin.pendingNote")}</p>
+        </div>
+      )}
 
       {staysClosed && (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-2">
@@ -596,7 +609,7 @@ const FlaggedCard = ({
         ) : (
           <>
             <ActionButton
-              label={t("admin.actionClear")}
+              label={t(pending ? "admin.actionApprove" : "admin.actionClear")}
               onClick={() => onAction({ kind: "clear", label, itemKind: item.kind, itemId: item.id })}
             />
             <ActionButton
@@ -1045,6 +1058,12 @@ const Admin = () => {
           <p className="text-sm text-destructive">{t("admin.summaryFailed")}</p>
         ) : (
           s && (
+            <div className="space-y-2">
+            {(s.pending_listings ?? 0) > 0 && (
+              <p className="rounded-2xl border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">
+                {t("admin.pendingSummary", { count: s.pending_listings ?? 0 })}
+              </p>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <StatTile value={n(s.open_reports)} label={t("admin.openReports")} />
               <StatTile value={n(s.flagged_listings)} label={t("admin.flaggedListings")} />
@@ -1052,6 +1071,7 @@ const Admin = () => {
               <StatTile value={n(s.suspended_users)} label={t("admin.suspendedUsers")} />
               <StatTile value={n(s.total_users)} label={t("admin.totalUsers")} />
               <StatTile value={n(s.active_listings)} label={t("admin.activeListings")} />
+            </div>
             </div>
           )
         )}
