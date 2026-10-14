@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Pencil, Plus, Trash2 } from "lucide-react";
+import { Settings, Pencil, Plus, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import StudentCard from "@/components/campus/StudentCard";
 import ProfileTimeline from "@/components/campus/ProfileTimeline";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchListings, fetchMatches, deleteListing } from "@/lib/api";
+import { fetchListings, fetchMatches, deleteListing, republishListing } from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
@@ -42,6 +42,22 @@ const Profile = () => {
     },
     onError: err =>
       toast.error(err instanceof Error ? err.message : t("profile.removeFailed")),
+  });
+  // Kapatılan ilan sahibinin elinden yeniden yayına girer (eskiden yalnızca
+  // yönetici açabiliyordu). Metin yeniden denetlenir; dolandırıcılık kalıbı
+  // varsa yayına değil incelemeye girer ve kullanıcıya bu söylenir.
+  const republish = useMutation({
+    mutationFn: republishListing,
+    onSuccess: listing => {
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      if (listing.pending_review) {
+        toast(t("create.pendingTitle"), { description: t("create.pendingDesc") });
+      } else {
+        toast.success(t("profile.republished"));
+      }
+    },
+    onError: err =>
+      toast.error(err instanceof Error ? err.message : t("profile.republishFailed")),
   });
 
   // İlan yayınlandıktan sonra doğrudan "İlanlarım" sekmesi açılır.
@@ -93,7 +109,9 @@ const Profile = () => {
   const timeline = interleave(user.photos.slice(1), personPrompts(me, { t, n, locale }), 1);
 
   const matchCount = myMatches.length;
-  const listingCount = myListings.length;
+  // Sayaç yalnızca yayındaki ve onay bekleyen ilanları sayar; kapatılanlar
+  // listede durur ama "ilan" sayısına girmez.
+  const listingCount = myListings.filter(l => l.is_active || l.pending_review).length;
   const memberSince = parseUtc(me.created_at).toLocaleDateString(locale, {
     month: "short",
     year: "numeric",
@@ -191,10 +209,16 @@ const Profile = () => {
 
           {activeTab === "listings" && (
             <div className="space-y-3">
-              {myListings.length > 0 ? myListings.map(listing => (
+              {myListings.length > 0 ? myListings.map(listing => {
+                const closed = !listing.is_active && !listing.pending_review;
+                return (
                 <div key={listing.id} className="rounded-2xl border border-border p-2 flex items-center gap-3">
                   {listing.photos[0] ? (
-                    <img src={listing.photos[0]} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                    <img
+                      src={listing.photos[0]}
+                      alt=""
+                      className={`w-20 h-20 rounded-xl object-cover shrink-0 ${closed ? "opacity-50" : ""}`}
+                    />
                   ) : (
                     <div className="w-20 h-20 rounded-xl shrink-0 bg-muted" />
                   )}
@@ -207,6 +231,7 @@ const Profile = () => {
                           {t("profile.pending")}
                         </span>
                       )}
+                      {closed && <span className="ml-2 font-semibold text-muted-foreground">{t("profile.closed")}</span>}
                     </p>
                     <p className="font-display text-[17px] leading-snug text-foreground truncate">{listing.title}</p>
                     <p className="text-[13px] text-muted-foreground">
@@ -215,22 +240,44 @@ const Profile = () => {
                         ? `${n(listing.rent ?? 0)} TL`
                         : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} TL`}
                     </p>
+                    {closed && (
+                      <button
+                        onClick={() => republish.mutate(listing.id)}
+                        disabled={republish.isPending}
+                        className="mt-1 text-[13px] font-semibold text-secondary hover:underline disabled:opacity-50"
+                      >
+                        {t("profile.republish")}
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={() => {
-                      if (window.confirm(t("profile.confirmRemove", { title: listing.title }))) {
-                        removeListing.mutate(listing.id);
-                      }
-                    }}
-                    disabled={removeListing.isPending}
-                    aria-label={t("profile.removeListing")}
-                    title={t("profile.removeListing")}
-                    className="mr-1 w-10 h-10 shrink-0 rounded-full text-muted-foreground flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="mr-1 flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={() => navigate(`/edit-listing/${listing.id}`)}
+                      aria-label={`${t("profile.editListing")}: ${listing.title}`}
+                      title={t("profile.editListing")}
+                      className="w-10 h-10 rounded-full text-muted-foreground flex items-center justify-center hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    {!closed && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(t("profile.confirmRemove", { title: listing.title }))) {
+                            removeListing.mutate(listing.id);
+                          }
+                        }}
+                        disabled={removeListing.isPending}
+                        aria-label={`${t("profile.removeListing")}: ${listing.title}`}
+                        title={t("profile.removeListing")}
+                        className="w-10 h-10 rounded-full text-muted-foreground flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                      >
+                        <EyeOff className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )) : (
+                );
+              }) : (
                 <p className="text-muted-foreground py-4">{t("profile.noListings")}</p>
               )}
               <Button variant="outline" onClick={() => navigate("/create-listing")} className="w-full h-12">

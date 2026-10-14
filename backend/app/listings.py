@@ -9,7 +9,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
@@ -442,8 +442,10 @@ def list_listings(
 ):
     """Aktif ilanlar, en yeni önce.
 
-    mine=1 ayrıca sahibinin onay bekleyen ilanlarını da döndürür: ilan
-    açıp "İlanlarım"da göremeyen kişi ilanının kaybolduğunu sanırdı.
+    mine=1 sahibinin KENDİ kapattığı ve onay bekleyen ilanlarını da
+    döndürür: kapattığı ilanı "İlanlarım"da görüp yeniden yayınlayabilsin,
+    onay bekleyeni de kaybolmuş sanmasın. Yöneticinin kaldırdığı ilan
+    (moderation_removed) burada da görünmez; onu yalnız yönetici geri alır.
     """
     stmt = (
         select(models.Listing)
@@ -459,10 +461,7 @@ def list_listings(
             )
         stmt = stmt.where(
             models.Listing.owner_id == user.id,
-            or_(
-                models.Listing.is_active.is_(True),
-                models.Listing.pending_review.is_(True),
-            ),
+            models.Listing.moderation_removed.is_not(True),
         )
     else:
         stmt = stmt.where(models.Listing.is_active)
@@ -577,9 +576,16 @@ def update_listing(
     db: Session = Depends(get_db),
     user: models.User | None = Depends(get_optional_user),
 ):
-    """İlan güncelleme — yalnızca ilan sahibi."""
+    """İlan güncelleme — yalnızca ilan sahibi.
+
+    Yayındaki, onay bekleyen ve sahibinin kapattığı ilan düzenlenebilir:
+    fiyatı değişen kişi ilanı kapatıp yenisini açmak zorunda kalmamalı,
+    kapattığı ilanı da yeniden yayınlamadan önce güncelleyebilmeli.
+    Yöneticinin kaldırdığı ilan düzenlenemez (404): kaldırma kararının
+    konusu olan metin, karar geri alınmadan değişmemeli.
+    """
     row = db.get(models.Listing, listing_id)
-    if row is None or not row.is_active:
+    if row is None or row.moderation_removed:
         raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
     if row.owner_id is None or user is None or user.id != row.owner_id:
         raise HTTPException(
@@ -615,10 +621,22 @@ def update_listing(
         row.flag_reasons = moderation.reasons_csv(result)
         # Yayındaki ilana sonradan dolandırıcılık kalıbı eklenirse o da
         # onaya düşer; yoksa kural, ilanı önce temiz açıp sonra düzenleyerek
-        # atlatılırdı.
-        if moderation.holds_for_review(result):
+        # atlatılırdı. KAPALI ilan kapalı kalır: sahibi yayına almadıkça
+        # yöneticinin onayı da onu yayına sokmamalı. Yeniden yayınlarken
+        # metin tekrar denetlenir (republish_listing).
+        if moderation.holds_for_review(result) and row.is_active:
             row.is_active = False
             row.pending_review = True
+
+    # İlçe değişip mahalle gönderilmediyse eski ilçenin mahallesi kalmasın;
+    # adil fiyat yanlış mahalleye bakardı. (null "dokunma" sayıldığı için
+    # arayüz mahalleyi boşaltırken alanı hiç göndermiyor.)
+    if (
+        "district" in updates
+        and updates["district"] != row.district
+        and "neighborhood" not in updates
+    ):
+        row.neighborhood = None
 
     old_photos = list(row.photos or [])
     for key, value in updates.items():
@@ -643,11 +661,10 @@ def deactivate_listing(
 ):
     """Kalıcı silme yerine pasife çeker (satır ve veriler durur).
 
-    DÜRÜSTLÜK NOTU: satır silinmediği için veri kaybı yoktur, ama sahibinin
-    KENDİ ELİYLE yeniden yayına alacağı bir uç hâlâ yok — kapatma kullanıcı
-    açısından tek yönlüdür. Yeniden yayına almak bugün YÖNETİCİDEN geçiyor
-    (POST /api/admin/listings/{id}/publish); kullanıcının kendi düğmesi
-    ayrı bir iştir ve yapılmadı.
+    Sahibi kapattığı ilanı POST /api/listings/{id}/republish ile yeniden
+    yayına alabilir (metin yeniden denetlenir). Eskiden bu yalnızca
+    yöneticiden geçiyordu (POST /api/admin/listings/{id}/publish) ve kapatma
+    kullanıcı açısından tek yönlüydü.
 
     (Yöneticinin kaldırdığı ilan ayrı bir durumdur: moderation_removed=True
     olur ve POST /api/admin/listing/{id}/restore ile geri alınır.)
@@ -667,3 +684,49 @@ def deactivate_listing(
     row.is_active = False
     row.pending_review = False
     db.commit()
+
+
+@router.post("/{listing_id}/republish", response_model=ListingOut)
+def republish_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Sahibinin kapattığı ilanı yeniden yayına alır.
+
+    Metin BUGÜNÜN kurallarıyla yeniden denetlenir: ilan kapalıyken kurallar
+    sıkılaşmış olabilir, ya da sahibi kapalıyken metni düzenlemiştir.
+    Engellenen metin 422 alır (alan adıyla, yeni ilan açarkenki gibi);
+    dolandırıcılık kalıbı taşıyan metin yayına değil onaya girer.
+
+    created_at DEĞİŞMEZ: kapatıp yeniden açmak ilanı destenin başına
+    taşımasın (sıralama en yeniden eskiye). Tazelik döngüsü ve "öne çıkarma"
+    ayrı, sınırlı bir iş (yol haritası 2.1).
+
+    Kapatıp açma döngüsü yeni ilan açmakla aynı kotaya sayılır
+    (content_limits "listing_create"): her yayın denetimden geçiyor.
+    """
+    row = db.get(models.Listing, listing_id)
+    if row is None or row.moderation_removed:
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
+    if row.owner_id is None or user.id != row.owner_id:
+        raise HTTPException(
+            status_code=403, detail=localized("Bu ilan sana ait değil.")
+        )
+    if row.is_active:
+        raise HTTPException(status_code=409, detail=localized("İlan zaten yayında."))
+    if row.pending_review:
+        raise HTTPException(
+            status_code=409, detail=localized("İlan zaten yönetici onayı bekliyor.")
+        )
+
+    content_limits.check("listing_create", user.id)
+    result = _moderate(row.title, row.description)
+    held = moderation.holds_for_review(result)
+    row.is_flagged = result.flagged
+    row.flag_reasons = moderation.reasons_csv(result)
+    row.is_active = not held
+    row.pending_review = held
+    db.commit()
+    db.refresh(row)
+    return row

@@ -484,6 +484,7 @@ server's response.
 | `/chat/:matchId` | `ChatScreen` | One conversation |
 | `/profile`, `/profile/edit` | `Profile`, `ProfileEdit` | |
 | `/create-listing` | `CreateListing` | 5-step wizard |
+| `/edit-listing/:listingId` | `CreateListing` | Same steps filled with the listing; saves with `PATCH` |
 | `/listings` | `Listings` | **Admin only** |
 | `/explore` | `Explore` | Budget heatmap |
 | `/safety` | `Safety` | Public |
@@ -924,9 +925,12 @@ the list are in [`ALGORITHMS.md`](ALGORITHMS.md) §2.
 
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
 `src/pages/ProfileEdit.tsx`).
-Profile reads `GET /api/listings?mine=true` and `GET /api/matches` (`:24-34`)
-and can delete a listing (`:37-45`). A listing held for admin approval
-(`pending_review`, a scam pattern) is listed with an "In review" label.
+Profile reads `GET /api/listings?mine=true` and `GET /api/matches`. "My
+listings" shows live, in-review (`pending_review`, a scam pattern) and closed
+listings. Each can be edited (`/edit-listing/:id`); a live one can be closed
+(`DELETE`, which only deactivates it) and a closed one republished
+(`POST /api/listings/{id}/republish`, which re-runs moderation and may put it
+in review instead). Listings an admin removed are not shown.
 ProfileEdit picks districts with the same `DistrictMultiSelect`
 (`/api/locations`) as sign-up and the deck filter. Its first tab, Preview, shows the profile
 the way other people see it in Likes: the same timeline, then the bio. Editing writes `PATCH /api/auth/me`;

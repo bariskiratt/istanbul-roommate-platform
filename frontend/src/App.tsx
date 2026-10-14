@@ -67,6 +67,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/edit" element={<ProfileEdit />} />
             <Route path="/create-listing" element={<CreateListing />} />
+            <Route path="/edit-listing/:listingId" element={<CreateListing />} />
             <Route path="/listings" element={<Listings />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/safety" element={<Safety />} />

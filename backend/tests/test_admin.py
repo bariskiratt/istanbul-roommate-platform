@@ -1486,7 +1486,9 @@ def test_sahibi_onay_bekleyen_ilani_geri_cekebilir(client):
     held = _make_listing(client, ali["headers"], description=SCAM_LISTING_TEXT)
 
     assert client.delete(f"/api/listings/{held}", headers=ali["headers"]).status_code == 204
-    assert client.get("/api/listings?mine=1", headers=ali["headers"]).json() == []
+    # "İlanlarım"da kapalı olarak durur (yeniden yayınlanabilsin diye).
+    [mine] = client.get("/api/listings?mine=1", headers=ali["headers"]).json()
+    assert (mine["is_active"], mine["pending_review"]) == (False, False)
     # Kayıt kuyruğa düşmüş bir işaret olarak kalır, ama artık bekleyen değil:
     # "clear" onu yayına ALMAZ (sahibinin geri çekme kararı korunur).
     client.post(

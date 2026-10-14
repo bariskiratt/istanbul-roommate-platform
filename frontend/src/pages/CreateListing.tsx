@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,14 +9,14 @@ import {
   Flame, Home, ImagePlus, Sofa, Sun, Thermometer, User, Wifi, X
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import FairPriceCheck from "@/components/FairPriceCheck";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker";
 import AuthGate from "@/components/AuthGate";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  ApiError, createListing, LISTING_FEATURES,
-  type ListingFeature, type ListingPayload,
+  ApiError, createListing, fetchListings, LISTING_FEATURES, updateListing,
+  type ApiListing, type ListingFeature, type ListingPayload,
 } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import { useI18n } from "@/i18n";
@@ -117,34 +117,66 @@ export const buildListingPayload = (draft: ListingDraft): ListingPayload => {
   };
 };
 
-const CreateListing = () => {
+/**
+ * Var olan ilanın formdaki karşılığı (düzenleme ekranının başlangıç hâli).
+ * Bilinmeyen (null) ev özelliği işaretsiz başlar; kaydedince "yok" yazılır,
+ * yeni ilan açarkenki kuralla aynı (bkz. buildListingPayload).
+ */
+export const draftFromListing = (l: ApiListing): ListingDraft => ({
+  listingType: l.type,
+  title: l.title,
+  description: l.description,
+  location: { district: l.district, neighborhood: l.neighborhood ?? "" },
+  photos: [...l.photos],
+  rent: l.rent != null ? String(l.rent) : "",
+  roomCount: l.room_count ?? "",
+  smokingAllowed: l.smoking_allowed === true,
+  petsAllowed: l.pets_allowed === true,
+  features: Object.fromEntries(
+    LISTING_FEATURES.map(k => [k, l[k] === true]),
+  ) as Record<ListingFeature, boolean>,
+  budget: [l.budget_min ?? 4000, l.budget_max ?? 8000],
+});
+
+/**
+ * İlan formu. `editing` verilirse aynı adımlar var olan ilanla dolu açılır,
+ * tip seçimi atlanır (sunucu tipi değiştirmeye izin vermiyor) ve gönderim
+ * PATCH olur. Eskiden düzenleme ekranı yoktu: fiyatı değişen kişi ilanını
+ * kapatıp yenisini açmak zorundaydı.
+ */
+const ListingForm = ({ editing }: { editing?: ApiListing }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isLoggedIn } = useAuth();
   const { t, n } = useI18n();
+  const initial = editing ? draftFromListing(editing) : null;
 
   // Step 0: type selection, then form
-  const [listingType, setListingType] = useState<ListingType>(null);
+  const [listingType, setListingType] = useState<ListingType>(initial?.listingType ?? null);
   const [currentStep, setCurrentStep] = useState(0);
 
   // Common fields
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
   // İlçe zorunlu, mahalle isteğe bağlı; ikisi birlikte tutulur ki ilçe
   // değişince başka ilçenin mahallesi geride kalmasın (bkz. LocationPicker).
-  const [location, setLocation] = useState<LocationValue>({ district: "", neighborhood: "" });
+  const [location, setLocation] = useState<LocationValue>(
+    initial?.location ?? { district: "", neighborhood: "" },
+  );
   const { district, neighborhood } = location;
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<string[]>(initial?.photos ?? []);
 
   // Ev ilanı fields
-  const [rent, setRent] = useState("");
-  const [roomCount, setRoomCount] = useState("");
-  const [smokingAllowed, setSmokingAllowed] = useState(false);
-  const [petsAllowed, setPetsAllowed] = useState(false);
-  const [features, setFeatures] = useState<Record<ListingFeature, boolean>>(emptyFeatures);
+  const [rent, setRent] = useState(initial?.rent ?? "");
+  const [roomCount, setRoomCount] = useState(initial?.roomCount ?? "");
+  const [smokingAllowed, setSmokingAllowed] = useState(initial?.smokingAllowed ?? false);
+  const [petsAllowed, setPetsAllowed] = useState(initial?.petsAllowed ?? false);
+  const [features, setFeatures] = useState<Record<ListingFeature, boolean>>(
+    initial?.features ?? emptyFeatures,
+  );
 
   // Kişisel ilan fields
-  const [budget, setBudget] = useState([4000, 8000]);
+  const [budget, setBudget] = useState(initial?.budget ?? [4000, 8000]);
 
   const [submitting, setSubmitting] = useState(false);
   // Son gönderim hatası — toast kaybolduktan sonra da formda görünür kalsın.
@@ -198,21 +230,35 @@ const CreateListing = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const created = await createListing(
-        buildListingPayload({
-          listingType: listingType!,
-          title,
-          description,
-          location,
-          photos,
-          rent,
-          roomCount,
-          smokingAllowed,
-          petsAllowed,
-          features,
-          budget,
-        }),
-      );
+      const payload = buildListingPayload({
+        listingType: listingType!,
+        title,
+        description,
+        location,
+        photos,
+        rent,
+        roomCount,
+        smokingAllowed,
+        petsAllowed,
+        features,
+        budget,
+      });
+      if (editing) {
+        // Tip PATCH'te değiştirilemez; gövdeden çıkarılır.
+        const { type: _type, ...changes } = payload;
+        const updated = await updateListing(editing.id, changes);
+        queryClient.invalidateQueries({ queryKey: ["listings"] });
+        // Kira değiştiyse adil fiyat kıyası da değişir.
+        queryClient.invalidateQueries({ queryKey: ["fair-price", editing.id] });
+        toast(
+          updated.pending_review && !editing.pending_review
+            ? { title: t("create.pendingTitle"), description: t("create.pendingDesc") }
+            : { title: t("create.updatedTitle"), description: t("create.updatedDesc") },
+        );
+        navigate("/profile", { state: { tab: "listings" } });
+        return;
+      }
+      const created = await createListing(payload);
       queryClient.invalidateQueries({ queryKey: ["listings"] });
       // Dolandırıcılık kalıbı taşıyan ilan yayına girmeden onay bekler;
       // "yayınlandı" demek yalan olurdu.
@@ -266,6 +312,8 @@ const CreateListing = () => {
     setSubmitError(null);
     if (currentStep > 0) {
       setCurrentStep(s => s - 1);
+    } else if (editing) {
+      navigate(-1);
     } else {
       setListingType(null);
     }
@@ -356,6 +404,7 @@ const CreateListing = () => {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <span className="flex-1 text-[13px] text-muted-foreground text-center">
+          {editing && <span className="font-semibold text-foreground">{t("create.editTitle")} · </span>}
           {t("ob.stepCounter", { current: currentStep + 1, total: totalSteps })}
         </span>
         <span className="h-8 px-3 rounded-full border border-border text-[12px] font-semibold text-foreground flex items-center">
@@ -711,10 +760,52 @@ const CreateListing = () => {
             disabled={!canProceed() || submitting}
             className="w-full flex h-12 text-base disabled:opacity-40"
           >
-            {submitting ? t("create.publishing") : currentStep === totalSteps - 1 ? t("create.publish") : t("common.continue")}
+            {submitting
+              ? t(editing ? "common.saving" : "create.publishing")
+              : currentStep === totalSteps - 1
+                ? t(editing ? "create.save" : "create.publish")
+                : t("common.continue")}
           </Button>
         </div>
       </div>
+    </div>
+  );
+};
+
+/**
+ * /create-listing yeni ilan, /edit-listing/:listingId düzenleme açar.
+ * Düzenlenecek ilan "İlanlarım" listesinden okunur: tekil uç
+ * (GET /api/listings/{id}) yalnızca yayındaki ilanı döndürüyor, oysa sahibi
+ * kapattığı ya da onay bekleyen ilanını da düzenleyebilmeli.
+ */
+const CreateListing = () => {
+  const { listingId } = useParams();
+  const { isLoggedIn, user: me } = useAuth();
+  const navigate = useNavigate();
+  const { t } = useI18n();
+  const editId = listingId !== undefined ? Number(listingId) : null;
+
+  const { data: mine, isPending, isError } = useQuery({
+    queryKey: ["listings", "mine"],
+    queryFn: () => fetchListings({ mine: true }),
+    enabled: editId !== null && isLoggedIn && me !== null,
+  });
+
+  if (editId === null || !isLoggedIn) return <ListingForm />;
+
+  const editing = mine?.find(l => l.id === editId);
+  if (editing) return <ListingForm key={editing.id} editing={editing} />;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-5 text-center">
+      <p className="text-muted-foreground">
+        {isPending && !isError ? t("common.loading") : t("create.editNotFound")}
+      </p>
+      {!(isPending && !isError) && (
+        <Button variant="outline" onClick={() => navigate("/profile", { state: { tab: "listings" } })}>
+          {t("create.backToListings")}
+        </Button>
+      )}
     </div>
   );
 };

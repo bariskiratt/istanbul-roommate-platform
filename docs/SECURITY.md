@@ -1450,10 +1450,11 @@ are findings; they are the boundaries of the current design.
    (`backend/app/listings.py:592`). The Safety copy says this explicitly
    (`frontend/src/i18n/translations.ts:677-678`). Only *account* deletion is
    permanent.
-8. **A user cannot re-publish their own deactivated listing.** Republishing
-   currently goes through an admin (`POST /api/admin/listings/{id}/publish`).
-   Documented honestly in the endpoint docstring at
-   `backend/app/listings.py:568-585`.
+8. **Republishing re-runs moderation.** An owner reopens a closed listing with
+   `POST /api/listings/{id}/republish`; the text is checked against today's
+   rules (blocked text gets 422, a scam pattern goes to review) and the call
+   counts against the listing-create quota. Listings an admin removed can't
+   be edited or republished by the owner.
 9. **No user-level block or mute.** The only remedies are report and admin
    suspension.
 10. **Visitors' IP addresses reach Google and OpenStreetMap.** Fonts load

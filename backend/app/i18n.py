@@ -104,6 +104,9 @@ EN: dict[str, str | tuple[str, str]] = {
         "A looking-for-a-room listing needs a budget range.",
     "Yalnızca ev ilanları için hesaplanır.":
         "Only calculated for room-offered listings.",
+    "İlan zaten yayında.": "This listing is already live.",
+    "İlan zaten yönetici onayı bekliyor.":
+        "This listing is already waiting for an admin's approval.",
     "Adil fiyat modeli yüklü değil.": "The fair price model isn't loaded.",
     "Bu ilan sana ait değil.": "This listing isn't yours.",
 

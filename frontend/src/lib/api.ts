@@ -306,8 +306,16 @@ export const updateListing = (id: number, payload: Partial<ListingPayload>) =>
     body: JSON.stringify(payload),
   });
 
+/** Sahibin kapattığı ilanı kapatır (silmez); `republishListing` geri açar. */
 export const deleteListing = (id: number) =>
   request<void>(`/api/listings/${id}`, { method: "DELETE" });
+
+/**
+ * Kapatılmış ilanı yeniden yayına alır. Metin yeniden denetlenir: engellenirse
+ * 422, dolandırıcılık kalıbı varsa yanıt `pending_review: true` döner.
+ */
+export const republishListing = (id: number) =>
+  postJSON<ApiListing>(`/api/listings/${id}/republish`, {});
 
 /** İlanın istediği oda payının adil aralıkla kıyası (ev arkadaşlığı bazlı). */
 export interface ListingFairPrice {
