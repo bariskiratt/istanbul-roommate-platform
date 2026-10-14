@@ -456,10 +456,10 @@ hits all of them.
 The contrast is right below. "Reset my deck" changes the answer wholesale, so
 it invalidates instead (`src/pages/SwipeScreen.tsx:342-343`).
 
-A related discipline shows up in `Matches` and `Notifications`, which copy the
-query result into local queue state so a card can animate out before the server
-confirms (`src/pages/Matches.tsx:57-59`, `src/pages/Notifications.tsx:59-61`).
-Because those two *do* invalidate after the server answers
+A related discipline shows up in `Matches`, which copies the query result
+into local queue state so a card can animate out before the server confirms
+(`src/pages/Matches.tsx:57-59`). Because it *does* invalidate after the server
+answers
 (`src/pages/Matches.tsx:71-72`), the effect re-seeds the queue from the fresh
 list, which is the correct outcome there — the decided like is gone from the
 server's response.
@@ -478,7 +478,7 @@ server's response.
 | `/` | `Index` | Public landing page |
 | `/onboarding` | `Onboarding` | 7-step signup |
 | `/swipe` | `SwipeScreen` | The deck |
-| `/notifications` | `Notifications` | Same data as `/matches`; unreachable from the nav |
+| `/notifications` | — | Redirects to `/matches` (the old page duplicated it and was removed) |
 | `/matches` | `Matches` | Received likes |
 | `/messages` | `Messages` | Conversation list |
 | `/chat/:matchId` | `ChatScreen` | One conversation |
@@ -580,7 +580,7 @@ What the hand-rolled version buys instead is worth naming:
 - **Keys are a TypeScript union.** `TranslationKey = keyof typeof tr`
   (`src/i18n/translations.ts:881`). A typo in `t("swipe.emptyTitl")` is a
   compile error, and every place that stores a key for later — filter chips
-  (`src/components/FilterModal.tsx:39`), feature labels
+  (`src/components/FilterModal.tsx`), feature labels
   (`src/pages/CreateListing.tsx:41`), report reasons
   (`src/lib/reportReasons.ts`), nav labels
   (`src/components/layout/BottomNav.tsx:14`) — is type-checked too.
@@ -654,8 +654,9 @@ non-i18n reason — the map click handler would otherwise close over a stale
 `budget` (`:72-76`).
 
 A third variant: **the stored value and the visible label must be different
-things.** Filter chips keep a stable Turkish `value` used for matching and a
-translation `key` used for display (`src/components/FilterModal.tsx:36-49`);
+things.** Filter chips keep a stable `value` used for matching
+(`LIFESTYLE_FILTERS` in `src/lib/deckFilters.ts`) and a translation `key` used
+for display (`filter.<value>`, `src/components/FilterModal.tsx`);
 listing feature checkboxes do the same, where `value` is literally the backend
 column name (`src/pages/CreateListing.tsx:39-49`). Otherwise switching language
 would silently change what gets filtered or submitted.
@@ -845,19 +846,25 @@ listing, never one the client sends) or a card by a key from a closed list.
 Unlike a plain swipe it is **not** optimistic (`sendLike`, `:320-332`): the
 card leaves only after the server accepts, so a comment rejected by moderation
 (422) stays in the box with the reason under it, the same rule `ChatScreen`
-follows. Filters live in `FilterModal`. The report box and the like composer
+follows. Filters are chosen in `FilterModal` and applied by the pure
+`matchesFilters` in `src/lib/deckFilters.ts`, which reads only what the card
+already shows: listing type, district, price, rooms, amenities, and the
+owner's smoking, pets, alcohol and sleep answers from `owner_profile` (an
+unknown answer does not match). Gender and the owner's budget, districts and
+bio are not filterable because they are deliberately hidden before a like.
+The price histogram is drawn from the deck's own prices and hidden below five
+listings. The report box and the like composer
 are mounted **outside** the card because a dragged card carries a `transform`,
 which would trap a `position: fixed` panel inside it (`:213-229`).
 
-**`Matches` / `Notifications`** (`src/pages/Matches.tsx`,
-`src/pages/Notifications.tsx`).
-Both read `GET /api/swipes/received` and answer with
-`POST /api/swipes/{id}/respond` (`Matches.tsx:50-54`, `:68-72`). They show the
-same data; `/notifications` is no longer linked from the navigation
-(`src/components/layout/BottomNav.tsx:7-8`). Each like opens with what it was
+**`Matches`** (`src/pages/Matches.tsx`).
+Reads `GET /api/swipes/received` and answers with
+`POST /api/swipes/{id}/respond` (`Matches.tsx:50-54`, `:68-72`). The old
+`/notifications` page showed the same data and was unreachable; it now
+redirects here. Each like opens with what it was
 for (`src/components/LikeContext.tsx`): the liked photo, or the liked card
 rebuilt from the receiver's own current data, and the comment on ruled paper.
-Notifications shows a compact version. Below that, Matches shows the person as
+Below that, Matches shows the person as
 a timeline: student card, prompt cards and photos, then the bio. When the like
 is accepted, the server turns its comment into the first chat message.
 
@@ -918,7 +925,10 @@ the list are in [`ALGORITHMS.md`](ALGORITHMS.md) §2.
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
 `src/pages/ProfileEdit.tsx`).
 Profile reads `GET /api/listings?mine=true` and `GET /api/matches` (`:24-34`)
-and can delete a listing (`:37-45`). Its first tab, Preview, shows the profile
+and can delete a listing (`:37-45`). A listing held for admin approval
+(`pending_review`, a scam pattern) is listed with an "In review" label.
+ProfileEdit picks districts with the same `DistrictMultiSelect`
+(`/api/locations`) as sign-up and the deck filter. Its first tab, Preview, shows the profile
 the way other people see it in Likes: the same timeline, then the bio. Editing writes `PATCH /api/auth/me`;
 university is intentionally not editable because the server derives it from the
 e-mail domain (`src/lib/api.ts:332`).
@@ -955,7 +965,8 @@ Vitest with a jsdom environment, globals enabled, and one setup file
 stubs `window.matchMedia`, which jsdom lacks and next-themes needs
 (`src/test/setup.ts:1-15`).
 
-Current state: **12 files, 105 tests**, all passing (`npx vitest run`, ~3 s).
+Current state: **22 files, 153 tests**, all passing (`npx vitest run`, ~4 s).
+The table lists the larger ones.
 
 | File | Tests | Subject |
 | --- | --- | --- |
@@ -970,6 +981,9 @@ Current state: **12 files, 105 tests**, all passing (`npx vitest run`, ~3 s).
 | `src/test/initials.test.ts` | 4 | Avatar initials |
 | `src/test/seo-slug.test.ts` | 4 | District slugs |
 | `src/test/routing.test.ts` | 3 | Route redirects |
+| `src/test/deckFilters.test.ts` | 12 | Deck filters, price histogram |
+| `src/test/studentEmail.test.ts` | 4 | Sign-up email rule mirrors the server's domain list |
+| `src/test/onboardingDraft.test.ts` | 8 | Refresh-safe sign-up draft |
 | `src/test/example.test.ts` | 1 | Placeholder |
 
 ### The pattern: extract the decision, test the decision
@@ -988,6 +1002,8 @@ untested:
 | `normalizeText` / `matchesQuery` / `filterByQuery` | `src/lib/search.ts:36`, `:51`, `:59` | Does this text match this query? |
 | `describeApiError` | `src/lib/apiError.ts:94` | What do we tell the user? |
 | `altPanelState` / `altListed` / `routeParts` | `src/lib/alternatives.ts:22`, `:30`, `:40` | Which alternatives state and list; how a route reads |
+| `matchesFilters` / `priceHistogram` | `src/lib/deckFilters.ts` | Does this card pass the filters; what the price bars show |
+| `isStudentEmail` | `src/lib/studentEmail.ts` | May this address sign up (mirror of the server rule)? |
 
 Why this is worth the small awkwardness of exporting from a page module:
 
@@ -1071,10 +1087,9 @@ Honest list, all verified against the current tree.
 
 **Performance and bundling**
 
-- **One 943 kB chunk** (278 kB gzipped). No route-level code splitting: every
-  page is a static import in `src/App.tsx:9-26`, so a visitor to the landing page
-  downloads Leaflet, the admin panel and framer-motion. Rollup emits the
-  chunk-size warning on every build.
+- Pages other than the landing page are split with `React.lazy`
+  (`src/App.tsx`), so a visitor to `/` no longer downloads Leaflet or the admin
+  panel. The shared vendor chunk is still large.
 - Dead weight in the bundle: `recharts`, `zod`, `cmdk`, `embla-carousel-react`,
   `input-otp` and `date-fns` are dependencies but are imported nowhere in `src/`;
   `react-hook-form` is used only by `src/components/ui/form.tsx`, which no page
@@ -1084,8 +1099,10 @@ Honest list, all verified against the current tree.
 
 **Robustness**
 
-- **No error boundary anywhere.** A render-time exception blanks the page; there
-  is no `componentDidCatch` or `ErrorBoundary` in `src/`.
+- One root error boundary (`src/components/ErrorBoundary.tsx`, wrapped around
+  the routes in `src/App.tsx`): a render-time exception shows a reload page
+  instead of a blank screen and resets on navigation. There are no per-section
+  boundaries, so the whole page is replaced, not just the broken part.
 - No offline handling, no request timeouts, no cancellation on unmount beyond
   what React Query does by default.
 - No retry/backoff policy is configured globally; the overrides that exist are
@@ -1100,8 +1117,6 @@ Honest list, all verified against the current tree.
 - **There is no public listing browser.** `/listings` is admin-only
   (`src/pages/Listings.tsx:943`); ordinary users can only see listings one card
   at a time in the deck.
-- `/notifications` duplicates `/matches` and is unreachable from the UI
-  (`src/components/layout/BottomNav.tsx:7-8`).
 
 **i18n**
 
@@ -1116,11 +1131,8 @@ Honest list, all verified against the current tree.
   language.
 - `translate()` outside React does not react to a language change
   (`src/i18n/index.tsx:33-43`).
-- Some user-facing strings are still hardcoded rather than keyed — the filter
-  chip identities are Turkish literals by design
-  (`src/components/FilterModal.tsx:41-49`), but `ProfileEdit` also ships a
-  hardcoded 17-district Turkish list (`src/pages/ProfileEdit.tsx:15`) instead of
-  reading `GET /api/locations` the way `Onboarding` does.
+- District names are Turkish in both languages: they come from
+  `GET /api/locations` and are proper names, not translated text.
 
 **Consistency**
 
