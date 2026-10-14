@@ -7,7 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ApiError, loginWithPassword, needsSecondFactor, requestOtp, resetPassword, verifyOtp } from "@/lib/api";
 import { profileIncomplete } from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
-import NewPasswordFields, { newPasswordReady } from "@/components/NewPasswordFields";
+import NewPasswordFields from "@/components/NewPasswordFields";
+import { newPasswordReady } from "@/lib/password";
 import SiteBar from "@/components/layout/SiteBar";
 import { useI18n } from "@/i18n";
 

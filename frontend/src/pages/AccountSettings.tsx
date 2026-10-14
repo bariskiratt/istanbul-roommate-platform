@@ -4,7 +4,8 @@ import { Mail, GraduationCap, ShieldCheck, Calendar, KeyRound } from "lucide-rea
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import PasswordInput from "@/components/PasswordInput";
-import NewPasswordFields, { newPasswordReady } from "@/components/NewPasswordFields";
+import NewPasswordFields from "@/components/NewPasswordFields";
+import { newPasswordReady } from "@/lib/password";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
