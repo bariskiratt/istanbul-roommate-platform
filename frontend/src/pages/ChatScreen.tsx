@@ -192,6 +192,7 @@ const ChatScreen = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuItem
+                className="gap-2"
                 onSelect={() =>
                   openReport({ type: "user", id: other.id, label: other.name || t("messages.unnamed") })
                 }
@@ -201,7 +202,7 @@ const ChatScreen = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 disabled={unmatch.isPending}
-                className="text-destructive focus:text-destructive"
+                className="gap-2 text-destructive focus:text-destructive"
                 onSelect={() => {
                   const name = other.name || t("messages.unnamed");
                   if (window.confirm(t("chat.unmatchConfirm", { name }))) unmatch.mutate(other.id);
