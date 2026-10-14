@@ -24,6 +24,7 @@ from pydantic import (
     Field,
     StringConstraints,
     field_validator,
+    model_validator,
 )
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -611,10 +612,28 @@ class PasswordChange(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=128)
 
 
-class AccountDelete(BaseModel):
-    """Hesap silme onayı: şifre ya da geçerli OTP ile."""
+class ResetPasswordIn(EmailIn):
+    code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8, max_length=128)
 
-    password: str = Field(..., min_length=1, max_length=128)
+
+class AccountDelete(BaseModel):
+    """Hesap silme onayı: şifre YA DA e-postaya gelen geçerli kod.
+
+    Kod yolu, şifresini unutmuş ve kodla girmiş kullanıcı için: silme hakkı
+    şifreyi hatırlamaya bağlı olmamalı. Kod /request-otp ile istenir.
+    """
+
+    password: str | None = Field(None, min_length=1, max_length=128)
+    code: str | None = Field(None, min_length=6, max_length=6)
+
+    @model_validator(mode="after")
+    def _one_proof(self) -> "AccountDelete":
+        if not self.password and not self.code:
+            raise ValueError(
+                localized("Onaylamak için şifreni ya da e-postana gelen kodu gir.")
+            )
+        return self
 
 
 # ---- bağımlılıklar ----
@@ -882,6 +901,28 @@ def _require_admin_password(user: models.User, password: str | None) -> None:
         )
 
 
+def _check_otp(user: models.User | None, code: str) -> None:
+    """Kod bu hesabın geçerli koduyla uyuşuyor mu? Uyuşmazsa 400. TÜKETMEZ.
+
+    Kodu kullanan üç uç var: giriş (/verify-otp), şifre sıfırlama
+    (/reset-password) ve şifresiz hesap silme (DELETE /me). Üçü de ÇAĞIRMADAN
+    ÖNCE aynı "verify-otp" kovasını ilerletir: ayrı kovalar 6 haneli kodu
+    tahmin etmek için uç başına ayrı 5 hak verirdi.
+    """
+    if user is None or user.otp_hash is None:
+        raise HTTPException(status_code=400, detail=localized("Önce kod iste."))
+
+    expires = user.otp_expires
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)  # SQLite tz bilgisini düşürür
+    if expires is None or expires < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=400, detail=localized("Kodun süresi doldu. Yeni kod iste.")
+        )
+    if not _otp_matches(user.otp_hash, code):
+        raise HTTPException(status_code=400, detail=localized("Kod hatalı."))
+
+
 @router.post("/verify-otp", response_model=TokenOut)
 def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     # 6 haneli kodun kaba kuvvetle denenmesini engeller (5 deneme / 15 dk).
@@ -900,18 +941,7 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     # kişinin hesabın sahibi olduğu HENÜZ kanıtlanmadı.
     if user is not None:
         _reject_if_suspended(user)
-    if user is None or user.otp_hash is None:
-        raise HTTPException(status_code=400, detail=localized("Önce kod iste."))
-
-    expires = user.otp_expires
-    if expires is not None and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)  # SQLite tz bilgisini düşürür
-    if expires is None or expires < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=400, detail=localized("Kodun süresi doldu. Yeni kod iste.")
-        )
-    if not _otp_matches(user.otp_hash, payload.code):
-        raise HTTPException(status_code=400, detail=localized("Kod hatalı."))
+    _check_otp(user, payload.code)
     # Yönetici hesabında kod tek başına yetmez (bkz. _start_admin_second_factor).
     if user.is_admin:
         _require_admin_password(user, payload.password)
@@ -928,6 +958,59 @@ def verify_otp(payload: VerifyIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    return {"token": token, "user": user}
+
+
+# Yönetici hesabının şifresi e-posta koduyla sıfırlanamaz: yönetici girişi
+# şifre VE kod ister (bkz. _start_admin_second_factor). Kodla şifre
+# koyabilmek, gelen kutusunu ele geçiren birine iki adımı birden verirdi.
+ADMIN_RESET_BLOCKED = (
+    "Yönetici hesabının şifresi e-posta koduyla sıfırlanamaz. "
+    "Şifreyi sunucu tarafında değiştirmen gerekiyor."
+)
+
+
+@router.post("/reset-password", response_model=TokenOut)
+def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)):
+    """Şifresini unutan kullanıcı: e-postasına gelen kodla yeni şifre koyar.
+
+    Eskiden şifresini unutan kişi kodla girebiliyordu ama şifresini ne
+    değiştirebiliyor ne de hesabını silebiliyordu: ikisi de mevcut şifreyi
+    istiyordu. Silme hakkının tek yolu kurucuya e-posta atmaktı.
+
+    Kod /request-otp ile istenir (aynı tek kullanımlık kod; yanıt adresin
+    kayıtlı olup olmadığını yine söylemez). Kod doğruysa:
+      - yeni şifre yazılır, kod harcanır;
+      - TÜM oturumlar kapatılır (şifresini değiştiren kişi, şifresi
+        çalındığı için de değiştiriyor olabilir) ve bu cihaza yeni bir
+        oturum açılır;
+      - hesap doğrulanmış sayılır: kod gelen kutusunun sahibi olduğunu
+        kanıtlar, /verify-otp ile aynı.
+
+    Kaba kuvvet: /verify-otp ile AYNI kova (e-posta başına 5 / 15 dk).
+    """
+    _rate_limit("verify-otp", payload.email)
+    user = db.scalar(select(models.User).where(models.User.email == payload.email))
+    if user is not None:
+        _reject_if_suspended(user)
+    _check_otp(user, payload.code)
+    # Kod doğrulandıktan SONRA: yönetici adresi kodu bilmeyene sızmasın
+    # (bkz. _require_admin_password).
+    if user.is_admin:
+        raise HTTPException(status_code=403, detail=localized(ADMIN_RESET_BLOCKED))
+
+    user.password_hash = _hash_password(payload.new_password)
+    user.verified = True
+    user.otp_hash = None
+    user.otp_expires = None
+    db.query(models.AuthToken).filter(
+        models.AuthToken.user_id == user.id
+    ).delete(synchronize_session=False)
+    _reset_rate_limit("verify-otp", payload.email)
+
+    token = _issue_token(db, user)
+    db.commit()
+    db.refresh(user)
     return {"token": token, "user": user}
 
 
@@ -1242,11 +1325,17 @@ def delete_account(
     (DELETE /api/admin/users/{id}) başkasının şifresini bilemez, onun
     doğrulaması require_admin + gerekçe zorunluluğudur. Ortak olan yalnızca
     "hangi satırlar silinir" mantığıdır.
+
+    Şifre yerine e-postaya gelen kod da kabul edilir (bkz. AccountDelete).
     """
-    if not user.password_hash or not _verify_password(
-        payload.password, user.password_hash
-    ):
-        raise HTTPException(status_code=400, detail=localized("Şifren hatalı."))
+    if payload.password:
+        if not user.password_hash or not _verify_password(
+            payload.password, user.password_hash
+        ):
+            raise HTTPException(status_code=400, detail=localized("Şifren hatalı."))
+    else:
+        _rate_limit("verify-otp", user.email)
+        _check_otp(user, payload.code)
 
     purge_user(db, user)
     db.commit()

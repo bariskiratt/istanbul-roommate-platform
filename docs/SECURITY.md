@@ -428,8 +428,9 @@ to admin-on-admin actions: if two admins could delete each other, one
 compromised mailbox would be enough to wipe the moderation team.
 
 Crucially, this does not remove anyone's right to delete their own account.
-`DELETE /api/auth/me` remains open to admins and requires the password
-(`backend/app/auth.py:1114-1133`). What is blocked is the accidental,
+`DELETE /api/auth/me` remains open to admins and requires a signed-in session
+plus the password or a fresh e-mail code (`delete_account` in
+`backend/app/auth.py`). The admin session itself already took both factors. What is blocked is the accidental,
 one-click-plus-reason-box path — not the deliberate, authenticated one.
 
 There is also a deliberate *absence*: no impersonation endpoint. The reasoning
@@ -1519,8 +1520,10 @@ listed here does not exist.
 ### D. A session is believed to be compromised
 
 - **The user's own move:** `POST /api/auth/change-password` — this deletes every
-  token for that user (`backend/app/auth.py:906-908`), a genuine
-  log-out-everywhere.
+  token for that user, a genuine log-out-everywhere. Someone who doesn't know
+  the password (or suspects it leaked) can do the same with an e-mail code
+  through `POST /api/auth/reset-password`, which also drops every token and
+  opens a new session only on the device that reset it.
 - **The admin's move:** suspend, which drops all tokens
   (`backend/app/admin.py:1336`), then unsuspend. Clumsy, but it is the only
   admin-side session revocation that exists.

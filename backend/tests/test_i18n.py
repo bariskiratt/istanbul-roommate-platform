@@ -238,6 +238,7 @@ def test_degiskenle_cevrilen_metinlerin_ingilizcesi_var():
     sources = [
         auth.SUSPENDED_DETAIL,
         auth.STUDENT_EMAIL_ERROR,
+        auth.ADMIN_RESET_BLOCKED,
         moderation.SYSTEM_MARKER_REJECTION,
         *moderation._MESSAGES.values(),
         *listings._FIELD_LABELS.values(),

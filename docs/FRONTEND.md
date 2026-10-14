@@ -936,9 +936,14 @@ e-mail domain (`src/lib/api.ts:332`).
 **`Settings` / `AccountSettings`** (`src/pages/Settings.tsx`,
 `src/pages/AccountSettings.tsx`).
 Theme, language, and links out. Account settings changes the password
-(`POST /api/auth/change-password`, `AccountSettings.tsx:46`) and deletes the
-account (`DELETE /api/auth/me`, `:62`), both requiring the current password
-(`src/lib/api.ts:384-399`).
+(`POST /api/auth/change-password`) and deletes the account
+(`DELETE /api/auth/me`). Both take the current password, or, for someone who
+signed in with a code and doesn't remember it, a fresh code sent to their
+e-mail: the password change then goes through `POST /api/auth/reset-password`,
+which signs out every other device and keeps this one signed in. Login has the
+same reset flow behind "Forgot your password?" (`Login.tsx`, mode `reset`).
+Admin accounts can't reset by code, since their login needs password and code
+together.
 
 **`Admin` — moderation panel** (`src/pages/Admin.tsx`).
 Four tabs — reports, flagged content, users, audit log (`:209`) — each with its

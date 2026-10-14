@@ -114,7 +114,9 @@ remove rows, ask for a written reason and are recorded in the audit log, which
 outlives the admin who acted (deleting their account nulls the reference rather
 than erasing the entry). Users can also erase their own account through
 `DELETE /api/auth/me`, which takes its listings, messages, matches, reports and
-uploaded photo files with it.
+uploaded photo files with it. It accepts the password or a fresh e-mail code,
+and a forgotten password can be reset with a code (`POST /api/auth/reset-password`),
+so neither right depends on remembering the password.
 
 Deleting a listing keeps the conversation it started: its swipes and the reports
 about it go, but matches survive with `listing_id` set to null. The listing was

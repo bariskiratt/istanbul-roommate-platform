@@ -469,10 +469,22 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
   });
 
 /** Hesabı ve tüm verilerini kalıcı olarak siler. */
-export const deleteAccount = (password: string) =>
+/**
+ * Şifresini unutan kullanıcı: /request-otp ile gelen kodla yeni şifre koyar.
+ * Sunucu tüm oturumları kapatır ve bu cihaz için yeni bir oturum döndürür.
+ */
+export const resetPassword = (email: string, code: string, newPassword: string) =>
+  postJSON<{ token: string; user: ApiUser }>("/api/auth/reset-password", {
+    email,
+    code,
+    new_password: newPassword,
+  });
+
+/** Hesabı siler. Onay: şifre ya da e-postaya gelen kod (şifreyi unutan için). */
+export const deleteAccount = (proof: { password: string } | { code: string }) =>
   request<void>("/api/auth/me", {
     method: "DELETE",
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(proof),
   });
 
 // ---- Swipe ve eşleşme ----
