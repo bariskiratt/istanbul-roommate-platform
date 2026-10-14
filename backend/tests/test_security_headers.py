@@ -19,7 +19,7 @@ from app.main import app
 
 PNG_BYTES = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
-    "0000000d4944415478da63f8ffff3f0005fe02fea72d1e2d0000000049454e44ae426082"
+    "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082"
 )
 
 
@@ -210,7 +210,7 @@ def test_uploaded_file_is_served_with_hardening_headers(client):
 
     res = client.get(f"/uploads/{name}")
     assert res.status_code == 200
-    assert res.content == PNG_BYTES
+    assert res.content == uploads_module.sanitize_photo(PNG_BYTES, "png")
     assert res.headers["x-content-type-options"] == "nosniff"
     # Belge olarak açılmasın (saklı XSS). <img src> etkilenmez: tarayıcı
     # Content-Disposition'ı yalnızca üst seviye gezinmede uygular.

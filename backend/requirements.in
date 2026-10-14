@@ -22,6 +22,7 @@ python-multipart>=0.0.9  # fotoğraf yükleme (multipart form)
 requests>=2.31     # OTP e-postası (Brevo) + scripts/fetch_transit.py
 boto3>=1.36        # fotoğraf deposu: S3 uyumlu kova (Cloudflare R2), app/uploads.py
 cryptography>=42.0  # mesaj şifreleme (AES-256-GCM, app/crypto.py)
+pillow>=11.0       # fotoğrafı yeniden kodlar: EXIF/GPS silinir, boyut küçülür (app/uploads.py)
 
 # Model servis etme (yükleme + tahmin)
 lightgbm>=4.0

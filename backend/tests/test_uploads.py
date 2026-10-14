@@ -16,11 +16,15 @@ from app import uploads as uploads_module
 from app.db import Base, get_db
 from app.main import app
 
-# 1x1 PNG (geçerli imza yeterli; içerik doğrulaması content-type üzerinden)
+# Geçerli 1x1 PNG. Yükleme dosyayı Pillow ile çözüp yeniden kodladığı için
+# yalnızca imzası doğru olan bir dizi artık yetmiyor (eski sabit bozuktu).
 PNG_BYTES = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
-    "0000000d4944415478da63f8ffff3f0005fe02fea72d1e2d0000000049454e44ae426082"
+    "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082"
 )
+# Yüklenen dosya yeniden kodlanarak saklanır (bkz. uploads.sanitize_photo);
+# depoda ve yanıtta görülmesi gereken bayt dizisi bu.
+CLEAN_PNG = uploads_module.sanitize_photo(PNG_BYTES, "png")
 
 
 @pytest.fixture()
@@ -82,7 +86,7 @@ def test_upload_png_returns_absolute_url(client, tmp_path):
     assert "/uploads/" in url and url.endswith(".png")
     # Dosya gerçekten yazıldı
     name = url.rsplit("/", 1)[-1]
-    assert (tmp_path / name).read_bytes() == PNG_BYTES
+    assert (tmp_path / name).read_bytes() == CLEAN_PNG
 
 
 def test_reject_wrong_type(client):
@@ -137,7 +141,7 @@ def test_disk_photo_is_served_with_cache_headers(client):
 
     res = client.get(f"/uploads/{name}")
     assert res.status_code == 200
-    assert res.content == PNG_BYTES
+    assert res.content == CLEAN_PNG
     assert res.headers["content-type"] == "image/png"
     assert res.headers["cache-control"] == uploads_module.PHOTO_CACHE_CONTROL
 
@@ -496,7 +500,7 @@ def test_upload_goes_to_bucket_not_disk(client, bucket, tmp_path):
     # URL biçimi değişmez: arayüz ve veritabanı depodan habersiz.
     assert "/uploads/" in url
     stored = bucket.objects[("roommatch-photos", f"uploads/{name}")]
-    assert stored["Body"] == PNG_BYTES
+    assert stored["Body"] == CLEAN_PNG
     assert stored["ContentType"] == "image/png"
     assert list(tmp_path.iterdir()) == []
 
@@ -507,7 +511,7 @@ def test_bucket_photo_is_served_with_hardening_headers(client, bucket):
 
     res = client.get(f"/uploads/{name}")
     assert res.status_code == 200
-    assert res.content == PNG_BYTES
+    assert res.content == CLEAN_PNG
     assert res.headers["content-type"] == "image/png"
     assert res.headers["cache-control"] == uploads_module.PHOTO_CACHE_CONTROL
     # M4 başlıkları kovadan gelen yanıtta da var.
@@ -656,3 +660,203 @@ def test_sweeper_never_runs_against_a_bucket_without_the_real_database(
     monkeypatch.setenv("DATABASE_URL", "postgresql://neon.example/db")
     uploads_module.start_orphan_sweeper()
     assert no_thread.started == ["photo-orphan-sweep"]
+
+
+# --------------------------------------------------------------------------
+# Meta verinin silinmesi (EXIF/GPS) — sanitize_photo ve eski dosya taraması
+# --------------------------------------------------------------------------
+
+
+def _exif_with_gps():
+    from PIL import ExifTags, Image
+
+    exif = Image.Exif()
+    # 6 = 90° döndürülmüş: telefonun dik çektiği kare böyle saklanır.
+    exif[ExifTags.Base.Orientation] = 6
+    exif[ExifTags.Base.Make] = "TestTelefon"
+    exif[ExifTags.IFD.GPSInfo] = {
+        ExifTags.GPS.GPSLatitudeRef: "N",
+        ExifTags.GPS.GPSLatitude: (41.0, 2.0, 30.0),
+    }
+    return exif
+
+
+def _phone_photo(fmt: str, size=(40, 20)) -> bytes:
+    """Konum, cihaz, yorum ve XMP taşıyan bir "telefon fotoğrafı"."""
+    from PIL import Image, PngImagePlugin
+
+    img = Image.new("RGBA" if fmt == "PNG" else "RGB", size, (200, 10, 10))
+    out = io.BytesIO()
+    if fmt == "JPEG":
+        img.save(out, "JPEG", exif=_exif_with_gps(), comment=b"gizli-yorum",
+                 xmp=b"<x:xmpmeta>konum</x:xmpmeta>")
+    elif fmt == "WEBP":
+        img.save(out, "WEBP", exif=_exif_with_gps(), xmp=b"<x:xmpmeta>konum</x:xmpmeta>")
+    else:
+        text = PngImagePlugin.PngInfo()
+        text.add_text("Comment", "gizli-yorum")
+        img.save(out, "PNG", exif=_exif_with_gps(), pnginfo=text)
+    return out.getvalue()
+
+
+def _open(data: bytes):
+    from PIL import Image
+
+    return Image.open(io.BytesIO(data))
+
+
+@pytest.mark.parametrize(
+    ("fmt", "ext", "ctype"),
+    [("JPEG", "jpg", "image/jpeg"), ("PNG", "png", "image/png"), ("WEBP", "webp", "image/webp")],
+)
+def test_upload_strips_location_and_other_metadata(client, tmp_path, fmt, ext, ctype):
+    original = _phone_photo(fmt)
+    assert b"gizli-yorum" in original or b"xmpmeta" in original  # fikstür gerçekten kirli
+
+    headers = _auth_headers(client)
+    res = client.post(
+        "/api/uploads", headers=headers, files={"file": (f"a.{ext}", original, ctype)}
+    )
+    assert res.status_code == 201, res.text
+    stored = (tmp_path / res.json()["url"].rsplit("/", 1)[-1]).read_bytes()
+
+    for marker in (b"Exif", b"EXIF", b"eXIf", b"gizli-yorum", b"xmpmeta", b"TestTelefon"):
+        assert marker not in stored, marker
+    img = _open(stored)
+    assert img.format == fmt
+    assert len(img.getexif()) == 0
+    if fmt != "PNG":
+        # Yönlendirme piksellere uygulandı: dik kare dik kalır.
+        assert img.size == (20, 40)
+
+
+def test_upload_keeps_transparency(client, tmp_path):
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGBA", (3, 3), (0, 0, 0, 0)).save(out, "PNG")
+    headers = _auth_headers(client)
+    url = client.post(
+        "/api/uploads", headers=headers, files={"file": ("a.png", out.getvalue(), "image/png")}
+    ).json()["url"]
+    img = _open((tmp_path / url.rsplit("/", 1)[-1]).read_bytes())
+    assert img.mode == "RGBA" and img.getpixel((0, 0))[3] == 0
+
+
+def test_upload_shrinks_large_photos(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(uploads_module, "MAX_PHOTO_EDGE", 16)
+    headers = _auth_headers(client)
+    url = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.jpg", _phone_photo("JPEG"), "image/jpeg")},
+    ).json()["url"]
+    img = _open((tmp_path / url.rsplit("/", 1)[-1]).read_bytes())
+    assert max(img.size) == 16
+    assert img.size == (8, 16)
+
+
+def test_upload_rejects_undecodable_image(client, tmp_path):
+    """İmzası doğru ama görüntü olmayan dosya: saklanmaz, kota yemez."""
+    headers = _auth_headers(client)
+    res = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.jpg", b"\xff\xd8\xff" + b"0" * 200, "image/jpeg")},
+    )
+    assert res.status_code == 415
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_upload_rejects_decompression_bomb(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(uploads_module, "MAX_PHOTO_PIXELS", 100)
+    headers = _auth_headers(client)
+    res = client.post(
+        "/api/uploads",
+        headers=headers,
+        files={"file": ("a.jpg", _phone_photo("JPEG"), "image/jpeg")},
+    )
+    assert res.status_code == 415
+    assert list(tmp_path.iterdir()) == []
+
+
+def _put_disk(tmp_path, data: bytes, ext: str) -> str:
+    name = f"{os.urandom(16).hex()}.{ext}"
+    (tmp_path / name).write_bytes(data)
+    return name
+
+
+def test_scrub_cleans_old_photos_once_on_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr(uploads_module, "UPLOADS_DIR", tmp_path)
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+    dirty = _put_disk(tmp_path, _phone_photo("JPEG"), "jpg")
+    clean = _put_disk(tmp_path, CLEAN_PNG, "png")
+    broken = _put_disk(tmp_path, b"\x89PNG\r\n\x1a\nbozuk", "png")
+
+    assert uploads_module.scrub_stored_photos() == 1
+
+    data = (tmp_path / dirty).read_bytes()
+    assert b"Exif" not in data and b"gizli-yorum" not in data
+    assert _open(data).size == (20, 40)
+    # Temiz dosyaya dokunulmaz (yeniden sıkıştırma kalite kaybettirirdi),
+    # bozuk dosya silinmez.
+    assert (tmp_path / clean).read_bytes() == CLEAN_PNG
+    assert (tmp_path / broken).exists()
+
+    # İşaret yazıldı: bir daha koşmaz, sonradan konan dosyaya bakmaz.
+    later = _put_disk(tmp_path, _phone_photo("WEBP"), "webp")
+    assert uploads_module.scrub_stored_photos() == 0
+    assert (tmp_path / later).read_bytes() == _phone_photo("WEBP")
+
+
+def test_scrub_rewrites_bucket_objects_in_place(bucket):
+    name = f"{'c' * 32}.jpg"
+    bucket.objects[("roommatch-photos", f"uploads/{name}")] = {
+        "Body": _phone_photo("JPEG"),
+        "LastModified": datetime.now(timezone.utc),
+    }
+
+    assert uploads_module.scrub_stored_photos() == 1
+
+    stored = bucket.objects[("roommatch-photos", f"uploads/{name}")]
+    assert b"Exif" not in stored["Body"]
+    assert stored["ContentType"] == "image/jpeg"
+    assert stored["CacheControl"] == uploads_module.PHOTO_CACHE_CONTROL
+    assert ("roommatch-photos", "uploads/_metadata-scrub-v1") in bucket.objects
+    assert uploads_module.scrub_stored_photos() == 0
+
+
+def test_scrub_is_retried_after_a_bucket_error(bucket):
+    """Yarıda kalan tarama işaret yazmaz; sonraki açılış baştan dener."""
+    name = f"{'d' * 32}.jpg"
+    bucket.objects[("roommatch-photos", f"uploads/{name}")] = {
+        "Body": _phone_photo("JPEG"),
+        "LastModified": datetime.now(timezone.utc),
+    }
+    bucket.fail_with = EndpointConnectionError(endpoint_url="https://r2.invalid")
+    with pytest.raises(EndpointConnectionError):
+        uploads_module.scrub_stored_photos()
+    bucket.fail_with = None
+    assert ("roommatch-photos", "uploads/_metadata-scrub-v1") not in bucket.objects
+    assert uploads_module.scrub_stored_photos() == 1
+
+
+def test_scrub_starts_by_default_and_can_be_switched_off(no_thread, monkeypatch):
+    monkeypatch.delenv("PHOTO_SCRUB", raising=False)
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+    uploads_module.start_photo_scrub()
+    assert no_thread.started == ["photo-metadata-scrub"]
+
+    no_thread.started.clear()
+    monkeypatch.setenv("PHOTO_SCRUB", "0")
+    uploads_module.start_photo_scrub()
+    assert no_thread.started == []
+
+
+def test_scrub_never_runs_against_a_bucket_without_the_real_database(
+    bucket, no_thread, monkeypatch
+):
+    monkeypatch.delenv("PHOTO_SCRUB", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    uploads_module.start_photo_scrub()
+    assert no_thread.started == []

@@ -27,6 +27,10 @@ Bu modül ayrıca ORTAK yardımcıları barındırır (diğer uçlar buradan ça
   sweep_orphan_photos(db) -> int          hiçbir kayda bağlanmamış eski
                                           dosyaları siler (açılışta başlayan
                                           start_orphan_sweeper günde bir çağırır)
+  sanitize_photo(data, ext) -> bytes      fotoğrafı yeniden kodlar: konum
+                                          dahil bütün meta veri gider, boyut
+                                          küçülür (yükleme ucu ve
+                                          start_photo_scrub kullanır)
 
 ("local" burada "diskte" değil "BİZİM ürettiğimiz" demektir; kova kullanılırken
 de aynı isimler geçerlidir.)
@@ -38,6 +42,7 @@ ne kabul edilir ne de silinir.
 """
 
 import functools
+import io
 import os
 import re
 import secrets
@@ -54,6 +59,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -124,6 +130,95 @@ def _matches_signature(data: bytes, ext: str) -> bool:
     if ext == "webp":
         return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
     return False
+
+
+# ---------------------------------------------------------------------------
+# Meta verinin silinmesi
+# ---------------------------------------------------------------------------
+#
+# Telefonla çekilen fotoğraf EXIF içinde çekildiği yerin GPS koordinatını,
+# tarihini ve cihazını taşır. Dosya olduğu gibi saklanırsa herkese açık
+# /uploads/ adresinden indiren herkes evin konumunu okur: ilan fotoğrafı
+# tam da evin içinde çekilir. Bu yüzden her yükleme Pillow ile piksellerden
+# yeniden kodlanır; yalnızca piksel, renk profili (ICC) ve şeffaflık kalır.
+# Yan kazanç: telefonun 4000 piksellik karesi küçülür, depo ve indirme azalır.
+
+# Uzun kenar en fazla bu kadar piksel. Kart ekranda ~400 px; 2048 retina
+# ekranda ve tam ekran açılan fotoğrafta da yeter.
+MAX_PHOTO_EDGE = 2048
+
+# Çözülmeden önce reddedilecek piksel sayısı (dekompresyon bombası): 5 MB'lik
+# bir PNG 30.000 x 30.000 piksel ilan edip açılırken GB'larca bellek
+# isteyebilir. 48 MP'lik telefon kameraları sığar.
+MAX_PHOTO_PIXELS = 60_000_000
+
+JPEG_QUALITY = 85
+WEBP_QUALITY = 82
+
+_PIL_FORMATS = {"jpg": "JPEG", "png": "PNG", "webp": "WEBP"}
+
+
+class PhotoRejected(ValueError):
+    """Dosya görüntü olarak çözülemedi ya da sınırları aşıyor."""
+
+
+def sanitize_photo(data: bytes, ext: str) -> bytes:
+    """Fotoğrafı aynı biçimde yeniden kodlar; bütün meta veriyi atar.
+
+    - EXIF (GPS, tarih, cihaz), XMP, JPEG yorumu ve PNG metin parçaları
+      çıkmaz. Yönlendirme (EXIF Orientation) önce piksellere uygulanır, yani
+      dik çekilmiş fotoğraf yan dönmez.
+    - Renk profili (ICC) ve şeffaflık korunur: kişisel veri değiller,
+      atılırlarsa fotoğrafın rengi değişir ya da arkası siyahlaşır.
+    - Uzun kenarı MAX_PHOTO_EDGE'i aşan fotoğraf orantılı küçülür.
+    - Hareketli WebP/PNG'nin yalnızca ilk karesi kalır.
+
+    Biçim ve uzantı DEĞİŞMEZ: dosya adı uzantıdan içerik türü türetiyor
+    (CONTENT_TYPES), mevcut adresler de bu yüzden aynı kalabiliyor.
+
+    Çözülemeyen ya da sınırı aşan dosyada PhotoRejected fırlar.
+    """
+    fmt = _PIL_FORMATS[ext]
+    try:
+        with Image.open(io.BytesIO(data), formats=[fmt]) as src:
+            if src.width * src.height > MAX_PHOTO_PIXELS:
+                raise PhotoRejected("too many pixels")
+            if fmt == "JPEG":
+                # Çözücü 1/2, 1/4, 1/8 ölçekle açar: 48 MP'lik kare belleğe
+                # tam boy hiç açılmaz (Render'ın 512 MB'ı için önemli).
+                src.draft("RGB", (MAX_PHOTO_EDGE, MAX_PHOTO_EDGE))
+            icc = src.info.get("icc_profile")
+            # Yönlendirmeyi piksellere uygular ve KOPYA döner (yüklenmiş).
+            img = ImageOps.exif_transpose(src)
+    except PhotoRejected:
+        raise
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError, ValueError) as exc:
+        raise PhotoRejected(str(exc)) from exc
+
+    if fmt == "JPEG" and img.mode not in ("RGB", "L"):
+        # CMYK vb.: ICC profili bu kipe ait, dönüştürülen piksellere uymaz.
+        img = img.convert("RGB")
+        icc = None
+    if max(img.size) > MAX_PHOTO_EDGE:
+        if img.mode == "P":
+            img = img.convert("RGBA")
+        img.thumbnail((MAX_PHOTO_EDGE, MAX_PHOTO_EDGE), Image.Resampling.LANCZOS)
+
+    # Kaydedici bazı alanları (JPEG yorumu, PNG ICC/şeffaflık) img.info'dan
+    # okur. Yalnızca şeffaflık bırakılır; ICC aşağıda açıkça verilir.
+    img.info = {k: v for k, v in img.info.items() if k == "transparency"}
+
+    out = io.BytesIO()
+    params: dict = {}
+    if icc:
+        params["icc_profile"] = icc
+    if fmt == "JPEG":
+        img.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True, **params)
+    elif fmt == "PNG":
+        img.save(out, "PNG", optimize=True, **params)
+    else:
+        img.save(out, "WEBP", quality=WEBP_QUALITY, **params)
+    return out.getvalue()
 
 
 def _extra_photo_hosts() -> set[str]:
@@ -636,6 +731,119 @@ def start_orphan_sweeper() -> None:
     threading.Thread(target=loop, name="photo-orphan-sweep", daemon=True).start()
 
 
+# ---------------------------------------------------------------------------
+# Eski fotoğrafların bir kerelik temizliği
+# ---------------------------------------------------------------------------
+#
+# sanitize_photo yalnızca YENİ yüklemelere uygulanır. Ondan önce yüklenmiş
+# fotoğraflar konum bilgisiyle depoda duruyor. Açılıştan kısa süre sonra
+# arka planda bir kez hepsi taranır; meta veri taşıyan ya da sınırdan büyük
+# olan aynı adla yeniden yazılır (adres değişmez, veritabanına dokunulmaz).
+# Bitince depoya bir işaret konur ve tarama bir daha koşmaz. Yarıda kalırsa
+# (kova hatası, süreç uykuya geçti) işaret yazılmaz ve sonraki açılışta
+# baştan başlar; temizlenmiş dosyalar meta veri taşımadığı için atlanır.
+
+# "0" ise tarama hiç başlamaz (PHOTO_SWEEP ile aynı acil durum anahtarı).
+PHOTO_SCRUB_ENV = "PHOTO_SCRUB"
+
+# İşaret nesnesinin adı fotoğraf desenine UYMAZ: servis edilmez, süpürülmez.
+_SCRUB_MARKER = "_metadata-scrub-v1"
+
+# Taramanın ne zaman başlayacağı: açılıştaki kova sınaması ve süpürmeyle
+# aynı anda koşmasın.
+SCRUB_DELAY = timedelta(minutes=2)
+
+# Bu anahtarlardan biri varsa dosya meta veri taşıyor sayılır.
+_METADATA_INFO_KEYS = ("exif", "xmp", "XML:com.adobe.xmp", "comment")
+
+
+def _has_metadata(data: bytes, ext: str) -> bool:
+    """Saklanan dosya yeniden kodlanmalı mı: meta veri var ya da çok büyük."""
+    with Image.open(io.BytesIO(data), formats=[_PIL_FORMATS[ext]]) as img:
+        if max(img.size) > MAX_PHOTO_EDGE:
+            return True
+        if any(key in img.info for key in _METADATA_INFO_KEYS):
+            return True
+        if len(img.getexif()) > 0:
+            return True
+        # PNG metin parçaları (tEXt/iTXt/zTXt): .text hepsini okur.
+        return bool(getattr(img, "text", None))
+
+
+def _read_stored(name: str) -> bytes | None:
+    """Depodaki dosyanın baytları; yoksa None. Kova hatası yukarı fırlar."""
+    settings = bucket_settings()
+    if settings is None:
+        path = Path(UPLOADS_DIR) / name
+        return path.read_bytes() if path.is_file() else None
+    try:
+        body = _s3_client(settings).get_object(
+            Bucket=settings.bucket, Key=_object_key(name)
+        )["Body"]
+    except ClientError as exc:
+        if _is_missing(exc):
+            return None
+        raise
+    try:
+        return body.read()
+    finally:
+        body.close()
+
+
+def scrub_stored_photos() -> int:
+    """Depodaki eski fotoğraflardan meta veriyi siler. Yeniden yazılan sayıyı
+    döner; işaret zaten varsa hiçbir şey yapmaz.
+
+    Çözülemeyen dosyaya dokunulmaz, loga yazılır: bozuk bir dosya yüzünden
+    tarama durmasın, silme de bu işin konusu değil.
+    """
+    if _read_stored(_SCRUB_MARKER) is not None:
+        return 0
+    rewritten = 0
+    for name, _written in _stored_photos():
+        data = _read_stored(name)
+        if data is None:  # tarama sırasında silinmiş (süpürme, hesap silme)
+            continue
+        ext = name.rsplit(".", 1)[1]
+        try:
+            if not _has_metadata(data, ext):
+                continue
+            clean = sanitize_photo(data, ext)
+        except (PhotoRejected, UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+            print(f"⚠️  Fotoğraf temizlenemedi, olduğu gibi bırakıldı ({name}): {exc}")
+            continue
+        _store_photo(name, clean, CONTENT_TYPES[ext])
+        rewritten += 1
+    _store_photo(_SCRUB_MARKER, b"ok", "text/plain")
+    print(f"🧽 Eski fotoğraflardan meta veri silindi: {rewritten} dosya yeniden yazıldı.")
+    return rewritten
+
+
+def start_photo_scrub() -> None:
+    """Eski fotoğrafların temizliğini arka planda başlatır (açılışta bir kez).
+
+    Süpürmeyle aynı korumalar: PHOTO_SCRUB=0 kapatır; kova tanımlı ama
+    DATABASE_URL yoksa başlamaz (yerel .env'deki yayın anahtarlarıyla
+    yayındaki dosyalar yeniden yazılmasın).
+    """
+    if os.getenv(PHOTO_SCRUB_ENV, "1").strip() == "0":
+        print(f"Eski fotoğraf temizliği kapalı ({PHOTO_SCRUB_ENV}=0).")
+        return
+    if bucket_settings() is not None and not os.getenv("DATABASE_URL", "").strip():
+        print("⚠️  Eski fotoğraf temizliği kapalı: kova tanımlı ama "
+              "DATABASE_URL yok.")
+        return
+
+    def run() -> None:
+        time.sleep(SCRUB_DELAY.total_seconds())
+        try:
+            scrub_stored_photos()
+        except Exception as exc:  # noqa: BLE001 — iş parçacığı sessiz ölmesin
+            print(f"⚠️  Eski fotoğraf temizliği yarıda kaldı: {exc}")
+
+    threading.Thread(target=run, name="photo-metadata-scrub", daemon=True).start()
+
+
 @router.post("", status_code=201)
 async def upload_photo(
     request: Request,
@@ -664,6 +872,16 @@ async def upload_photo(
     if not data:
         raise HTTPException(status_code=422, detail=localized("Dosya boş."))
     if not _matches_signature(data, ext):
+        raise HTTPException(
+            status_code=415,
+            detail=localized("Dosya içeriği görüntü formatıyla uyuşmuyor."),
+        )
+
+    # Yeniden kodlama (CPU işi) olay döngüsünü bekletmesin. Çözülemeyen
+    # dosya, imzası doğru olsa bile reddedilir.
+    try:
+        data = await run_in_threadpool(sanitize_photo, data, ext)
+    except PhotoRejected:
         raise HTTPException(
             status_code=415,
             detail=localized("Dosya içeriği görüntü formatıyla uyuşmuyor."),
