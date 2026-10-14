@@ -1,53 +1,38 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { X, Minus, Plus, Sofa, CigaretteOff, Dog, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import DistrictMultiSelect from "@/components/DistrictMultiSelect";
 import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import type { ListingFeature } from "@/lib/api";
-
-export interface ListingFilters {
-  listingType: string;
-  priceRange: [number, number];
-  rooms: number;
-  lifestyle: string[];
-  /** Backend `features` parametresiyle aynı anahtarlar. */
-  features: ListingFeature[];
-  gender: string;
-}
-
-export const defaultFilters: ListingFilters = {
-  listingType: "Hepsi",
-  priceRange: [1000, 30000],
-  rooms: 0,
-  lifestyle: [],
-  features: [],
-  gender: "Hepsi",
-};
+import {
+  LIFESTYLE_FILTERS,
+  PRICE_MAX,
+  PRICE_MIN,
+  defaultFilters,
+  priceHistogram,
+  type LifestyleFilter,
+  type ListingFilters,
+  type ListingTypeFilter,
+} from "@/lib/deckFilters";
 
 interface FilterModalProps {
   open: boolean;
   onClose: () => void;
   onApply?: (filters: ListingFilters) => void;
+  /**
+   * Destedeki ilanların fiyatları (bkz. deckFilters.listingPrice). Fiyat
+   * çubuğunun arkasındaki dağılım bunlardan çizilir; yeterli fiyat yoksa
+   * dağılım hiç gösterilmez. Eskiden burada uydurma, sabit bir dizi vardı.
+   */
+  prices?: number[];
 }
 
-const priceDistribution = [3,5,8,12,18,25,30,35,40,38,32,28,24,20,16,14,12,10,8,6,5,4,3,2,2,1,1,1,1,1];
+// Yaşam tarzı çipleri: kimlik deckFilters'ta, etiket sözlükte (filter.<kimlik>).
+const lifestyleChips: { value: LifestyleFilter; key: TranslationKey }[] =
+  LIFESTYLE_FILTERS.map(value => ({ value, key: `filter.${value}` as TranslationKey }));
 
-// NOT: `value` alanları filtre kimliğidir ve SwipeScreen'deki eşleştirme
-// ile birebir aynı kalmalıdır; yalnızca `key` (ekranda görünen etiket)
-// dile göre değişir.
-type Chip = { value: string; key: TranslationKey };
-
-const lifestyleChips: Chip[] = [
-  { value: "Sigara İçmez", key: "filter.noSmoke" },
-  { value: "Hayvan Dostu", key: "filter.petFriendly" },
-  { value: "Alkol Kullanmaz", key: "filter.noAlcohol" },
-  { value: "Erken Kalkar", key: "filter.earlyBird" },
-  { value: "Gece Kuşu", key: "filter.nightOwl" },
-  { value: "Temiz ve Düzenli", key: "filter.tidy" },
-  { value: "Sosyal", key: "filter.social" },
-  { value: "Sessiz", key: "filter.quiet" },
-];
 // Ev özellikleri: `value` doğrudan backend sütun adıdır, böylece seçim hem
 // istemcide hem `GET /api/listings?features=` sorgusunda aynı anlama gelir.
 const featureChips: { value: ListingFeature; key: TranslationKey }[] = [
@@ -59,15 +44,10 @@ const featureChips: { value: ListingFeature; key: TranslationKey }[] = [
   { value: "balcony", key: "filter.balcony" },
   { value: "natural_gas", key: "filter.gas" },
 ];
-const genderOptions: Chip[] = [
-  { value: "Hepsi", key: "filter.all" },
-  { value: "Kadın", key: "filter.female" },
-  { value: "Erkek", key: "filter.male" },
-];
-const listingTypeOptions: Chip[] = [
-  { value: "Hepsi", key: "filter.all" },
-  { value: "Ev İlanı", key: "common.houseListing" },
-  { value: "Kişisel İlan", key: "common.personalListing" },
+const listingTypeOptions: { value: ListingTypeFilter; key: TranslationKey }[] = [
+  { value: "all", key: "filter.all" },
+  { value: "ev_ilani", key: "common.houseListing" },
+  { value: "kisisel_ilan", key: "common.personalListing" },
 ];
 
 // Kısayollar ayrı bir filtre havuzu DEĞİLDİR: aşağıdaki gerçek çiplerin
@@ -75,24 +55,24 @@ const listingTypeOptions: Chip[] = [
 // değişir. Yalnızca gerçekten veriye dayanan filtreler burada yer alabilir.
 type QuickChip = { icon: typeof Sofa; key: TranslationKey } & (
   | { kind: "feature"; value: ListingFeature }
-  | { kind: "lifestyle"; value: string }
+  | { kind: "lifestyle"; value: LifestyleFilter }
 );
 
 const quickFilters: QuickChip[] = [
   { icon: Sofa, kind: "feature", value: "furnished", key: "filter.furnished" },
   { icon: Wifi, kind: "feature", value: "internet_included", key: "filter.internet" },
-  { icon: Dog, kind: "lifestyle", value: "Hayvan Dostu", key: "filter.petFriendly" },
-  { icon: CigaretteOff, kind: "lifestyle", value: "Sigara İçmez", key: "filter.noSmoke" },
+  { icon: Dog, kind: "lifestyle", value: "petFriendly", key: "filter.petFriendly" },
+  { icon: CigaretteOff, kind: "lifestyle", value: "noSmoke", key: "filter.noSmoke" },
 ];
 
-const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
+const FilterModal = ({ open, onClose, onApply, prices = [] }: FilterModalProps) => {
   const { t, n } = useI18n();
-  const [listingType, setListingType] = useState("Hepsi");
-  const [priceRange, setPriceRange] = useState([1000, 30000]);
+  const [listingType, setListingType] = useState<ListingTypeFilter>(defaultFilters.listingType);
+  const [priceRange, setPriceRange] = useState<number[]>([...defaultFilters.priceRange]);
   const [rooms, setRooms] = useState(0);
-  const [selectedLifestyle, setSelectedLifestyle] = useState<string[]>([]);
+  const [selectedLifestyle, setSelectedLifestyle] = useState<LifestyleFilter[]>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<ListingFeature[]>([]);
-  const [gender, setGender] = useState("Hepsi");
+  const [districts, setDistricts] = useState<string[]>([]);
 
   const toggleChip = <T extends string>(arr: T[], setArr: (v: T[]) => void, val: T) => {
     setArr(arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]);
@@ -110,10 +90,10 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
   };
 
   const clearAll = () => {
-    setListingType("Hepsi"); setPriceRange([1000, 30000]);
+    setListingType(defaultFilters.listingType); setPriceRange([...defaultFilters.priceRange]);
     setRooms(0);
     setSelectedLifestyle([]); setSelectedFeatures([]);
-    setGender("Hepsi");
+    setDistricts([]);
     onApply?.(defaultFilters);
   };
 
@@ -124,12 +104,14 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
       rooms,
       lifestyle: selectedLifestyle,
       features: selectedFeatures,
-      gender,
+      districts,
     });
     onClose();
   };
 
-  const maxBar = Math.max(...priceDistribution);
+  const histogram = useMemo(() => priceHistogram(prices), [prices]);
+  const maxBar = Math.max(1, ...histogram);
+  const span = PRICE_MAX - PRICE_MIN;
 
   return (
     <AnimatePresence>
@@ -202,37 +184,50 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               <hr className="border-border" />
 
+              {/* Semt: tek kampüs çevresine odaklanmak için. Sunucu da
+                  ?district= destekliyor; deste istemcide süzülüyor. */}
+              <div>
+                <h3 className="text-lg text-foreground mb-1">{t("filter.districts")}</h3>
+                <p className="text-xs text-muted-foreground mb-3">{t("filter.districtsSub")}</p>
+                <DistrictMultiSelect selected={districts} onChange={setDistricts} maxHeightClass="max-h-[180px]" />
+              </div>
+
+              <hr className="border-border" />
+
               {/* Price range */}
               <div>
                 <h3 className="text-lg text-foreground mb-1">{t("filter.budget")}</h3>
                 <p className="text-xs text-muted-foreground mb-4">{t("filter.budgetSub")}</p>
-                {/* Histogram */}
-                <div className="flex items-end gap-[2px] h-16 mb-2">
-                  {priceDistribution.map((v, i) => {
-                    const pct = (v / maxBar) * 100;
-                    const pos = i / priceDistribution.length;
-                    const minPos = (priceRange[0] - 1000) / 29000;
-                    const maxPos = (priceRange[1] - 1000) / 29000;
-                    const inRange = pos >= minPos && pos <= maxPos;
-                    return (
-                      <div
-                        key={i}
-                        className={`flex-1 rounded-t-sm transition-colors ${inRange ? "bg-primary" : "bg-muted"}`}
-                        style={{ height: `${pct}%` }}
-                      />
-                    );
-                  })}
-                </div>
+                {/* Gerçek ilan fiyatlarının dağılımı; az ilanda hiç çizilmez. */}
+                {histogram.length > 0 && (
+                  <div className="flex items-end gap-[2px] h-16 mb-2" aria-hidden="true">
+                    {histogram.map((v, i) => {
+                      const pct = (v / maxBar) * 100;
+                      const pos = i / histogram.length;
+                      const minPos = (priceRange[0] - PRICE_MIN) / span;
+                      const maxPos = (priceRange[1] - PRICE_MIN) / span;
+                      const inRange = pos >= minPos && pos <= maxPos;
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-1 rounded-t-sm transition-colors ${inRange ? "bg-primary" : "bg-muted"}`}
+                          // Boş kutu da ince bir çizgi olarak görünsün; aralık okunur kalır.
+                          style={{ height: v > 0 ? `${Math.max(pct, 6)}%` : "2px" }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
                 {/* Dual range - using two native inputs */}
                 <div className="relative h-6 mb-4">
                   <input
-                    type="range" min={1000} max={30000} step={500}
+                    type="range" min={PRICE_MIN} max={PRICE_MAX} step={500}
                     value={priceRange[0]}
                     onChange={e => setPriceRange([Math.min(Number(e.target.value), priceRange[1] - 500), priceRange[1]])}
                     className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-card [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:cursor-pointer"
                   />
                   <input
-                    type="range" min={1000} max={30000} step={500}
+                    type="range" min={PRICE_MIN} max={PRICE_MAX} step={500}
                     value={priceRange[1]}
                     onChange={e => setPriceRange([priceRange[0], Math.max(Number(e.target.value), priceRange[0] + 500)])}
                     className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-card [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:cursor-pointer"
@@ -284,7 +279,9 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
 
               {/* Lifestyle */}
               <div>
-                <h3 className="text-lg text-foreground mb-3">{t("filter.lifestyle")}</h3>
+                <h3 className="text-lg text-foreground mb-1">{t("filter.lifestyle")}</h3>
+                {/* Kural deckFilters.matchesLifestyle'da: metin gerçek davranışı anlatıyor. */}
+                <p className="text-xs text-muted-foreground mb-3">{t("filter.lifestyleSub")}</p>
                 <div className="flex flex-wrap gap-2">
                   {lifestyleChips.map(c => {
                     const active = selectedLifestyle.includes(c.value);
@@ -332,25 +329,10 @@ const FilterModal = ({ open, onClose, onApply }: FilterModalProps) => {
                 </div>
               </div>
 
-              <hr className="border-border" />
-
-              {/* Gender */}
-              <div>
-                <h3 className="text-lg text-foreground mb-3">{t("filter.gender")}</h3>
-                <div className="flex gap-2">
-                  {genderOptions.map(g => (
-                    <button
-                      key={g.value}
-                      onClick={() => setGender(g.value)}
-                      className={`px-5 py-2 rounded-full text-sm font-medium border transition-colors ${
-                        gender === g.value ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-foreground/40"
-                      }`}
-                    >
-                      {t(g.key)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Cinsiyet filtresi kaldırıldı: ilanın "ev halkı" bilgisi
+                  (kimlerle yaşanacak) henüz toplanmıyor ve sahibinin cinsiyeti
+                  destede bilerek gizli. Veri gelince geri gelir (yol haritası
+                  1.9). */}
             </div>
 
             {/* Footer */}

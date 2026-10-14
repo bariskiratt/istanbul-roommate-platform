@@ -324,17 +324,6 @@ const tr = {
   "profile.earlyBird": "Erken kalkar",
   "profile.flexible": "Esnek",
 
-  // ---- yaşam tarzı etiketleri ----
-  "tag.smokes": "Sigara içer",
-  "tag.noSmoke": "Sigara içmez",
-  "tag.pets": "Hayvan dostu",
-  "tag.noPets": "Hayvansız",
-  "tag.alcohol": "Alkol kullanır",
-  "tag.noAlcohol": "Alkol kullanmaz",
-  "tag.early": "Erken kalkar",
-  "tag.night": "Gece kuşu",
-  "tag.flexible": "Esnek",
-
   // ---- filtreler ----
   "filter.title": "Filtreler",
   "filter.recommended": "Önerilen filtreler",
@@ -349,13 +338,14 @@ const tr = {
   "filter.roomsMin": "En az",
   "filter.any": "Farketmez",
   "filter.lifestyle": "Yaşam tarzı uyumu",
+  "filter.lifestyleSub":
+    "Sigara ve hayvan ev ilanında evin kuralına bakar. Alkol ve uyku düzeni ilanı veren kişinin cevabıdır; cevap vermemiş kişinin ilanı gizlenir.",
+  "filter.districts": "Semt",
+  "filter.districtsSub": "Seçtiğin semtlerden birindeki ilanlar gösterilir",
   "filter.features": "Ev özellikleri",
   "filter.featuresSub": "Yalnızca ev ilanlarında bulunur",
   "filter.featuresScope":
     "Bu seçim yalnızca ev ilanlarına uygulanır: özelliği işaretli olmayan ev ilanları gizlenir, kişisel ilanlar (ev arayanlar) listede kalır.",
-  "filter.gender": "Cinsiyet tercihi",
-  "filter.female": "Kadın",
-  "filter.male": "Erkek",
   "filter.clear": "Temizle",
   "filter.show": "İlanları göster",
   "filter.noSmoke": "Sigara içmez",
@@ -363,9 +353,6 @@ const tr = {
   "filter.noAlcohol": "Alkol kullanmaz",
   "filter.earlyBird": "Erken kalkar",
   "filter.nightOwl": "Gece kuşu",
-  "filter.tidy": "Temiz ve düzenli",
-  "filter.social": "Sosyal",
-  "filter.quiet": "Sessiz",
   "filter.furnished": "Eşyalı",
   "filter.elevator": "Asansörlü",
   "filter.parking": "Otoparkı var",
@@ -551,11 +538,6 @@ const tr = {
   "map.altUnreachable": "Bu mahalle raylı sisteme yürüme mesafesinde değil, bu yüzden ulaşıma dayalı öneri çıkaramıyoruz.",
   "map.altFootnote": "Süreler tahmini: durak başı ~2 dk, aktarma ~10 dk, yürüme kuş uçuşu mesafeden. Yokuş hesaba katılmaz.",
 
-  // ---- bildirimler ----
-  "notif.title": "Bildirimler",
-  "notif.likedYourHouse": "{count} kişi evinizi beğendi",
-  "notif.empty": "Henüz yeni bildirim yok",
-
   // ---- bölüm seçici ----
   "dept.loading": "Bölümler yükleniyor…",
   "dept.select": "Bölümünü seç",
@@ -591,7 +573,7 @@ const tr = {
   "ob.step5Title": "Bütçe ve konum",
   "ob.step6Title": "Yaşam tarzın",
   "ob.step7Title": "Fotoğrafların",
-  "ob.step1Sub": "Sadece .edu.tr uzantılı e-postalar kabul edilir",
+  "ob.step1Sub": "Yalnızca üniversite e-posta adresleri kabul edilir (çoğu .edu.tr ile biter)",
   "ob.step2Sub": "{email} adresine gönderilen 6 haneli kodu gir",
   "ob.step3Sub": "Temel bilgilerini paylaş",
   "ob.step4Sub": "Üniversite ve bölüm bilgilerin",
@@ -599,7 +581,7 @@ const tr = {
   "ob.step6Sub": "Ev arkadaşı uyumun için önemli bilgiler",
   "ob.step7Sub": "En az 1 fotoğraf yüklemen gerekiyor",
   "ob.emailFallback": "E-posta",
-  "ob.eduOnly": "Yalnızca .edu.tr uzantılı üniversite e-postaları kabul edilir",
+  "ob.eduOnly": "Bu bir üniversite adresine benzemiyor. Okulunun sana verdiği adresi kullan.",
   "ob.createPassword": "Şifre oluştur",
   "ob.passwordPlaceholder": "En az 8 karakter",
   "ob.ruleLength": "En az 8 karakter",
@@ -677,6 +659,9 @@ const tr = {
   // ---- 404 ----
   "notfound.text": "Aradığın sayfa bulunamadı.",
   "notfound.home": "Ana sayfaya dön",
+  "crash.title": "Bir şeyler ters gitti",
+  "crash.text": "Bu sayfa açılırken bir hata oldu. Sayfayı yenilemek çoğu zaman yeter.",
+  "crash.reload": "Sayfayı yenile",
 
   // ---- yönetim paneli ----
   "admin.title": "Yönetim",
@@ -990,8 +975,8 @@ const tr = {
     "Bu metin platform değiştikçe güncellenir. Güncel sürüm her zaman bu sayfada yayımlanır ve en üstteki tarih değişir.",
 
   // ---- yeni arayüz (defter/kampüs) ----
-  "card.stampTop": "Doğrulandı",
-  "card.stampBottom": ".edu.tr ile",
+  "card.stampTop": "Üni. e-postası",
+  "card.stampBottom": "doğrulandı",
   "card.blankUniversity": "Senin üniversiten",
   "card.noUniversity": "Üniversite belirtilmemiş",
   "card.name": "Ad",
@@ -1395,17 +1380,6 @@ const en: Record<TranslationKey, string> = {
   "profile.earlyBird": "Early riser",
   "profile.flexible": "Flexible",
 
-  // ---- lifestyle tags ----
-  "tag.smokes": "Smoker",
-  "tag.noSmoke": "Non-smoker",
-  "tag.pets": "Pet friendly",
-  "tag.noPets": "No pets",
-  "tag.alcohol": "Drinks alcohol",
-  "tag.noAlcohol": "No alcohol",
-  "tag.early": "Early riser",
-  "tag.night": "Night owl",
-  "tag.flexible": "Flexible",
-
   // ---- filters ----
   "filter.title": "Filters",
   "filter.recommended": "Suggested filters",
@@ -1420,13 +1394,14 @@ const en: Record<TranslationKey, string> = {
   "filter.roomsMin": "At least",
   "filter.any": "Any",
   "filter.lifestyle": "Lifestyle fit",
+  "filter.lifestyleSub":
+    "Smoking and pets follow the house rules on house listings. Alcohol and sleep schedule are the poster's own answers; listings from people who didn't answer are hidden.",
+  "filter.districts": "District",
+  "filter.districtsSub": "Shows listings in any of the districts you pick",
   "filter.features": "Home features",
   "filter.featuresSub": "Only house listings have these",
   "filter.featuresScope":
     "This only applies to house listings: house listings without the feature are hidden, while personal listings (people looking for a place) stay in the list.",
-  "filter.gender": "Gender preference",
-  "filter.female": "Women",
-  "filter.male": "Men",
   "filter.clear": "Clear",
   "filter.show": "Show listings",
   "filter.noSmoke": "Non-smoker",
@@ -1434,9 +1409,6 @@ const en: Record<TranslationKey, string> = {
   "filter.noAlcohol": "No alcohol",
   "filter.earlyBird": "Early riser",
   "filter.nightOwl": "Night owl",
-  "filter.tidy": "Clean and tidy",
-  "filter.social": "Social",
-  "filter.quiet": "Quiet",
   "filter.furnished": "Furnished",
   "filter.elevator": "Elevator",
   "filter.parking": "Parking",
@@ -1622,11 +1594,6 @@ const en: Record<TranslationKey, string> = {
   "map.altUnreachable": "This neighborhood isn't within walking distance of rail, so there's no transit-based suggestion.",
   "map.altFootnote": "Times are estimates: ~2 min per stop, ~10 min per change, walking from straight-line distance. Hills aren't counted.",
 
-  // ---- notifications ----
-  "notif.title": "Notifications",
-  "notif.likedYourHouse": "{count} people liked your place",
-  "notif.empty": "No new notifications yet",
-
   // ---- department picker ----
   "dept.loading": "Loading departments…",
   "dept.select": "Choose your department",
@@ -1660,7 +1627,7 @@ const en: Record<TranslationKey, string> = {
   "ob.step5Title": "Budget and location",
   "ob.step6Title": "Your lifestyle",
   "ob.step7Title": "Your photos",
-  "ob.step1Sub": "Only .edu.tr addresses are accepted",
+  "ob.step1Sub": "Only university email addresses are accepted (most end in .edu.tr)",
   "ob.step2Sub": "Enter the 6-digit code sent to {email}",
   "ob.step3Sub": "Share the basics",
   "ob.step4Sub": "Your university and department",
@@ -1668,7 +1635,7 @@ const en: Record<TranslationKey, string> = {
   "ob.step6Sub": "Details that matter for roommate compatibility",
   "ob.step7Sub": "You need to upload at least 1 photo",
   "ob.emailFallback": "your email",
-  "ob.eduOnly": "Only .edu.tr university email addresses are accepted",
+  "ob.eduOnly": "This doesn't look like a university address. Use the one your school gave you.",
   "ob.createPassword": "Create a password",
   "ob.passwordPlaceholder": "At least 8 characters",
   "ob.ruleLength": "At least 8 characters",
@@ -1746,6 +1713,9 @@ const en: Record<TranslationKey, string> = {
   // ---- 404 ----
   "notfound.text": "We couldn't find that page.",
   "notfound.home": "Back to home",
+  "crash.title": "Something went wrong",
+  "crash.text": "This page hit an error while loading. Reloading usually fixes it.",
+  "crash.reload": "Reload page",
 
   // ---- moderation panel ----
   "admin.title": "Moderation",
@@ -2039,8 +2009,8 @@ const en: Record<TranslationKey, string> = {
     "This notice is updated as the platform changes. The current version is always published on this page and the date at the top changes with it.",
 
   // ---- yeni arayüz (defter/kampüs) ----
-  "card.stampTop": "Verified",
-  "card.stampBottom": "via .edu.tr",
+  "card.stampTop": "Uni email",
+  "card.stampBottom": "verified",
   "card.blankUniversity": "Your university",
   "card.noUniversity": "University not set",
   "card.name": "Name",
