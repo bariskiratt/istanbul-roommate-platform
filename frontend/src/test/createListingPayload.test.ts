@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildListingPayload, type ListingDraft } from "@/pages/CreateListing";
-import { LISTING_FEATURES, type ListingFeature } from "@/lib/api";
+import { buildListingPayload, draftFromListing, type ListingDraft } from "@/pages/CreateListing";
+import { LISTING_FEATURES, type ApiListing, type ListingFeature } from "@/lib/api";
 
 const noFeatures = (): Record<ListingFeature, boolean> =>
   Object.fromEntries(LISTING_FEATURES.map(k => [k, false])) as Record<ListingFeature, boolean>;
@@ -68,5 +68,62 @@ describe("buildListingPayload", () => {
 
   it("kira metni sayıya çevrilir", () => {
     expect(buildListingPayload(draft({ rent: "12500" })).rent).toBe(12500);
+  });
+});
+
+describe("draftFromListing (düzenleme ekranı)", () => {
+  const listing: ApiListing = {
+    id: 7,
+    type: "ev_ilani",
+    title: "Moda'da oda",
+    description: "Güneşli.",
+    district: "Kadıköy",
+    neighborhood: "Caferağa Mah.",
+    photos: ["a.jpg", "b.jpg", "c.jpg"],
+    rent: 12000,
+    room_count: "3+1",
+    smoking_allowed: false,
+    pets_allowed: null,
+    furnished: true,
+    elevator: null,
+    is_active: false,
+    created_at: "2026-10-01T10:00:00",
+    owner_id: 3,
+    owner_name: "Ayşe",
+    owner_university: null,
+  };
+
+  it("kaydedince ilanın mevcut değerlerini aynen geri yollar", () => {
+    const p = buildListingPayload(draftFromListing(listing));
+    expect(p).toMatchObject({
+      type: "ev_ilani",
+      title: "Moda'da oda",
+      district: "Kadıköy",
+      neighborhood: "Caferağa Mah.",
+      rent: 12000,
+      room_count: "3+1",
+      smoking_allowed: false,
+      furnished: true,
+    });
+    expect(p.photos).toEqual(listing.photos);
+  });
+
+  it("bilinmeyen alan işaretsiz başlar", () => {
+    const d = draftFromListing(listing);
+    expect(d.petsAllowed).toBe(false);
+    expect(d.features.elevator).toBe(false);
+  });
+
+  it("kişisel ilanda bütçe aralığı gelir", () => {
+    const d = draftFromListing({
+      ...listing,
+      type: "kisisel_ilan",
+      rent: null,
+      room_count: null,
+      budget_min: 7000,
+      budget_max: 11000,
+    });
+    expect(d.budget).toEqual([7000, 11000]);
+    expect(buildListingPayload(d)).toMatchObject({ budget_min: 7000, budget_max: 11000 });
   });
 });

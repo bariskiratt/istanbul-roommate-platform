@@ -24,6 +24,7 @@ from app.config import (
 )
 from app.admin import router as admin_router
 from app.auth import router as auth_router
+from app.blocks import router as blocks_router
 from app.db import get_db, init_db
 from app.startup_checks import check_startup_config
 from app.heatmap import (
@@ -407,6 +408,7 @@ app.include_router(swipes_router)
 app.include_router(messages_router)
 app.include_router(uploads_router)
 app.include_router(reports_router)
+app.include_router(blocks_router)
 app.include_router(admin_router)
 
 # Yüklenen fotoğrafların servisi: /uploads/<ad> (disk ya da kova, bkz. uploads.py)

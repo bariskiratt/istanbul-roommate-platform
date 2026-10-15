@@ -28,6 +28,7 @@ export const ROUTES: Record<string, Meta> = {
   "/profile": { title: "meta.profile" },
   "/profile/edit": { title: "meta.profileEdit" },
   "/create-listing": { title: "meta.createListing" },
+  "/edit-listing/:listingId": { title: "meta.editListing" },
   "/listings": { title: "meta.listings" },
   "/settings": { title: "meta.settings" },
   "/settings/account": { title: "meta.accountSettings" },

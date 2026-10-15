@@ -85,6 +85,12 @@ EN: dict[str, str | tuple[str, str]] = {
         "Admin account: enter the code we just emailed you.",
     "Yönetici hesabı: kodla birlikte şifreni de gir.":
         "Admin account: enter your password along with the code.",
+    "Yönetici hesabının şifresi e-posta koduyla sıfırlanamaz. "
+    "Şifreyi sunucu tarafında değiştirmen gerekiyor.":
+        "An admin account's password can't be reset with an email code. "
+        "Change it on the server instead.",
+    "Onaylamak için şifreni ya da e-postana gelen kodu gir.":
+        "Enter your password or the code we emailed you to confirm.",
     "Çok hızlı gidiyorsun. Biraz bekleyip tekrar dene.":
         "You're going too fast. Wait a moment and try again.",
 
@@ -98,6 +104,10 @@ EN: dict[str, str | tuple[str, str]] = {
         "A looking-for-a-room listing needs a budget range.",
     "Yalnızca ev ilanları için hesaplanır.":
         "Only calculated for room-offered listings.",
+    "İlan zaten yayında.": "This listing is already live.",
+    "Kendini engelleyemezsin.": "You can't block yourself.",
+    "İlan zaten yönetici onayı bekliyor.":
+        "This listing is already waiting for an admin's approval.",
     "Adil fiyat modeli yüklü değil.": "The fair price model isn't loaded.",
     "Bu ilan sana ait değil.": "This listing isn't yours.",
 

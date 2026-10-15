@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app import content_limits, crypto, dealbreakers, models, moderation
 from app.auth import get_current_user
+from app.blocks import blocked_ids, is_blocked
 from app.db import get_db
 from app.i18n import localized
 from app.reports import require_admin
@@ -334,6 +335,9 @@ def swipe(
         raise HTTPException(
             status_code=400, detail=localized("Kendi ilanını kaydıramazsın.")
         )
+    # Aralarında engel varsa ilan bu kişi için yok: destede de görünmüyor.
+    if listing.owner_id is not None and is_blocked(db, user.id, listing.owner_id):
+        raise HTTPException(status_code=404, detail=localized("İlan bulunamadı."))
 
     target_kind, target_ref = _resolve_target(payload.target, listing)
     comment, comment_flagged, comment_reasons = _prepare_comment(
@@ -425,6 +429,11 @@ def received_likes(
     "İstemediklerim"de elediğim bir özelliği taşıyan kişinin beğenisi
     gösterilmez (bkz. app.dealbreakers). Beğeni SİLİNMEZ ve yanıtlanmış da
     sayılmaz: seçim kaldırılınca kuyruğa geri gelir.
+
+    Satır başına bir BEĞENİ döner (hangi ilan, neyi, yorum). Arayüz bunları
+    kişiye göre gruplar (frontend/src/lib/likeGroups.ts) ve kararı kişiye
+    verir; respond_to_like da kararı o kişinin bütün bekleyen beğenilerine
+    uygular.
     """
     rows = db.scalars(
         select(models.Swipe)
@@ -439,6 +448,8 @@ def received_likes(
             models.Swipe.responded.is_(False),
             # Askıya alınan kullanıcının beğenisi kuyrukta durmaz.
             models.Swipe.swiper_id.not_in(_suspended_user_ids()),
+            # Engellenen (ya da seni engelleyen) kişinin beğenisi de.
+            models.Swipe.swiper_id.not_in(blocked_ids(user.id)),
         )
         .order_by(models.Swipe.created_at.desc(), models.Swipe.id.desc())
     ).all()
@@ -492,14 +503,36 @@ def respond_to_like(
         raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
     if row.swiper is not None and row.swiper.is_suspended:
         raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
+    # Kuyrukta görünmeyen beğeni işlenemez; engel yeni eşleşme doğurmamalı.
+    if is_blocked(db, user.id, row.swiper_id):
+        raise HTTPException(status_code=404, detail=localized("Beğeni bulunamadı."))
 
     matched, match_id = False, None
     if payload.accept:
         match, _ = _get_or_create_match(db, user.id, row.swiper_id, row.listing_id)
         # Yorum, beğeni yanıtlanmış sayılmadan ÖNCE taşınır; bkz.
-        # _deliver_comments (yanıtlanmış beğeninin yorumu taşınmaz).
+        # _deliver_comments (yanıtlanmış beğeninin yorumu taşınmaz). Kişinin
+        # diğer ilanlarına yazdığı yorumlar da bu çağrıyla gelir.
         _deliver_comments(db, match, user.id, row.swiper_id)
         matched, match_id = True, match.id
+
+    # KARAR KİŞİYE VERİLİR, KAYDIRMAYA DEĞİL. Beğeniler ekranı aynı kişinin
+    # birden çok ilanına verdiği beğenileri tek kartta gösterir; karar o
+    # kişinin bu sahibin ilanlarına verdiği bütün bekleyen beğenilere
+    # uygulanır. Eskiden kuyruk kaydırmaları listeliyordu: üç ilanını beğenen
+    # kişi üç kez çıkıyor, birini kabul etmek diğer ikisini bekletiyordu
+    # (eşleşme zaten kişi çifti başına tek).
+    for other in db.scalars(
+        select(models.Swipe)
+        .join(models.Listing, models.Swipe.listing_id == models.Listing.id)
+        .where(
+            models.Listing.owner_id == user.id,
+            models.Swipe.swiper_id == row.swiper_id,
+            models.Swipe.direction == "like",
+            models.Swipe.responded.is_(False),
+        )
+    ):
+        other.responded = True
     row.responded = True
 
     db.commit()
@@ -529,6 +562,11 @@ def my_matches(
             # edilmez — bkz. app/messages.py send_message (403).
             models.Match.user_a_id.not_in(_suspended_user_ids()),
             models.Match.user_b_id.not_in(_suspended_user_ids()),
+            # Engel ya da kaldırılan eşleşme: sohbet iki taraftan da kalkar.
+            # Kişi kendini engelleyemediği için bu küme yalnızca karşı tarafı
+            # yakalar.
+            models.Match.user_a_id.not_in(blocked_ids(user.id)),
+            models.Match.user_b_id.not_in(blocked_ids(user.id)),
         )
         .order_by(models.Match.created_at.desc(), models.Match.id.desc())
     ).all()

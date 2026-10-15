@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from "framer-motion";
-import { X, Check } from "lucide-react";
+import { X, Check, Flag, UserX } from "lucide-react";
 import { toast } from "sonner";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
@@ -11,27 +11,30 @@ import AuthGate from "@/components/AuthGate";
 import StudentCard from "@/components/campus/StudentCard";
 import ProfileTimeline from "@/components/campus/ProfileTimeline";
 import LikeContext from "@/components/LikeContext";
+import ReportDialog from "@/components/ReportDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchReceivedLikes, respondToLike, type ReceivedLike } from "@/lib/api";
+import { blockUser, fetchReceivedLikes, respondToLike } from "@/lib/api";
+import { groupLikesByPerson, type LikeGroup } from "@/lib/likeGroups";
 import { interleave, personPrompts } from "@/lib/prompts";
 import { useI18n } from "@/i18n";
 
-// API beğenisini kart bileşeninin beklediği görünüme çevirir
-const toLikeCard = (r: ReceivedLike, unnamed: string) => ({
-  id: String(r.swipe_id),
-  swipeId: r.swipe_id,
-  listingTitle: r.listing_title,
-  // Sunucudaki hâli: neyin beğenildiği, yorum ve kartların kaynağı.
-  raw: r,
+// Kişinin beğenilerini (bkz. lib/likeGroups.ts) kartın beklediği görünüme
+// çevirir. Kuyrukta her kişi BİR kez görünür.
+const toLikeCard = (g: LikeGroup, unnamed: string) => ({
+  id: String(g.user.id),
+  swipeId: g.swipeId,
+  // Sunucudaki hâli: neyin beğenildiği, yorumlar; en yeni önce.
+  likes: g.likes,
+  rawUser: g.user,
   user: {
-    id: r.user.id,
+    id: g.user.id,
     // Ham üniversite: öğrenci kartındaki mühür yalnızca bu doluysa basılır
-    rawUniversity: r.user.university,
-    rawDepartment: r.user.department,
-    name: r.user.name || unnamed,
-    year: r.user.year ?? 0,
-    bio: r.user.bio,
-    photos: r.user.photos,
+    rawUniversity: g.user.university,
+    rawDepartment: g.user.department,
+    name: g.user.name || unnamed,
+    year: g.user.year ?? 0,
+    bio: g.user.bio,
+    photos: g.user.photos,
   },
 });
 
@@ -46,6 +49,10 @@ const Matches = () => {
   const [matchPopup, setMatchPopup] = useState<LikeCard | null>(null);
   const [confetti, setConfetti] = useState(false);
   const [swipeDir, setSwipeDir] = useState<"left" | "right" | null>(null);
+  // Şikâyet kutusu kartın DIŞINDA durur (kart sürüklenirken transform alır;
+  // bkz. SwipeScreen'deki aynı not).
+  const [reportUser, setReportUser] = useState<{ id: number; name: string } | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const { data: received = [] } = useQuery({
     queryKey: ["received-likes"],
@@ -54,11 +61,12 @@ const Matches = () => {
   });
 
   const unnamed = t("messages.unnamed");
+  const groups = useMemo(() => groupLikesByPerson(received), [received]);
   useEffect(() => {
-    setQueue(received.map(r => toLikeCard(r, unnamed)));
-  }, [received, unnamed]);
+    setQueue(groups.map(g => toLikeCard(g, unnamed)));
+  }, [groups, unnamed]);
 
-  const total = received.length;
+  const total = groups.length;
   const remaining = queue.length;
 
   const handleDecision = useCallback((direction: "left" | "right") => {
@@ -86,6 +94,23 @@ const Matches = () => {
       setSwipeDir(null);
     }, 300);
   }, [queue, queryClient, t]);
+
+  // Engel: bu kişinin beğenileri kuyruktan düşer, ikiniz birbirinizi destede
+  // de görmezsiniz (backend/app/blocks.py). Hesap ayarlarından kaldırılır.
+  const block = useCallback((card: LikeCard) => {
+    if (!window.confirm(t("likes.blockConfirm", { name: card.user.name }))) return;
+    blockUser(card.user.id)
+      .then(() => {
+        setQueue(prev => prev.filter(c => c.user.id !== card.user.id));
+        queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+        queryClient.invalidateQueries({ queryKey: ["listings"] });
+        queryClient.invalidateQueries({ queryKey: ["blocks"] });
+        toast.success(t("likes.blocked", { name: card.user.name }), {
+          description: t("likes.blockedDesc"),
+        });
+      })
+      .catch(err => toast.error(err instanceof Error ? err.message : t("common.error")));
+  }, [queryClient, t]);
 
   const currentProfile = queue[0];
   const nextProfile = queue[1];
@@ -126,6 +151,11 @@ const Matches = () => {
                 notification={currentProfile}
                 onSwipe={handleDecision}
                 direction={swipeDir}
+                onReport={() => {
+                  setReportUser({ id: currentProfile.user.id, name: currentProfile.user.name });
+                  setReportOpen(true);
+                }}
+                onBlock={() => block(currentProfile)}
               />
             </AnimatePresence>
           </div>
@@ -241,6 +271,16 @@ const Matches = () => {
         </div>
       )}
 
+      {reportUser && (
+        <ReportDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="user"
+          targetId={reportUser.id}
+          targetLabel={reportUser.name}
+        />
+      )}
+
       <AuthGate show={!isLoggedIn} onClose={() => {}} />
       <BottomNav />
     </div>
@@ -255,10 +295,12 @@ interface ProfileCardProps {
   notification: LikeCard;
   onSwipe: (dir: "left" | "right") => void;
   direction: "left" | "right" | null;
+  onReport: () => void;
+  onBlock: () => void;
 }
 
-const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => {
-  const { user, raw } = notification;
+const ProfileCard = ({ notification, onSwipe, direction, onReport, onBlock }: ProfileCardProps) => {
+  const { user, rawUser, likes } = notification;
   const { t, n, locale } = useI18n();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
@@ -266,7 +308,7 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
   const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   // Kapak fotoğrafı öğrenci kartında; kalanlar kartların arasına girer.
-  const timeline = interleave(raw.user.photos.slice(1), personPrompts(raw.user, { t, n, locale }), 1);
+  const timeline = interleave(rawUser.photos.slice(1), personPrompts(rawUser, { t, n, locale }), 1);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 100) onSwipe("right");
@@ -296,7 +338,12 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
       {/* İç kaydırıcı dikey kayar, kart yatay sürüklenir (touch-pan-y). */}
       <div className="h-full rounded-2xl border border-border bg-card p-3 space-y-4 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
         <div className="px-1 pt-1">
-          <LikeContext like={raw} />
+          {/* Birden çok ilanını beğendiyse hepsi burada, en yeni önce. */}
+          <div className="space-y-4 divide-y divide-border [&>*+*]:pt-4">
+            {likes.map(like => (
+              <LikeContext key={like.swipe_id} like={like} />
+            ))}
+          </div>
         </div>
 
         <StudentCard
@@ -314,6 +361,17 @@ const ProfileCard = ({ notification, onSwipe, direction }: ProfileCardProps) => 
         {user.bio && (
           <p className="paper-ruled rounded-lg text-[14px] text-foreground whitespace-pre-line">{user.bio}</p>
         )}
+
+        {/* Kartın en altında, kazara basılmasın diye karar düğmelerinden uzakta. */}
+        <div className="flex items-center justify-center gap-3 pt-1 pb-2 text-[13px] text-muted-foreground">
+          <button onClick={onReport} className="flex items-center gap-1.5 hover:text-destructive transition-colors">
+            <Flag className="w-3.5 h-3.5" /> {t("report.reportUser")}
+          </button>
+          <span aria-hidden="true">·</span>
+          <button onClick={onBlock} className="flex items-center gap-1.5 hover:text-destructive transition-colors">
+            <UserX className="w-3.5 h-3.5" /> {t("likes.block")}
+          </button>
+        </div>
       </div>
     </motion.div>
   );

@@ -18,7 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileIncomplete } from "@/lib/onboardingDraft";
 
-const NEEDS_PROFILE = ["/swipe", "/matches", "/messages", "/chat/", "/profile", "/create-listing"];
+const NEEDS_PROFILE = ["/swipe", "/matches", "/messages", "/chat/", "/profile", "/create-listing", "/edit-listing/"];
 
 const OnboardingRedirect = () => {
   const { user } = useAuth();

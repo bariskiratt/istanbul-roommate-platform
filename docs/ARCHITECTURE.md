@@ -605,6 +605,18 @@ it — otherwise the easiest way to erase your moderation history would be to
 delete your own account (`backend/app/models.py:294-301`, and the sweep that
 relies on it at `backend/app/auth.py:598-607`).
 
+### `blocks` — hiding instead of deleting
+
+`Block(blocker_id, blocked_id)` is one row per direction, unique per pair
+(`backend/app/models.py`). Unmatching is the same row: like Hinge or Bumble,
+an unmatched person doesn't come back. The effect is applied where data is
+read, in both directions, through `blocks.blocked_ids(user_id)`: the deck and
+`GET /api/listings/{id}`, the swipe endpoint, the Likes queue and its respond
+endpoint, the match list, and the message endpoints (404, as if the match
+didn't exist). Nothing is deleted, so unblocking restores the conversation and
+a harassment report keeps its evidence. Account deletion removes the user's
+blocks in both directions (`purge_user`).
+
 ### The deletion order problem
 
 `purge_user` (`backend/app/auth.py:503-617`) is the most intricate function in
@@ -960,9 +972,10 @@ Stated plainly, because a document that only lists strengths is not useful.
    fetched in a Python loop (`backend/app/swipes.py:524-546`). Fine for a
    student with a handful of matches; linear growth in queries per request.
 
-7. **Listing owners cannot reopen their own listings.** Closing is one-way from
-   the user's side; only an admin endpoint can republish
-   (`backend/app/listings.py:481-494` — the docstring says so explicitly).
+7. **Republishing keeps the original date.** An owner can reopen a closed
+   listing (`POST /api/listings/{id}/republish`, moderation runs again), but
+   `created_at` stays, so it doesn't jump to the top of the deck. A freshness
+   loop with limits is roadmap item 2.1.
 
 8. **The listing feed is unpaginated.** `GET /api/listings` returns every
    matching active listing with no limit or offset

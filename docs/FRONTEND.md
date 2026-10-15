@@ -461,8 +461,8 @@ into local queue state so a card can animate out before the server confirms
 (`src/pages/Matches.tsx:57-59`). Because it *does* invalidate after the server
 answers
 (`src/pages/Matches.tsx:71-72`), the effect re-seeds the queue from the fresh
-list, which is the correct outcome there — the decided like is gone from the
-server's response.
+list, which is the correct outcome there — the decided person's likes are gone
+from the server's response.
 
 ---
 
@@ -484,6 +484,7 @@ server's response.
 | `/chat/:matchId` | `ChatScreen` | One conversation |
 | `/profile`, `/profile/edit` | `Profile`, `ProfileEdit` | |
 | `/create-listing` | `CreateListing` | 5-step wizard |
+| `/edit-listing/:listingId` | `CreateListing` | Same steps filled with the listing; saves with `PATCH` |
 | `/listings` | `Listings` | **Admin only** |
 | `/explore` | `Explore` | Budget heatmap |
 | `/safety` | `Safety` | Public |
@@ -862,12 +863,16 @@ which would trap a `position: fixed` panel inside it (`:213-229`).
 Reads `GET /api/swipes/received` and answers with
 `POST /api/swipes/{id}/respond` (`Matches.tsx:50-54`, `:68-72`). The old
 `/notifications` page showed the same data and was unreachable; it now
-redirects here. Each like opens with what it was
-for (`src/components/LikeContext.tsx`): the liked photo, or the liked card
-rebuilt from the receiver's own current data, and the comment on ruled paper.
-Below that, Matches shows the person as
+redirects here. The queue is one card per person, not per like
+(`src/lib/likeGroups.ts`): someone who liked three of your listings appears
+once, and the decision covers all three. The card opens with what each like
+was for (`src/components/LikeContext.tsx`), newest first: the liked photo, or
+the liked card rebuilt from the receiver's own current data, and the comment on
+ruled paper. Below that, Matches shows the person as
 a timeline: student card, prompt cards and photos, then the bio. When the like
-is accepted, the server turns its comment into the first chat message.
+is accepted, the server turns its comment into the first chat message. The end
+of the card has "Report" and "Block"; blocking drops the person's likes from
+the queue (`POST /api/blocks`).
 
 **`Messages`** (`src/pages/Messages.tsx`).
 Conversation list from `GET /api/matches` (`:32-36`). Last-message previews go
@@ -881,7 +886,11 @@ One thread: `GET /api/messages/{matchId}` polled every 4 s (`:52-61`),
 handling: a send rejected by moderation or a suspended counterpart puts the text
 **back in the input** so it is not lost (`:70-80`); and a match missing from
 `/api/matches` is not enough to claim "no such conversation", because the server
-still allows reading history — the code distinguishes the two (`:102-112`).
+still allows reading history — the code distinguishes the two. The header
+menu reports the person or unmatches them (a block, `POST /api/blocks`, after
+a confirm), and each of the other person's messages has a small flag that
+reports that single message. Account settings lists blocked people with an
+unblock button (`GET`/`DELETE /api/blocks`).
 
 **`Listings` — admin listing console** (`src/pages/Listings.tsx`).
 Admin-only (`:942-954`). Server-side search with a 300 ms debounce (`:842-846`),
@@ -925,9 +934,12 @@ the list are in [`ALGORITHMS.md`](ALGORITHMS.md) §2.
 
 **`Profile` / `ProfileEdit`** (`src/pages/Profile.tsx`,
 `src/pages/ProfileEdit.tsx`).
-Profile reads `GET /api/listings?mine=true` and `GET /api/matches` (`:24-34`)
-and can delete a listing (`:37-45`). A listing held for admin approval
-(`pending_review`, a scam pattern) is listed with an "In review" label.
+Profile reads `GET /api/listings?mine=true` and `GET /api/matches`. "My
+listings" shows live, in-review (`pending_review`, a scam pattern) and closed
+listings. Each can be edited (`/edit-listing/:id`); a live one can be closed
+(`DELETE`, which only deactivates it) and a closed one republished
+(`POST /api/listings/{id}/republish`, which re-runs moderation and may put it
+in review instead). Listings an admin removed are not shown.
 ProfileEdit picks districts with the same `DistrictMultiSelect`
 (`/api/locations`) as sign-up and the deck filter. Its first tab, Preview, shows the profile
 the way other people see it in Likes: the same timeline, then the bio. Editing writes `PATCH /api/auth/me`;
@@ -937,9 +949,14 @@ e-mail domain (`src/lib/api.ts:332`).
 **`Settings` / `AccountSettings`** (`src/pages/Settings.tsx`,
 `src/pages/AccountSettings.tsx`).
 Theme, language, and links out. Account settings changes the password
-(`POST /api/auth/change-password`, `AccountSettings.tsx:46`) and deletes the
-account (`DELETE /api/auth/me`, `:62`), both requiring the current password
-(`src/lib/api.ts:384-399`).
+(`POST /api/auth/change-password`) and deletes the account
+(`DELETE /api/auth/me`). Both take the current password, or, for someone who
+signed in with a code and doesn't remember it, a fresh code sent to their
+e-mail: the password change then goes through `POST /api/auth/reset-password`,
+which signs out every other device and keeps this one signed in. Login has the
+same reset flow behind "Forgot your password?" (`Login.tsx`, mode `reset`).
+Admin accounts can't reset by code, since their login needs password and code
+together.
 
 **`Admin` — moderation panel** (`src/pages/Admin.tsx`).
 Four tabs — reports, flagged content, users, audit log (`:209`) — each with its
