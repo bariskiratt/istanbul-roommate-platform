@@ -47,6 +47,9 @@ class User(Base):
     preferred_districts: Mapped[list] = mapped_column(JSON, default=list)
     bio: Mapped[str] = mapped_column(Text, default="")
     photos: Mapped[list] = mapped_column(JSON, default=list)
+    # Ev arkadaşında kesinlikle istemediği özellikler (app.dealbreakers
+    # kapalı listesi). Boş liste: eleme yok. Yalnızca sahibine döner.
+    dealbreakers: Mapped[list] = mapped_column(JSON, default=list)
 
     # Tek kullanımlık giriş kodu (hash'lenmiş; e-posta servisi bağlanana kadar
     # dev modda API yanıtında döner)

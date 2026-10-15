@@ -81,6 +81,8 @@ const tr = {
   "swipe.emptyAll": "Şu an sana gösterecek yeni ilan yok. Yeni ilanlar eklendikçe burada görünecek.",
   "swipe.emptyFiltered": "Filtrelerine uyan ilan kalmadı. Filtreleri gevşetmeyi dene.",
   "swipe.clearFilters": "Filtreleri temizle",
+  "swipe.emptyDealbreakers": "İstemediklerin bazı ilanları gizliyor olabilir.",
+  "swipe.editDealbreakers": "İstemediklerini düzenle",
   "swipe.emptyCreate": "Kendi ilanını ver",
   "swipe.emptyMap": "Bütçe haritasına bak",
   "swipe.matched": "Eşleştiniz!",
@@ -632,6 +634,21 @@ const tr = {
   "ob.codeSentTitle": "Doğrulama kodu e-postana gönderildi!",
   "ob.codeFailed": "Kod gönderilemedi",
   "ob.profileReady": "Profilin hazır",
+  "ob.stepDealTitle": "Kimle yaşamak istemezsin?",
+  "ob.stepDealSub":
+    "İsteğe bağlı. Seçtiğin özellikleri taşıyan kişiler desteye hiç çıkmaz. Sonra profilinden değiştirebilirsin.",
+
+  // ---- istemediklerim (kesin eleme, bkz. lib/dealbreakers.ts) ----
+  "deal.title": "İstemediklerin",
+  "deal.sub": "Seçtiğin özellikleri taşıyan kişiler desteye hiç çıkmaz.",
+  "deal.mutual": "Bu kişiler de senin ilanlarını görmez. Cevabı bilinmeyen kimse elenmez.",
+  "deal.smoking": "Sigara içen",
+  "deal.smokingDesc": "Sigara içilebilen evler de çıkmaz",
+  "deal.alcohol": "Alkol kullanan",
+  "deal.pets": "Evcil hayvanı olan",
+  "deal.petsDesc": "Evcil hayvan kabul eden evler de çıkmaz",
+  "deal.nightOwl": "Gece kuşu",
+  "deal.earlyBird": "Erken kalkan",
 
   // ---- güvenlik ----
   "safety.backToApp": "Uygulamaya dön",
@@ -1148,6 +1165,8 @@ const en: Record<TranslationKey, string> = {
   "swipe.emptyAll": "There are no new listings to show you right now. New ones will show up here.",
   "swipe.emptyFiltered": "No listings match your filters. Try loosening them.",
   "swipe.clearFilters": "Clear filters",
+  "swipe.emptyDealbreakers": "Your dealbreakers may be hiding some listings.",
+  "swipe.editDealbreakers": "Edit dealbreakers",
   "swipe.emptyCreate": "Post your own listing",
   "swipe.emptyMap": "Check the budget map",
   "swipe.matched": "It's a match!",
@@ -1696,6 +1715,20 @@ const en: Record<TranslationKey, string> = {
   "ob.codeSentTitle": "Verification code sent to your email!",
   "ob.codeFailed": "Couldn't send the code",
   "ob.profileReady": "Your profile is ready",
+  "ob.stepDealTitle": "Who wouldn't you live with?",
+  "ob.stepDealSub":
+    "Optional. People with the traits you pick never show up in your deck. You can change this later in your profile.",
+
+  "deal.title": "Dealbreakers",
+  "deal.sub": "People with the traits you pick never show up in your deck.",
+  "deal.mutual": "They won't see your listings either. Nobody is hidden for an unanswered question.",
+  "deal.smoking": "Smokers",
+  "deal.smokingDesc": "Homes that allow smoking are hidden too",
+  "deal.alcohol": "Drinkers",
+  "deal.pets": "Pet owners",
+  "deal.petsDesc": "Homes that allow pets are hidden too",
+  "deal.nightOwl": "Night owls",
+  "deal.earlyBird": "Early risers",
 
   // ---- safety ----
   "safety.backToApp": "Back to the app",

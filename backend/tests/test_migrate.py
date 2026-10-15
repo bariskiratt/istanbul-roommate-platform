@@ -210,6 +210,9 @@ def test_eksik_sutunlar_eklenir_ve_eski_veri_durur(legacy_db):
     assert listing["title"] == "Eski ilan"
     assert message["content"] == "eski düz metin mesaj"
     assert user["is_suspended"] == 0
+    # İstemediklerim boş liste olarak gelir (NULL değil): eski kullanıcı
+    # hiçbir şeyi elememiş sayılır ve yanıt şeması liste bulur.
+    assert user["dealbreakers"] == "[]"
     assert listing["is_flagged"] == 0
     assert listing["moderation_removed"] == 0
     assert message["moderation_removed"] == 0
