@@ -476,7 +476,7 @@ server's response.
 | Path | Page | Notes |
 | --- | --- | --- |
 | `/` | `Index` | Public landing page |
-| `/onboarding` | `Onboarding` | 7-step signup |
+| `/onboarding` | `Onboarding` | 8-step signup |
 | `/swipe` | `SwipeScreen` | The deck |
 | `/notifications` | — | Redirects to `/matches` (the old page duplicated it and was removed) |
 | `/matches` | `Matches` | Received likes |
@@ -807,8 +807,9 @@ Marketing page whose content is real: it fetches `GET /api/listings`
 Logged-in admins get a different CTA target (`:147`).
 
 **`Onboarding` — signup** (`src/pages/Onboarding.tsx`).
-Seven steps (`STEP_COUNT`, `:20`; the step blocks start at `:267`, `:327`,
-`:353`, `:404`, `:441`, `:518`, `:582`). Step 0 calls `POST /api/auth/register`
+Eight steps (`STEP_COUNT`). Step 6 is the optional dealbreaker question
+("who wouldn't you live with?", `src/components/DealbreakerPicker.tsx`, also on
+`ProfileEdit`); the server applies it, see `docs/ALGORITHMS.md` §4.5. Step 0 calls `POST /api/auth/register`
 (`:143`) and does not call it twice if the user walks back (`:140-144`); step 1
 verifies the e-mail code via `POST /api/auth/verify-otp`, logs in, and
 pre-fills the university the server derived from the e-mail domain (`:156-163`);

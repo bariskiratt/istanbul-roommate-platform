@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { BRAND } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,13 +21,14 @@ import {
 import PasswordInput from "@/components/PasswordInput";
 import DepartmentPicker from "@/components/DepartmentPicker";
 import DistrictMultiSelect from "@/components/DistrictMultiSelect";
+import DealbreakerPicker from "@/components/DealbreakerPicker";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
 import { useI18n } from "@/i18n";
 import Wordmark from "@/components/campus/Wordmark";
 import StudentCard from "@/components/campus/StudentCard";
 
-const STEP_COUNT = 7;
+const STEP_COUNT = 8;
 /** Kod doğrulanınca oturum açılır; buradan geriye (e-posta, kod) dönülmez. */
 const FIRST_PROFILE_STEP = 2;
 
@@ -34,6 +36,7 @@ const Onboarding = () => {
   const navigate = useNavigate();
   const { isLoggedIn, user, login, setUser } = useAuth();
   const { t, n } = useI18n();
+  const queryClient = useQueryClient();
   // Yenilemeden önce girilenler (bkz. lib/onboardingDraft.ts).
   const [draft] = useState(loadOnboardingDraft);
   const [currentStep, setCurrentStep] = useState(() => {
@@ -56,6 +59,7 @@ const Onboarding = () => {
   const [budget, setBudget] = useState(draft.budget);
   const [district, setDistrict] = useState<string[]>(draft.district);
   const [lifestyle, setLifestyle] = useState(draft.lifestyle);
+  const [dealbreakers, setDealbreakers] = useState(draft.dealbreakers);
   const [photos, setPhotos] = useState<string[]>(draft.photos);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -77,9 +81,9 @@ const Onboarding = () => {
   useEffect(() => {
     saveOnboardingDraft({
       step: currentStep, email, registeredEmail, name, gender, birthYear,
-      department, year, budget, district, lifestyle, photos,
+      department, year, budget, district, lifestyle, dealbreakers, photos,
     });
-  }, [currentStep, email, registeredEmail, name, gender, birthYear, department, year, budget, district, lifestyle, photos]);
+  }, [currentStep, email, registeredEmail, name, gender, birthYear, department, year, budget, district, lifestyle, dealbreakers, photos]);
 
   useEffect(() => {
     // Kaydı çoktan bitmiş hesabın burada işi yok; formu doldurup profilini
@@ -150,7 +154,8 @@ const Onboarding = () => {
       case 3: return department && year;  // üniversite otomatik; zorunlu değil
       case 4: return district.length > 0;
       case 5: return true;
-      case 6: return photos.length >= 1;
+      case 6: return true;  // istemediklerim isteğe bağlı
+      case 7: return photos.length >= 1;
       default: return false;
     }
   };
@@ -200,9 +205,13 @@ const Onboarding = () => {
           pets: lifestyle.pets,
           sleep_schedule: lifestyle.sleep,
           preferred_districts: district,
+          dealbreakers,
           photos,
         });
         setUser(me);
+        // Deste istemediklerime göre sunucuda süzülür; önceden çekilmiş
+        // bir liste varsa o seçim olmadan çekilmişti.
+        queryClient.invalidateQueries({ queryKey: ["listings"] });
         clearOnboardingDraft();
         toast.success(t("ob.profileReady"));
         navigate("/swipe");
@@ -227,17 +236,18 @@ const Onboarding = () => {
 
   const stepTitles = [
     t("ob.step1Title"), t("ob.step2Title"), t("ob.step3Title"), t("ob.step4Title"),
-    t("ob.step5Title"), t("ob.step6Title"), t("ob.step7Title"),
+    t("ob.step5Title"), t("ob.step6Title"), t("ob.stepDealTitle"), t("ob.step7Title"),
   ];
   const stepSubtitles = [
     t("ob.step1Sub"),
     t("ob.step2Sub", { email: email || t("ob.emailFallback") }),
-    t("ob.step3Sub"), t("ob.step4Sub"), t("ob.step5Sub"), t("ob.step6Sub"), t("ob.step7Sub"),
+    t("ob.step3Sub"), t("ob.step4Sub"), t("ob.step5Sub"), t("ob.step6Sub"),
+    t("ob.stepDealSub"), t("ob.step7Sub"),
   ];
 
   // Kayıt bir öğrenci kartı doldurmak gibi ilerler: kod doğrulandıktan sonra
   // ad, bölüm ve fotoğraf adımlarında kart canlı olarak dolar.
-  const showCard = currentStep === 2 || currentStep === 3 || currentStep === 6;
+  const showCard = currentStep === 2 || currentStep === 3 || currentStep === 7;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -566,8 +576,13 @@ const Onboarding = () => {
             </div>
           )}
 
-          {/* Step 6: Photos */}
+          {/* Step 6: İstemediklerim (kesin eleme, isteğe bağlı) */}
           {currentStep === 6 && (
+            <DealbreakerPicker value={dealbreakers} onChange={setDealbreakers} />
+          )}
+
+          {/* Step 7: Photos */}
+          {currentStep === 7 && (
             <div className="grid grid-cols-3 gap-3">
               {photos.map((photo, i) => (
                 <div key={i} className="aspect-[3/4] rounded-xl overflow-hidden border border-border relative">

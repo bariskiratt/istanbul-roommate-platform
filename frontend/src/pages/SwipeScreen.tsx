@@ -83,6 +83,8 @@ const SwipeScreen = () => {
   // Deste sıfırlama ucu sunucuda yalnızca yöneticiye açık; düğmeyi de öyle
   // gösteriyoruz ki kimse kesin 403 alacak bir işlem görmesin.
   const isAdmin = me?.is_admin === true;
+  // İstemediklerim sunucuda eler; boş destede kullanıcı sebebini bilsin.
+  const hasDealbreakers = (me?.dealbreakers?.length ?? 0) > 0;
 
   // Rapor kutusu kartın DIŞINDA durur: kart sürüklenirken transform aldığı
   // için içine konan `position: fixed` panel karta göre konumlanır ve ekranı
@@ -279,6 +281,18 @@ const SwipeScreen = () => {
             <p className="text-muted-foreground leading-relaxed">
               {t(activeFilters ? "swipe.emptyFiltered" : "swipe.emptyAll")}
             </p>
+            {hasDealbreakers && (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {t("swipe.emptyDealbreakers")}{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile/edit")}
+                  className="text-secondary font-semibold underline-offset-4 hover:underline"
+                >
+                  {t("swipe.editDealbreakers")}
+                </button>
+              </p>
+            )}
             {activeFilters ? (
               <Button variant="outline" onClick={() => setActiveFilters(null)}>
                 {t("swipe.clearFilters")}

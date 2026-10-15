@@ -916,6 +916,34 @@ the encryption model — and issues one query per match to find it
 (`swipes.py:302-308`), an N+1 that is bounded only by how many matches a user
 has.
 
+### 4.5 Dealbreakers are a hard filter, both ways
+
+`users.dealbreakers` holds the traits a person will not live with, from a closed
+list in `backend/app/dealbreakers.py`: `smoking`, `alcohol`, `pets`,
+`night_owl`, `early_bird`. Sign-up asks for them (optional) and the profile
+edit screen changes them. They filter; they do not rank.
+
+- **Listing lists** (`GET /api/listings` for a logged-in user, the deck
+  included; not `mine=1`, not anonymous requests) drop a listing when its owner
+  has a trait the viewer ruled out, or when the house rules allow it
+  (`smoking_allowed`, `pets_allowed` on a house listing). They also drop the
+  listing when the **owner** ruled out a trait the **viewer** has, so nobody
+  sends a like into a queue that will never show it.
+- **The Likes queue** (`GET /api/swipes/received`) hides likes from people with
+  a ruled-out trait. The swipe row is not touched, so removing the dealbreaker
+  brings the like back.
+- **Unknown is never a reason to hide.** Only an explicit "yes" (or a sleep
+  schedule of `gece` / `erken`) counts.
+- **Only fields the card already shows are used** (`Listing.owner_profile` and
+  the house rules). Budget, districts, bio, gender and age stay hidden on the
+  deck, and a filter on them would reveal them through who disappears. A
+  person's own dealbreakers are returned only to them (`UserOut`), never in
+  `UserPublic` or `owner_profile`.
+
+The filter runs in Python after the query (`listings.list_listings`), because
+the owner's choices live in a JSON column whose SQL differs between SQLite and
+Postgres; the owner row is already joined for `owner_profile`.
+
 ---
 
 ## 5. Where the constants live
@@ -1044,7 +1072,8 @@ Every tunable in this document, in one place:
     (`listings.py:332`) and the Likes queue is reverse-chronological
     (`swipes.py:218`). Budget overlap, university, district preference and
     lifestyle fields exist on `UserPublic` (`swipes.py:26-44`) and influence
-    nothing. There is no compatibility score in this codebase.
+    nothing beyond dealbreakers (§4.5), which hide people but do not reorder
+    anyone. There is no compatibility score in this codebase.
 25. **`GET /api/matches` is N+1** — one extra query per match for the last
     message (`swipes.py:302-308`).
 26. **Match creation is not idempotent under concurrency at the application

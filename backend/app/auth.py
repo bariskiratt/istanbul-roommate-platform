@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app import config, models
 from app.db import get_db
+from app.dealbreakers import DEALBREAKERS, Dealbreaker
 from app.departments import DEPARTMENT_GROUPS, is_valid as is_valid_department
 from app.emailer import send_otp_email
 from app.i18n import localized
@@ -508,8 +509,17 @@ class UserOut(BaseModel):
     preferred_districts: list[str]
     bio: str
     photos: list[str]
+    # Kişinin kendi "istemediklerim" seçimi; yalnızca kendisine döner.
+    dealbreakers: list[str] = []
     created_at: datetime
     is_admin: bool = False
+
+    @field_validator("dealbreakers", mode="before")
+    @classmethod
+    def _no_null_dealbreakers(cls, v):
+        # Migrasyon eski satırlara boş liste yazar; NULL yine de 500'e
+        # düşürmesin.
+        return v or []
 
 
 # LİSTE ALANLARININ SINIRLARI — HEM ÖĞE SAYISI HEM ÖĞE UZUNLUĞU.
@@ -588,6 +598,16 @@ class UserUpdate(BaseModel):
     )
     bio: str | None = Field(None, max_length=2000)
     photos: list[PhotoUrl] | None = Field(None, max_length=MAX_PHOTOS)
+    # Kapalı liste (app.dealbreakers). Boş liste ya da null: eleme yok.
+    dealbreakers: list[Dealbreaker] | None = Field(
+        None, max_length=len(DEALBREAKERS)
+    )
+
+    @field_validator("dealbreakers")
+    @classmethod
+    def _dedupe_dealbreakers(cls, v: list[str] | None) -> list[str]:
+        # null "hepsini kaldır" demektir; sütun NULL tutmaz.
+        return list(dict.fromkeys(v or []))
 
 
 class TokenOut(BaseModel):

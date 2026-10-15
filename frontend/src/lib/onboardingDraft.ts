@@ -1,7 +1,9 @@
+import { normalizeDealbreakers, type Dealbreaker } from "./dealbreakers";
+
 /**
  * Kayıt formunun yarım kalmış hâli.
  *
- * Kayıt yedi adım sürüyor ve kullanıcı kodu almak için posta uygulamasına
+ * Kayıt sekiz adım sürüyor ve kullanıcı kodu almak için posta uygulamasına
  * geçiyor; telefon tarayıcısı o arada sekmeyi yeniden yükleyebiliyor.
  * Eskiden her yenileme formu sıfırlıyordu: kod adımındaki kişi e-postayı
  * yeniden yazınca "zaten kayıtlı" hatası alıyor, profil adımlarındaki kişi
@@ -25,6 +27,8 @@ export interface OnboardingDraft {
   budget: number[];
   district: string[];
   lifestyle: { smoking: boolean; alcohol: boolean; pets: boolean; sleep: string };
+  /** İstemediklerim; okurken bilinmeyen anahtarlar atılır. */
+  dealbreakers: Dealbreaker[];
   photos: string[];
 }
 
@@ -42,6 +46,7 @@ export const EMPTY_ONBOARDING_DRAFT: OnboardingDraft = {
   budget: [4000, 8000],
   district: [],
   lifestyle: { smoking: false, alcohol: false, pets: false, sleep: "esnek" },
+  dealbreakers: [],
   photos: [],
 };
 
@@ -63,6 +68,9 @@ export const loadOnboardingDraft = (): OnboardingDraft => {
   } catch {
     // Gizli sekme ya da bozuk JSON: boş formla devam edilir.
   }
+  // Tür (dizi) tutsa da içerik eski ya da bozuk olabilir; sunucu bilinmeyen
+  // anahtarı reddeder ve kayıt son adımda takılırdı.
+  draft.dealbreakers = normalizeDealbreakers(draft.dealbreakers);
   return draft;
 };
 
