@@ -8,6 +8,7 @@
 
 import { detectLang, translate } from "@/i18n";
 import { describeApiError } from "@/lib/apiError";
+import type { Dealbreaker } from "@/lib/dealbreakers";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
@@ -384,6 +385,11 @@ export interface ApiUser {
   preferred_districts: string[];
   bio: string;
   photos: string[];
+  /**
+   * Kesinlikle istemediği özellikler (bkz. lib/dealbreakers.ts). Yalnızca
+   * kişinin kendi profilinde gelir; okurken normalizeDealbreakers'tan geçir.
+   */
+  dealbreakers?: string[];
   created_at: string;
   is_admin: boolean;
 }
@@ -404,6 +410,7 @@ export interface UserUpdate {
   preferred_districts?: string[];
   bio?: string;
   photos?: string[];
+  dealbreakers?: Dealbreaker[];
 }
 
 export const registerUser = (email: string, password: string) =>

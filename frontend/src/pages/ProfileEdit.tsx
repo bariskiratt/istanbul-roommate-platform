@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, X, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { type ApiUser, updateMe } from "@/lib/api";
 import { usePhotoUpload } from "@/hooks/use-photo-upload";
 import DepartmentPicker from "@/components/DepartmentPicker";
 import DistrictMultiSelect from "@/components/DistrictMultiSelect";
+import DealbreakerPicker from "@/components/DealbreakerPicker";
+import { normalizeDealbreakers } from "@/lib/dealbreakers";
 import { useI18n } from "@/i18n";
 
 /**
@@ -38,6 +41,7 @@ const ProfileEditForm = ({ me }: { me: ApiUser }) => {
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const { t, n } = useI18n();
+  const queryClient = useQueryClient();
 
   const [name, setName] = useState(me.name ?? "");
   const [department, setDepartment] = useState(me.department ?? "");
@@ -51,6 +55,7 @@ const ProfileEditForm = ({ me }: { me: ApiUser }) => {
   const [alcohol, setAlcohol] = useState(me.alcohol ?? false);
   const [pets, setPets] = useState(me.pets ?? false);
   const [sleep, setSleep] = useState(me.sleep_schedule ?? "esnek");
+  const [dealbreakers, setDealbreakers] = useState(() => normalizeDealbreakers(me.dealbreakers));
   const [bio, setBio] = useState(me.bio ?? "");
   const [photos, setPhotos] = useState<string[]>(me.photos ?? []);
   const [saving, setSaving] = useState(false);
@@ -73,10 +78,15 @@ const ProfileEditForm = ({ me }: { me: ApiUser }) => {
         alcohol,
         pets,
         sleep_schedule: sleep,
+        dealbreakers,
         bio,
         photos,
       });
       setUser(updated);
+      // Deste ve Beğeniler istemediklerime (ve kendi alışkanlıklarıma) göre
+      // sunucuda süzülüyor; ikisi de yeni seçimle yeniden çekilmeli.
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      queryClient.invalidateQueries({ queryKey: ["received-likes"] });
       toast.success(t("pedit.saved"));
       navigate("/profile");
     } catch (err) {
@@ -225,6 +235,15 @@ const ProfileEditForm = ({ me }: { me: ApiUser }) => {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* İstemediklerim: kesin eleme (bkz. lib/dealbreakers.ts) */}
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-xl text-foreground">{t("deal.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("deal.sub")}</p>
+          </div>
+          <DealbreakerPicker value={dealbreakers} onChange={setDealbreakers} />
         </section>
 
         {/* Bio */}

@@ -29,7 +29,9 @@ class _Column:
     sql_type: str
     # None: varsayılan yok (NULL = belirtilmemiş).
     # False/True: ALTER TABLE ile eklenirken mevcut satırlara da yazılır.
-    default: bool | None = None
+    # str: SQL'e olduğu gibi yazılan sabit (ör. boş JSON listesi için
+    # "'[]'"); o da mevcut satırlara yazılır.
+    default: bool | str | None = None
     references: str | None = None
 
 
@@ -54,6 +56,9 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
         _Column("unsuspended_at", "TIMESTAMP"),
         _Column("unsuspended_by", "INTEGER", references="users(id)"),
         _Column("last_suspension_reason", "VARCHAR(500)"),
+        # İstemediklerim — eski kullanıcılar hiçbir şeyi elememiş sayılır.
+        # NULL değil boş liste: yanıt şeması liste bekliyor.
+        _Column("dealbreakers", "JSON", default="'[]'"),
     ),
     "listings": (
         # Auth öncesi dönemden kalan tablolarda olmayabilir.
@@ -138,7 +143,9 @@ def _existing_columns(conn, table: str, dialect: str) -> set[str]:
     return {col["name"] for col in inspect(conn).get_columns(table)}
 
 
-def _default_literal(default: bool, dialect: str) -> str:
+def _default_literal(default: bool | str, dialect: str) -> str:
+    if isinstance(default, str):
+        return default
     if dialect == "postgresql":
         return "TRUE" if default else "FALSE"
     # SQLite (ve diğerleri) boolean'ı tam sayı olarak saklar.

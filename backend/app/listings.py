@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
 
-from app import content_limits, models, moderation
+from app import content_limits, dealbreakers, models, moderation
 from app.auth import get_current_user, get_optional_user
 from app.blocks import blocked_ids, is_blocked
 from app.db import get_db
@@ -443,6 +443,9 @@ def list_listings(
 ):
     """Aktif ilanlar, en yeni önce.
 
+    Giriş yapan kullanıcının "istemediklerim" seçimi uygulanır (bkz.
+    app.dealbreakers); kendi ilanları (mine=1) hariç.
+
     mine=1 sahibinin KENDİ kapattığı ve onay bekleyen ilanlarını da
     döndürür: kapattığı ilanı "İlanlarım"da görüp yeniden yayınlayabilsin,
     onay bekleyeni de kaybolmuş sanmasın. Yöneticinin kaldırdığı ilan
@@ -499,6 +502,12 @@ def list_listings(
     rows = db.scalars(stmt).all()
     if user is None:
         return [_hide_owner(row) for row in rows]
+    if not mine:
+        # İstemediklerim (app.dealbreakers): kişinin elediği ya da onu eleyen
+        # sahiplerin ilanları gelmez. Sahibin profili zaten yüklü (joinedload);
+        # kural SQL yerine burada, çünkü sahibin seçimleri JSON listesinde ve
+        # JSON sorgusu SQLite ile Postgres'te ayrı yazılırdı.
+        rows = [row for row in rows if not dealbreakers.hides_listing(user, row)]
     return rows
 
 

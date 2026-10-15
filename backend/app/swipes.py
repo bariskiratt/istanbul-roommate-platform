@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app import content_limits, crypto, models, moderation
+from app import content_limits, crypto, dealbreakers, models, moderation
 from app.auth import get_current_user
 from app.blocks import blocked_ids, is_blocked
 from app.db import get_db
@@ -426,6 +426,10 @@ def received_likes(
 ):
     """İlanlarımı beğenen, henüz cevaplamadığım kullanıcılar (en yeni önce).
 
+    "İstemediklerim"de elediğim bir özelliği taşıyan kişinin beğenisi
+    gösterilmez (bkz. app.dealbreakers). Beğeni SİLİNMEZ ve yanıtlanmış da
+    sayılmaz: seçim kaldırılınca kuyruğa geri gelir.
+
     Satır başına bir BEĞENİ döner (hangi ilan, neyi, yorum). Arayüz bunları
     kişiye göre gruplar (frontend/src/lib/likeGroups.ts) ve kararı kişiye
     verir; respond_to_like da kararı o kişinin bütün bekleyen beğenilerine
@@ -449,6 +453,7 @@ def received_likes(
         )
         .order_by(models.Swipe.created_at.desc(), models.Swipe.id.desc())
     ).all()
+    rows = [s for s in rows if not dealbreakers.hides_person(user, s.swiper)]
     return [
         {
             "swipe_id": s.id,
