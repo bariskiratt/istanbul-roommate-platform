@@ -1,0 +1,20 @@
+# Lambda imajının bağımlılıkları: yalnızca modeli yükleyip tahmin etmek için.
+#
+# Sürümler backend/requirements.txt'tekilerle AYNI olmalı: model joblib
+# (pickle) ile saklanıyor ve eğiten tarafla (GitHub Actions, backend
+# requirements.txt) farklı bir LightGBM/scikit-learn/pandas sürümü onu ya hiç
+# açamaz ya da sessizce farklı tahmin üretir. tests/test_requirements.py
+# ikisini karşılaştırır; backend'de biri yükseltilirse CI burayı da ister.
+# boto3 Lambda çalışma zamanında hazır geldiği için kurulmaz.
+cloudpickle==3.1.2
+joblib==1.6.0
+lightgbm==4.7.0
+narwhals==2.27.1
+numpy==2.5.3
+pandas==3.0.6
+python-dateutil==2.9.0.post0
+scikit-learn==1.9.1
+scipy==1.18.1
+six==1.17.0
+threadpoolctl==3.7.0
+tzdata==2026.5

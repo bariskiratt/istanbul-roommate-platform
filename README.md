@@ -38,7 +38,9 @@ API locally with `API_DOCS=1` to see them)
 Long-form engineering documentation lives in [`docs/`](docs/) — architecture,
 the fair-rent model, the non-ML algorithms, the frontend, and a security audit.
 [`docs/README.md`](docs/README.md) says which document answers which question
-and in what order to read them. Deployment is [DEPLOY.md](DEPLOY.md).
+and in what order to read them. Deployment is [DEPLOY.md](DEPLOY.md). The
+optional AWS service for the fair-rent model (S3, Lambda, API Gateway,
+Terraform, GitHub OIDC) is [`docs/AWS.md`](docs/AWS.md).
 
 ## 🧠 Models & method
 
@@ -61,10 +63,16 @@ Details in [`docs/MODEL.md`](docs/MODEL.md). Summary:
 ## 🏗️ Architecture
 
 ```
-frontend/   React + TypeScript + Vite + Tailwind + shadcn/ui  →  Vercel
-backend/    FastAPI + SQLAlchemy + LightGBM (Docker)          →  Render
-            SQLite locally, Postgres in production
+frontend/            React + TypeScript + Vite + Tailwind + shadcn/ui  →  Vercel
+backend/             FastAPI + SQLAlchemy + LightGBM (Docker)          →  Render
+                     SQLite locally, Postgres in production
+services/fairprice/  fair-rent model inference (container image)       →  AWS Lambda (optional)
+infra/               Terraform: S3, ECR, Lambda, API Gateway, IAM/OIDC, CloudWatch
 ```
+
+With AWS configured, the backend asks the Lambda for the price band and falls
+back to its in-process model on any error or timeout; models are trained in
+GitHub Actions, gated on quality and versioned in S3 ([`docs/AWS.md`](docs/AWS.md)).
 
 Key backend modules:
 
@@ -79,14 +87,16 @@ app/moderation.py rule-based content checks (always on, no network)
 app/moderation_ai.py  optional AI moderation layer (ANTHROPIC_API_KEY)
 app/reports.py    user reports + admin guard (require_admin)
 app/uploads.py    photo upload + static serving
-app/pricing.py    feature engineering (shared by training & serving)
+app/pricing.py    feature engineering (shared by training, backend & Lambda)
+app/rent_model.py where the model comes from (S3 or image) and who computes the band (Lambda or local)
 app/indexing.py   CPI (TÜFE) indexing of model output
 app/admin.py      admin panel endpoints (/api/admin/*)
 app/locations.py  district -> neighbourhood list, filtered to model coverage
 app/content_limits.py  per-user quotas on content endpoints
 app/migrate.py    additive schema migration + drift warning on startup
 app/emailer.py    OTP email via Brevo
-scripts/          offline: train_model, build_market_values, fetch_transit
+scripts/          offline: train_model, publish_model (S3 + quality gate),
+                  build_market_values, fetch_transit
 ```
 
 ## 🛡️ Moderation & the admin panel

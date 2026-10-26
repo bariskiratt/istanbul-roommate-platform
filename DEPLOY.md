@@ -552,6 +552,15 @@ of type hosted even after multiple attempts` — twice in 121 runs). The workflo
 was removed rather than retuned: a shorter cron does not help when GitHub is
 already delivering 10% of the requested schedule.
 
+## 6) Optional: the fair-rent model on AWS
+
+Nothing here is required: without it the backend serves the model trained into
+its own image. With it, models are trained in GitHub Actions and stored in S3,
+and price bands come from an AWS Lambda behind API Gateway, with the
+in-process model as an automatic fallback. Architecture, security and the
+nine setup steps (Terraform apply, the `AWS_ROLE_ARN` repository variable, the
+four `FAIRPRICE_*` variables below) are in [docs/AWS.md](docs/AWS.md).
+
 ## Environment variables (backend)
 
 | Variable | Default | What it does / what happens if unset |
@@ -576,4 +585,8 @@ already delivering 10% of the requested schedule.
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
 | `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
 | `PHOTO_SWEEP` | `1` | `0` stops the background job that deletes uploaded photos no record uses (section 1.5). It never runs when `S3_BUCKET` is set and `DATABASE_URL` is not. |
+| `FAIRPRICE_MODEL_BUCKET` | — | Optional, AWS ([docs/AWS.md](docs/AWS.md)). S3 bucket holding the trained models; at startup the model `fair-price/latest.json` points to is loaded if its checksum and feature signature match this code. Unset or unusable → the model trained into the image is used, as before. |
+| `FAIRPRICE_URL` | — | Optional, AWS. The Lambda's `…/predict` URL (Terraform output `predict_url`). Set (with the two keys below) → price bands come from the Lambda, with the in-process model as fallback on any error or a 3 s timeout. Unset → bands are computed in-process. |
+| `FAIRPRICE_AWS_ACCESS_KEY_ID` / `FAIRPRICE_AWS_SECRET_ACCESS_KEY` | — | Key of the `evdes-render-backend` IAM user, which may only read models and call `/predict`. Without them `FAIRPRICE_URL` is ignored. |
+| `FAIRPRICE_TIMEOUT` | `3` | Seconds to wait for the Lambda before answering from the in-process model. |
 | `PHOTO_SCRUB` | `1` | `0` stops the one-time background job that removes location and other metadata from photos uploaded before uploads were re-encoded (section 1.5). Same guard as `PHOTO_SWEEP`. |

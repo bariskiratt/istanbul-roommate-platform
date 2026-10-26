@@ -13,11 +13,8 @@ Not: odalar eşit büyüklükte varsayılır; ilan verilerinde oda metrekaresi
 yok. Fark varsa ilan sahibi kirayı elle ayarlar.
 """
 
-import numpy as np
-import pandas as pd
-
+from app import rent_model
 from app.indexing import DATA_PERIOD, is_configured, rent_index
-from app.pricing import build_features
 
 # Model tahmini için ilçe geneli varsayılanları (ilanlarda m²/yaş/kat yok)
 DEFAULT_AREA = {1: 55.0, 2: 90.0, 3: 125.0, 4: 160.0}
@@ -74,25 +71,20 @@ def estimate_for_listing(
 
     rooms = parse_rooms(room_count)
     resolved = resolve_neighborhood(model, neighborhood)
-    features = build_features(
-        pd.DataFrame([{
-            "room": rooms,
-            "living room": 1,
-            "area (m2)": DEFAULT_AREA.get(rooms, 90.0),
-            "age": DEFAULT_AGE,
-            "floor": DEFAULT_FLOOR,
-            "district": district.strip(),
-            # Boş dize = mahalle bilinmiyor; model ilçe genelinden tahmin eder.
-            "neighborhood": resolved,
-        }]),
-        model["categories"],
-    )
+    # Bant AWS Lambda'dan (tanımlıysa) ya da yerel modelden (app/rent_model.py).
+    (band,), served_by = rent_model.bands(model, [{
+        "room": rooms,
+        "living_room": 1,
+        "area": DEFAULT_AREA.get(rooms, 90.0),
+        "age": DEFAULT_AGE,
+        "floor": DEFAULT_FLOOR,
+        "district": district,
+        # Boş dize = mahalle bilinmiyor; model ilçe genelinden tahmin eder.
+        "neighborhood": resolved,
+    }])
 
     factor, indexed_to = rent_index()
-    band = sorted(
-        float(np.exp(m.predict(features)[0])) * factor
-        for m in model["models"].values()
-    )
+    band = [v * factor for v in band]
     flat_low, flat_mid, flat_high = band
     room_low, room_mid, room_high = (v / rooms for v in band)
 
@@ -128,4 +120,6 @@ def estimate_for_listing(
         # Kullanılan mahalle (yoksa/tanınmadıysa None) — arayüz "Kadıköy geneli"
         # ile "Caferağa Mah." arasındaki farkı dürüstçe yazabilsin diye.
         "neighborhood": resolved or None,
+        # "lambda" ya da "local": bandı kim hesapladı (docs/AWS.md).
+        "served_by": served_by,
     }

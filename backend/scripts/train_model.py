@@ -2,9 +2,17 @@
 
 Çalıştırma:  python -m scripts.train_model
 Çıktı:       models/fair_price_model.joblib
+             models/metrics.json  (kalite ölçümleri + kimlik; S3'e yüklenirken
+                                   kalite kapısı bunu okur, bkz. publish_model.py)
 """
 
+import hashlib
+import json
+import os
+import subprocess
 import warnings
+from datetime import datetime, timezone
+from importlib.metadata import version
 
 import joblib
 import lightgbm as lgb
@@ -16,12 +24,14 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 
-from app.config import MODEL_PATH
+from app.config import MODEL_METRICS_PATH, MODEL_PATH
 from app.pricing import (
     CATEGORICAL_FEATURES,
+    MODEL_LIBRARIES,
     NUMERIC_FEATURES,
     build_features,
     extract_categories,
+    feature_signature,
     load_clean_data,
 )
 
@@ -143,18 +153,65 @@ def baseline_metrics(X, y, df):
     return metrics(y.values, oof)
 
 
-def single_fold_medape(X, y) -> float:
-    """Hızlı mod için tek katlı (%80/20) medyan sapma ölçümü.
+def holdout_metrics(X, y) -> dict:
+    """Tek katlı (%80/20) ölçüm: servis edilen bandın tamamı sınanır.
 
-    5-kat CV'nin onda biri maliyetle kabaca aynı sayıyı verir; amaç API'de
-    kullanıcıya gösterilen 'medyan sapma' alanını dürüstçe doldurmak.
+    5-kat CV'nin onda biri maliyetle medyan sapmayı kabaca aynı verir; amaç
+    API'de kullanıcıya gösterilen 'medyan sapma' alanını dürüstçe doldurmak.
+    Bandın kapsaması da ölçülür: q25–q75 arası, ayrılmış ilanların yaklaşık
+    yarısını içermeli. Yalnız q50'nin hatasına bakan bir kalite kapısı, uçları
+    bozulmuş (ör. q25 > q75) bir modeli geçirirdi.
     """
     kf = KFold(n_splits=5, shuffle=True, random_state=SEED)
     train_idx, test_idx = next(iter(kf.split(X)))
-    model = make_lgbm(objective="quantile", alpha=0.5)
-    model.fit(X.iloc[train_idx], y.iloc[train_idx])
-    pred = model.predict(X.iloc[test_idx])
-    return float(metrics(y.iloc[test_idx].values, pred)["MedAPE%"])
+    preds = {}
+    for label, alpha in QUANTILES.items():
+        model = make_lgbm(objective="quantile", alpha=alpha)
+        model.fit(X.iloc[train_idx], y.iloc[train_idx])
+        preds[label] = model.predict(X.iloc[test_idx])
+    actual = y.iloc[test_idx].values
+    low = np.minimum(preds["low"], preds["high"])
+    high = np.maximum(preds["low"], preds["high"])
+    return {
+        "medape": float(metrics(actual, preds["mid"])["MedAPE%"]),
+        "band_coverage": float(np.mean((actual >= low) & (actual <= high))),
+    }
+
+
+def _git_commit() -> str | None:
+    """Eğitilen kodun commit'i (Docker derlemesinde .git yok: None)."""
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return os.getenv("GITHUB_SHA")
+
+
+def write_metrics(artifact: dict, holdout: dict, df, fast: bool) -> dict:
+    """Modelin yanına kimliğini ve ölçümlerini yazar (models/metrics.json).
+
+    sha256 kaydedilen dosyanın kendisinden hesaplanır: S3'ten indiren taraf
+    (backend, Lambda) indirdiği baytların bu dosya olduğunu doğrular.
+    """
+    baseline = artifact["baseline_medape"]
+    record = {
+        "signature": artifact["signature"],
+        "sha256": hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest(),
+        "served_model": artifact["served_model"],
+        "served_medape": round(artifact["served_medape"], 3),
+        "band_coverage": round(holdout["band_coverage"], 4),
+        "baseline_medape": None if np.isnan(baseline) else round(baseline, 3),
+        "n_samples": int(len(df)),
+        "n_districts": int(df["district"].nunique()),
+        "n_neighborhoods": int(df["neighborhood"].nunique()),
+        "fast": fast,
+        "git_commit": _git_commit(),
+        "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "libraries": {name: version(name) for name in MODEL_LIBRARIES},
+    }
+    MODEL_METRICS_PATH.write_text(json.dumps(record, indent=2) + "\n")
+    return record
 
 
 def main(fast: bool = False):
@@ -168,11 +225,12 @@ def main(fast: bool = False):
     print(f"   {len(df)} ilan, {X['district'].nunique()} ilçe, "
           f"{X['neighborhood'].nunique()} mahalle")
 
+    holdout = holdout_metrics(X, y)
     if fast:
         print("\n⚡ Hızlı mod: CV karşılaştırması atlanıyor; servis edilen "
               "modelin hatası tek katla ölçülüyor.")
         table = None
-        served_error = single_fold_medape(X, y)
+        served_error = holdout["medape"]
         baseline_error = float("nan")
         print(f"   Servis edilen LightGBM q50 medyan sapma: %{served_error:.1f}")
     else:
@@ -218,10 +276,16 @@ def main(fast: bool = False):
         "served_medape": float(served_error),
         "baseline_medape": float(baseline_error),
         "n_samples": len(df),
+        # Yükleyen taraf (backend, Lambda) bu imzayı kendi pricing.py'siyle
+        # karşılaştırır; tutmazsa modeli kullanmaz (pricing.feature_signature).
+        "signature": feature_signature(),
     }
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifact, MODEL_PATH)
     print(f"\n💾 '{MODEL_PATH.relative_to(MODEL_PATH.parent.parent)}' kaydedildi.")
+    record = write_metrics(artifact, holdout, df, fast)
+    print(f"   Bant kapsaması (q25–q75, ayrılmış %20): "
+          f"%{record['band_coverage'] * 100:.0f} · imza {record['signature']}")
 
     # Örnek tahmin — makul mü diye gözle bak.
     print("\n🔍 Örnek: Kadıköy / Caferağa Mah., 2+1, 90 m², 20 yaş, 3. kat")

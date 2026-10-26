@@ -1,0 +1,7 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+# Kişisel değerler (e-posta); örneği terraform.tfvars.example
+terraform.tfvars

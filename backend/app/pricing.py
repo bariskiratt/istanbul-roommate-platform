@@ -5,6 +5,10 @@ yoksa modele eğitimdekinden farklı dağılımlı veri gider. Bu yüzden tüm
 temizlik ve özellik üretimi tek yerde tutuluyor.
 """
 
+import hashlib
+from importlib.metadata import version
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -25,6 +29,16 @@ BOUNDS = {
     "room": (1, 11),
     "floor": (-3, 30),
 }
+
+# Tahmin isteğinin ham alanları (API anahtarları). Backend ile AWS Lambda'daki
+# tahmin servisi (services/fairprice) arasındaki sözleşme bu alanlardır, özellik
+# matrisi değil: iki taraf da özellikleri aşağıdaki build_features ile kendi
+# üretir, böylece tahmin servisine model ile uyumsuz bir matris gidemez.
+ROW_FIELDS = ("room", "living_room", "area", "age", "floor", "district", "neighborhood")
+
+# Modelin kimliğine giren kütüphaneler: model joblib (pickle) ile saklandığı
+# için yükleyen tarafın sürümleri eğitendekiyle aynı olmalı.
+MODEL_LIBRARIES = ("lightgbm", "scikit-learn", "pandas", "numpy")
 
 NUMERIC_FEATURES = ["room", "living room", "log_area", "age", "floor"]
 CATEGORICAL_FEATURES = ["district", "neighborhood"]
@@ -69,11 +83,13 @@ def build_features(df, categories=None):
 
     for column in CATEGORICAL_FEATURES:
         values = df[column].astype(str)
-        dtype = (
-            pd.CategoricalDtype(categories[column])
-            if categories is not None
-            else pd.CategoricalDtype(sorted(values.unique()))
-        )
+        if categories is None:
+            dtype = pd.CategoricalDtype(sorted(values.unique()))
+        else:
+            dtype = pd.CategoricalDtype(categories[column])
+            # Görülmemiş değeri açıkça NaN yap: pandas bunu astype içinde
+            # sessizce yapmayı bırakıp hata vermeye geçiyor (Pandas4Warning).
+            values = values.where(values.isin(categories[column]))
         X[column] = values.astype(dtype)
 
     return X[FEATURES]
@@ -82,3 +98,47 @@ def build_features(df, categories=None):
 def extract_categories(X):
     """Eğitimde kullanılan kategori listelerini çıkarır (serviste yeniden kullanmak için)."""
     return {c: list(X[c].cat.categories) for c in CATEGORICAL_FEATURES}
+
+
+def feature_signature() -> str:
+    """Bu kodla eğitilmiş modelleri tanıyan kısa parmak izi.
+
+    Model artık eğitildiği yerden (GitHub Actions) başka yerlerde de
+    yükleniyor: S3'ten indiren backend ve AWS Lambda'daki tahmin servisi.
+    Bu dosyadaki özellik üretimi ya da kütüphane sürümleri değişmişse eski
+    model sessizce yanlış tahmin verir (eğitim/servis kayması). Parmak izi bu
+    dosyanın içeriğinden ve MODEL_LIBRARIES sürümlerinden üretilir; eğitim
+    modele yazar, yükleyen taraf kendi hesapladığıyla karşılaştırır ve
+    tutmayan modeli kullanmaz. Bilerek katı: yorum değişikliği de yeni bir
+    imza demektir, bu da yalnızca modelin (birkaç saniyede) yeniden
+    eğitilmesine yol açar.
+    """
+    digest = hashlib.sha256(Path(__file__).read_bytes())
+    for package in MODEL_LIBRARIES:
+        digest.update(f"|{package}=={version(package)}".encode())
+    return digest.hexdigest()[:16]
+
+
+def predict_band(model, rows):
+    """Her satır için dairenin tamamının ham kira bandını döndürür.
+
+    `rows`: ROW_FIELDS anahtarlı sözlükler. Dönüş: her satır için sıralı
+    (low, mid, high) TL, modelin eğitim dönemi fiyatıyla (TÜFE endekslemesi
+    ve oda payına bölme çağıranın işi). Backend'in yerel yolu ile Lambda
+    servisi aynı fonksiyonu çağırır; eşlik testi
+    (services/fairprice/parity_check.py) ikisinin aynı sayıyı verdiğini sınar.
+    """
+    frame = pd.DataFrame([{
+        "room": row["room"],
+        "living room": row["living_room"],
+        "area (m2)": row["area"],
+        "age": row["age"],
+        "floor": row["floor"],
+        "district": str(row["district"]).strip(),
+        # Boş dize = mahalle bilinmiyor; model ilçe genelinden tahmin eder.
+        "neighborhood": str(row.get("neighborhood") or "").strip(),
+    } for row in rows])
+    features = build_features(frame, model["categories"])
+    columns = [np.exp(m.predict(features)) for m in model["models"].values()]
+    # Çeyreklik modelleri bağımsız eğitildiği için nadiren sıra bozulabilir.
+    return [tuple(sorted(float(v) for v in values)) for values in zip(*columns)]

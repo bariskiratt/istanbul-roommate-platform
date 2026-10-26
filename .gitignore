@@ -32,3 +32,6 @@ istanbul-real-estate-heatmap/
 # Derleme anında üretilir (npm run seo / prebuild)
 frontend/public/semt/
 frontend/public/sitemap.xml
+
+# train_model.py yazar (S3 ve CI için kimlik + ölçümler)
+backend/models/metrics.json
