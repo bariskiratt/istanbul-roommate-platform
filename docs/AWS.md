@@ -49,7 +49,7 @@ flowchart LR
 |---|---|---|
 | Model bucket | S3, versioned, private, TLS-only. One immutable folder per trained model plus a `latest.json` pointer. | `infra/storage.tf` |
 | Image registry | ECR, immutable tags, scan on push, keeps the last 10 images. | `infra/service.tf` |
-| Prediction service | Lambda (container image, 1 GB, 10 s), a `live` alias, warmed every 5 minutes. | `infra/modules/predict-service/lambda.tf`, `services/fairprice/` |
+| Prediction service | Lambda (container image, 1 GB, 30 s), a `live` alias, warmed every 5 minutes. | `infra/modules/predict-service/lambda.tf`, `services/fairprice/` |
 | HTTP front door | API Gateway HTTP API, `POST /predict`, **IAM authorization**, throttled. | `infra/modules/predict-service/api.tf` |
 | CI identity | An IAM user whose key is a GitHub secret (default), or, on a classic account, a GitHub OIDC provider + a role only `main` of this repository can assume (`github_oidc = true`). Same permissions either way. | `infra/github.tf` |
 | Backend identity | IAM user for Render: read models, call `/predict`. Nothing else. | `infra/render.tf` |
