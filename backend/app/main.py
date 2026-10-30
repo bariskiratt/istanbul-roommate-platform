@@ -5,10 +5,9 @@ import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
-import joblib
-import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -19,7 +18,6 @@ from sqlalchemy.orm import Session
 from app.config import (
     API_DOCS,
     MARKET_VALUES_CSV,
-    MODEL_PATH,
     NEIGHBORHOOD_GEOJSON,
 )
 from app.admin import router as admin_router
@@ -33,7 +31,7 @@ from app.heatmap import (
     index_market_prices,
 )
 from app.i18n import LanguageMiddleware, localized
-from app import locations
+from app import locations, rent_model
 from app.indexing import DATA_PERIOD, is_configured, rent_index
 from app.listings import router as listings_router
 from app.messages import router as messages_router
@@ -41,7 +39,7 @@ from app.reports import router as reports_router
 from app.swipes import router as swipes_router
 from app import uploads
 from app.uploads import router as uploads_router
-from app.pricing import BOUNDS, build_features
+from app.pricing import BOUNDS
 from app.transit import TRANSIT_PATH, AccessibilityIndex, TransitNetwork
 
 
@@ -115,14 +113,21 @@ async def lifespan(_app: FastAPI):
     else:
         print("⚠️  GeoJSON boş — harita uçları veri döndürmeyecek.")
 
-    # Adil fiyat modeli opsiyonel: yoksa harita yine de çalışsın.
-    if MODEL_PATH.exists():
-        STATE["model"] = joblib.load(MODEL_PATH)
-        print(f"✅ Adil fiyat modeli yüklendi "
-              f"(medyan sapma %{STATE['model']['served_medape']:.1f}).")
+    # Adil fiyat modeli opsiyonel: yoksa harita yine de çalışsın. Kaynak S3
+    # (FAIRPRICE_MODEL_BUCKET) ya da imajdaki dosya; bkz. app/rent_model.py.
+    model, model_info = rent_model.load_model()
+    STATE["model_info"] = model_info
+    if model is not None:
+        STATE["model"] = model
+        source = model_info["version"] or model_info["source"]
+        print(f"✅ Adil fiyat modeli yüklendi ({source}; "
+              f"medyan sapma %{model['served_medape']:.1f}).")
     else:
-        print(f"⚠️  Model yok ({MODEL_PATH}) — /api/estimate devre dışı. "
-              f"Eğitmek için: python -m scripts.train_model")
+        print("⚠️  Model yok — /api/estimate devre dışı. "
+              "Eğitmek için: python -m scripts.train_model")
+    if rent_model.remote_configured():
+        print("✅ Adil fiyat bandı AWS Lambda'dan istenecek (FAIRPRICE_URL); "
+              "hata olursa yerel model.")
 
     # /api/locations yanıtı sabit; ilk istekte değil burada kurulur.
     # Model varsa liste onun tanıdığı mahallelerle sınırlanır (bkz. locations.py).
@@ -519,6 +524,9 @@ def health(db: Session = Depends(get_db)):
         print(f"⚠️  /api/health: veritabanına ulaşılamadı: {exc}")
         database = "error"
     status = {"database": database, **uploads.photo_storage_status()}
+    # Bilgi amaçlı: yüklü model sürümü ve Lambda yolu. Sağlık kararına girmez,
+    # çünkü ikisi de bozulduğunda site yerel modelle çalışmaya devam eder.
+    status["fair_price"] = rent_model.status(STATE.get("model_info"))
     healthy = database == "ok" and status.get("photo_bucket") != "error"
     return JSONResponse(status, status_code=200 if healthy else 503)
 
@@ -589,25 +597,21 @@ async def estimate(payload: EstimateRequest):
     """İlan özelliklerinden adil kira aralığı tahmin eder."""
     model = _require_model()
 
-    features = build_features(
-        pd.DataFrame([{
+    # Bant AWS Lambda'dan (tanımlıysa) ya da yerel modelden gelir; ağ çağrısı
+    # olay döngüsünü bloklamasın diye iş parçacığında.
+    ((low, mid, high),), served_by = await run_in_threadpool(
+        rent_model.bands,
+        model,
+        [{
             "room": payload.room,
-            "living room": payload.living_room,
-            "area (m2)": payload.area,
+            "living_room": payload.living_room,
+            "area": payload.area,
             "age": payload.age,
             "floor": payload.floor,
-            "district": payload.district.strip(),
-            "neighborhood": payload.neighborhood.strip(),
-        }]),
-        model["categories"],
+            "district": payload.district,
+            "neighborhood": payload.neighborhood,
+        }],
     )
-
-    band = {
-        label: float(np.exp(m.predict(features)[0]))
-        for label, m in model["models"].items()
-    }
-    # Çeyreklik modelleri bağımsız eğitildiği için nadiren sıra bozulabilir.
-    low, mid, high = sorted(band.values())
 
     # Model eğitim dönemi liralarıyla konuşur; TÜFE ile bugüne endeksle.
     factor, indexed_to = rent_index()
@@ -638,6 +642,8 @@ async def estimate(payload: EstimateRequest):
         "indexed_to": indexed_to,
         "indexed": is_configured(),
         "basis": payload.basis,
+        # "lambda" ya da "local": bandı kim hesapladı (docs/AWS.md).
+        "served_by": served_by,
     }
 
     if payload.asking_price is not None:

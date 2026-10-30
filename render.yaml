@@ -91,3 +91,17 @@ services:
       # Kurulum: DEPLOY.md §1.6.
       - key: DATABASE_URL
         sync: false
+      # İsteğe bağlı: adil kira modeli AWS'de (docs/AWS.md). Dördü de boşsa
+      # backend imajdaki modelle bugünkü gibi çalışır. Değerler terraform
+      # çıktılarından ve `aws iam create-access-key --user-name
+      # evdes-render-backend` komutundan gelir; anahtar yalnızca modeli okuyup
+      # /predict'i çağırabilir. Lambda hata verirse ya da 3 sn'de cevap
+      # vermezse bant yerel modelle hesaplanır (app/rent_model.py).
+      - key: FAIRPRICE_MODEL_BUCKET
+        sync: false
+      - key: FAIRPRICE_URL
+        sync: false
+      - key: FAIRPRICE_AWS_ACCESS_KEY_ID
+        sync: false
+      - key: FAIRPRICE_AWS_SECRET_ACCESS_KEY
+        sync: false

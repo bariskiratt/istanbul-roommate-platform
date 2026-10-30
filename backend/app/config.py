@@ -22,8 +22,9 @@ NEIGHBORHOOD_GEOJSON = RAW_DIR / "mahalle_geojson.json"
 # Üretilen veri
 MARKET_VALUES_CSV = PROCESSED_DIR / "neighborhood_market_values.csv"
 
-# Eğitilmiş model
+# Eğitilmiş model ve ölçümleri (scripts/train_model.py yazar)
 MODEL_PATH = MODELS_DIR / "fair_price_model.joblib"
+MODEL_METRICS_PATH = MODELS_DIR / "metrics.json"
 
 # Uygulama veritabanı (ilanlar; ileride kullanıcı/eşleşme/mesaj)
 DB_PATH = DATA_DIR / "app.db"

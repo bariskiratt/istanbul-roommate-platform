@@ -67,3 +67,27 @@ def _disable_moderation_ai(monkeypatch):
     sonuç hem yavaşlar hem de deterministik olmaz.
     """
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_aws_fair_price(monkeypatch):
+    """Geliştiricinin kabuğundaki AWS ayarları testlere sızmasın.
+
+    FAIRPRICE_* tanımlıysa adil fiyat bandı gerçek Lambda'dan istenir ve model
+    S3'ten indirilirdi (app/rent_model.py); testler ağsız ve yerel modelle
+    koşar. Devre kesici de testler arasında sıfırlanır.
+    """
+    from app import rent_model
+
+    for name in (
+        "FAIRPRICE_URL",
+        "FAIRPRICE_MODEL_BUCKET",
+        "FAIRPRICE_AWS_ACCESS_KEY_ID",
+        "FAIRPRICE_AWS_SECRET_ACCESS_KEY",
+        "FAIRPRICE_AWS_REGION",
+        "FAIRPRICE_TIMEOUT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    rent_model.reset()
+    yield
+    rent_model.reset()

@@ -33,6 +33,8 @@ their opening paragraphs and defer to SECURITY.md rather than half-covering
 authentication, admin powers or encryption.
 
 Deployment is likewise out of scope for all five — that is [DEPLOY.md](../DEPLOY.md).
+The optional AWS service for the fair-rent model (training pipeline, quality
+gate, Lambda, Terraform) has its own document, [AWS.md](AWS.md).
 
 ---
 

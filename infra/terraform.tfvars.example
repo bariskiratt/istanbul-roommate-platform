@@ -1,0 +1,9 @@
+# bootstrap.sh bunu terraform.tfvars olarak kopyalar. terraform.tfvars depoya
+# GİRMEZ (.gitignore): depo herkese açık, e-posta adresin orada durmasın.
+
+# Bütçe ve alarm e-postaları buraya gelir.
+alert_email = "sen@example.com"
+
+# 2. aşama: "AWS yayını" iş akışı imajı ECR'ye gönderdikten sonra true yap ve
+# yeniden `terraform apply` çalıştır (docs/AWS.md, Kurulum adım 6).
+enable_predict_service = false

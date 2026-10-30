@@ -1,0 +1,14 @@
+variable "function_name" { type = string }
+variable "image_uri" { type = string }
+variable "memory_mb" { type = number }
+variable "reserved_concurrency" { type = number }
+variable "model_bucket_name" { type = string }
+variable "model_bucket_arn" { type = string }
+variable "model_prefix" { type = string }
+variable "render_user_name" { type = string }
+variable "api_rate_limit" { type = number }
+variable "api_burst_limit" { type = number }
+variable "warmer_enabled" { type = bool }
+variable "log_retention_days" { type = number }
+variable "alarm_topic_arn" { type = string }
+variable "region" { type = string }

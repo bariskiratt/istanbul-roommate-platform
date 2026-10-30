@@ -6,9 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import rent_model
 from app import uploads as uploads_module
 from app.db import Base, get_db
-from app.main import app
+from app.main import STATE, app
+
+# Testlerde model yüklenmez (lifespan koşmaz) ve AWS değişkenleri silinir.
+NO_MODEL = {"model_source": "none", "model_version": None, "lambda": "off"}
 
 
 @pytest.fixture()
@@ -43,7 +47,11 @@ def test_disk_mode_is_healthy(client, monkeypatch):
     monkeypatch.delenv("S3_BUCKET", raising=False)
     res = client.get("/api/health")
     assert res.status_code == 200
-    assert res.json() == {"database": "ok", "photo_storage": "disk"}
+    assert res.json() == {
+        "database": "ok",
+        "photo_storage": "disk",
+        "fair_price": NO_MODEL,
+    }
 
 
 def test_bucket_reports_startup_check(client, bucket_env, monkeypatch):
@@ -55,6 +63,7 @@ def test_bucket_reports_startup_check(client, bucket_env, monkeypatch):
         "database": "ok",
         "photo_storage": "bucket",
         "photo_bucket": "unchecked",
+        "fair_price": NO_MODEL,
     }
 
     monkeypatch.setattr(uploads_module, "_bucket_check", "ok")
@@ -78,5 +87,34 @@ def test_database_failure_is_503_without_details(client, monkeypatch):
     app.dependency_overrides[get_db] = lambda: BrokenSession()
     res = client.get("/api/health")
     assert res.status_code == 503
-    assert res.json() == {"database": "error", "photo_storage": "disk"}
+    assert res.json() == {
+        "database": "error",
+        "photo_storage": "disk",
+        "fair_price": NO_MODEL,
+    }
     assert "password" not in res.text
+
+
+def test_reports_model_version_and_lambda_path(client, monkeypatch):
+    """Model sürümü ve Lambda yolu görünür; ikisi de sağlık kararına girmez."""
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+    monkeypatch.setitem(
+        STATE, "model_info", {"source": "s3", "version": "20261026-193000-abc1234"}
+    )
+    monkeypatch.setenv("FAIRPRICE_URL", "https://abc.execute-api.us-west-2.amazonaws.com/predict")
+    monkeypatch.setenv("FAIRPRICE_AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
+    monkeypatch.setenv("FAIRPRICE_AWS_SECRET_ACCESS_KEY", "secret")
+
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    assert res.json()["fair_price"] == {
+        "model_source": "s3",
+        "model_version": "20261026-193000-abc1234",
+        "lambda": "on",
+    }
+
+    # Devre kesici açıkken (AWS yanıt vermiyor) site sağlıklı, tahminler yerel.
+    monkeypatch.setattr(rent_model, "_open_until", float("inf"))
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    assert res.json()["fair_price"]["lambda"] == "fallback"

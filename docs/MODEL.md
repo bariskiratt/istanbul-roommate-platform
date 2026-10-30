@@ -467,9 +467,12 @@ full run. LightGBM was chosen because
 
 ### 6.3 `--fast` mode, and why the shipped number is 15,3% not 15,1%
 
-`main(fast=True)` (`train_model.py:160-177`) skips the CV contest entirely and
-calls `single_fold_medape()` (`train_model.py:146-157`): one 80/20 split — the
-first fold of the same `KFold` — one q50 fit, one MedAPE.
+`main(fast=True)` skips the CV contest entirely and takes the error from
+`holdout_metrics()` in `train_model.py`: one 80/20 split — the first fold of the
+same `KFold` — one q50 fit, one MedAPE. (The same split also fits q25 and q75
+to measure how often the band contains the held-out rent; that coverage,
+~40%, feeds the quality gate described in [AWS.md](AWS.md) §3 and does not
+change the served error.)
 
 The reason is deployment, not science. `Dockerfile:33-35` explains it: the
 Render free build machine has 2 cores (pinned via `OMP_NUM_THREADS=2`,

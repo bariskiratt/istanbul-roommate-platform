@@ -1,0 +1,7 @@
+{
+  "rows": [
+    {"room": 2, "living_room": 1, "area": 90, "age": 20, "floor": 3, "district": "Kadıköy", "neighborhood": "Caferağa Mah."},
+    {"room": 3, "living_room": 1, "area": 125, "age": 15, "floor": 3, "district": "Beşiktaş", "neighborhood": ""},
+    {"room": 1, "living_room": 1, "area": 55, "age": 5, "floor": 1, "district": "Esenyurt", "neighborhood": "Olmayan Mah."}
+  ]
+}
