@@ -209,3 +209,126 @@ def test_hesap_silmek_raporlanan_ilani_ve_mesaji_da_temizler(ctx):
         assert db.scalar(
             select(models.User).where(models.User.email == "veli@uni.edu.tr")
         ) is not None
+
+
+# ---- şifresini unutan kullanıcı (rakip raporu #4) ----
+
+NEW_PASSWORD = "YeniSifre1"
+
+
+def _request_code(client, email: str = EMAIL) -> str:
+    return client.post("/api/auth/request-otp", json={"email": email}).json()["dev_code"]
+
+
+def test_sifre_kodla_sifirlanir_ve_tum_oturumlar_kapanir(ctx):
+    client, _ = ctx
+    old_headers = _login(client)
+
+    code = _request_code(client)
+    res = client.post(
+        "/api/auth/reset-password",
+        json={"email": EMAIL, "code": code, "new_password": NEW_PASSWORD},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["user"]["email"] == EMAIL
+
+    # Eski oturum düştü, yeni oturum çalışıyor.
+    assert client.get("/api/auth/me", headers=old_headers).status_code == 401
+    new_headers = {"Authorization": f"Bearer {body['token']}"}
+    assert client.get("/api/auth/me", headers=new_headers).status_code == 200
+
+    # Eski şifre geçmez, yenisi geçer; kod bir daha kullanılamaz.
+    assert client.post(
+        "/api/auth/login", json={"email": EMAIL, "password": PASSWORD}
+    ).status_code == 401
+    assert client.post(
+        "/api/auth/login", json={"email": EMAIL, "password": NEW_PASSWORD}
+    ).status_code == 200
+    assert client.post(
+        "/api/auth/reset-password",
+        json={"email": EMAIL, "code": code, "new_password": "BaskaSifre1"},
+    ).status_code == 400
+
+
+def test_sifre_sifirlama_yanlis_kod_ve_kisa_sifre(ctx):
+    client, _ = ctx
+    _login(client)
+    code = _request_code(client)
+    wrong = "000000" if code != "000000" else "111111"
+
+    assert client.post(
+        "/api/auth/reset-password",
+        json={"email": EMAIL, "code": wrong, "new_password": NEW_PASSWORD},
+    ).status_code == 400
+    assert client.post(
+        "/api/auth/reset-password",
+        json={"email": EMAIL, "code": code, "new_password": "kisa"},
+    ).status_code == 422
+    # Kayıtlı olmayan adres: kod istenmemiş gibi davranılır.
+    assert client.post(
+        "/api/auth/reset-password",
+        json={"email": "yok@uni.edu.tr", "code": code, "new_password": NEW_PASSWORD},
+    ).status_code == 400
+    # Şifre değişmedi.
+    assert client.post(
+        "/api/auth/login", json={"email": EMAIL, "password": PASSWORD}
+    ).status_code == 200
+
+
+def test_sifre_sifirlama_giris_koduyla_ayni_tahmin_kovasini_kullanir(ctx):
+    """Ayrı kova olsaydı 6 haneli kod için uç başına ayrı 5 hak doğardı."""
+    client, _ = ctx
+    _login(client)
+    code = _request_code(client)
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(5):
+        client.post("/api/auth/verify-otp", json={"email": EMAIL, "code": wrong})
+    res = client.post(
+        "/api/auth/reset-password",
+        json={"email": EMAIL, "code": code, "new_password": NEW_PASSWORD},
+    )
+    assert res.status_code == 429
+
+
+def test_yonetici_sifresi_kodla_sifirlanamaz(ctx):
+    """Yönetici girişi şifre + kod ister; kodla şifre koymak ikisini birden verirdi."""
+    client, _ = ctx
+    admin = "yonetici@uni.edu.tr"
+    reg = client.post("/api/auth/register", json={"email": admin, "password": PASSWORD})
+    client.post(
+        "/api/auth/verify-otp",
+        json={"email": admin, "code": reg.json()["dev_code"], "password": PASSWORD},
+    )
+    code = _request_code(client, admin)
+    res = client.post(
+        "/api/auth/reset-password",
+        json={"email": admin, "code": code, "new_password": NEW_PASSWORD},
+    )
+    assert res.status_code == 403
+    # Eski şifre hâlâ geçerli (ikinci adıma geçer).
+    assert client.post(
+        "/api/auth/login", json={"email": admin, "password": PASSWORD}
+    ).json().get("otp_required") is True
+
+
+def test_hesap_sifresiz_e_posta_koduyla_silinir(ctx):
+    client, TestSession = ctx
+    headers = _login(client)
+
+    # Ne şifre ne kod: 422.
+    assert client.request(
+        "DELETE", "/api/auth/me", headers=headers, json={}
+    ).status_code == 422
+
+    code = _request_code(client)
+    wrong = "000000" if code != "000000" else "111111"
+    assert client.request(
+        "DELETE", "/api/auth/me", headers=headers, json={"code": wrong}
+    ).status_code == 400
+
+    assert client.request(
+        "DELETE", "/api/auth/me", headers=headers, json={"code": code}
+    ).status_code == 204
+    with TestSession() as db:
+        assert db.scalar(select(models.User).where(models.User.email == EMAIL)) is None

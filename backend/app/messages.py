@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app import content_limits, crypto, models, moderation
 from app.auth import get_current_user
+from app.blocks import is_blocked
 from app.db import get_db
 from app.i18n import localized
 
@@ -60,6 +61,11 @@ def _require_participant(
     """
     match = db.get(models.Match, match_id)
     if match is None or user.id not in (match.user_a_id, match.user_b_id):
+        raise HTTPException(status_code=404, detail=localized("Eşleşme bulunamadı."))
+    # Engel ya da kaldırılan eşleşme: sohbet iki taraf için de yok sayılır.
+    # Satırlar durur (engel kalkınca geri gelir), ama okunamaz, yazılamaz.
+    other_id = match.user_b_id if match.user_a_id == user.id else match.user_a_id
+    if is_blocked(db, user.id, other_id):
         raise HTTPException(status_code=404, detail=localized("Eşleşme bulunamadı."))
     return match
 

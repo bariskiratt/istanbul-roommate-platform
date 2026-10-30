@@ -4,13 +4,18 @@ import { Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiError, loginWithPassword, needsSecondFactor, requestOtp, verifyOtp } from "@/lib/api";
+import { ApiError, loginWithPassword, needsSecondFactor, requestOtp, resetPassword, verifyOtp } from "@/lib/api";
 import { profileIncomplete } from "@/lib/onboardingDraft";
 import PasswordInput from "@/components/PasswordInput";
+import NewPasswordFields from "@/components/NewPasswordFields";
+import { newPasswordReady } from "@/lib/password";
 import SiteBar from "@/components/layout/SiteBar";
 import { useI18n } from "@/i18n";
 
-type Mode = "password" | "otp";
+// "reset": şifresini unutan kullanıcı e-postasına gelen kodla yeni şifre
+// koyar ve oturum açar. Eskiden "şifreni mi unuttun" yalnızca kodla girişe
+// götürüyordu; kişi içeride şifresini değiştiremiyor, hesabını silemiyordu.
+type Mode = "password" | "otp" | "reset";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,6 +25,8 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   // Yönetici hesabı iki adımlıdır: şifre VE e-posta kodu birlikte istenir.
   // Şifre sekmesinde şifre kabul edilince kod alanı açılır (adminStep); kod
@@ -30,9 +37,9 @@ const Login = () => {
 
   const emailValid = email.includes("@");
 
-  const finish = (token: string, user: Parameters<typeof login>[1]) => {
+  const finish = (token: string, user: Parameters<typeof login>[1], message?: string) => {
     login(token, user);
-    toast.success(t("login.greet", { name: user.name ? `, ${user.name}` : "" }));
+    toast.success(message ?? t("login.greet", { name: user.name ? `, ${user.name}` : "" }));
     // Kaydı yarıda kalan hesap (ör. kod doğrulandıktan sonra sekme kapandı)
     // boş profille uygulamaya değil, kaydın profil adımlarına döner.
     navigate(profileIncomplete(user) ? "/onboarding" : "/swipe");
@@ -46,7 +53,10 @@ const Login = () => {
     }
     setBusy(true);
     try {
-      if (mode === "password" && adminStep) {
+      if (mode === "reset" && codeSent) {
+        const { token, user } = await resetPassword(email, code, newPassword);
+        finish(token, user, t("login.resetDone"));
+      } else if (mode === "password" && adminStep) {
         const { token, user } = await verifyOtp(email, code, password);
         finish(token, user);
       } else if (mode === "password") {
@@ -102,6 +112,8 @@ const Login = () => {
 
   const resetCodeStep = () => {
     setCode("");
+    setNewPassword("");
+    setConfirmPassword("");
     setCodeSent(false);
     setAdminStep(false);
     setNeedPassword(false);
@@ -113,22 +125,29 @@ const Login = () => {
   };
 
   // Kod alanı: kod sekmesinde kod gidince, şifre sekmesinde yönetici adımında.
-  const showCode = (mode === "otp" && codeSent) || adminStep;
+  const showCode = ((mode === "otp" || mode === "reset") && codeSent) || adminStep;
   const showPassword = mode === "password" || needPassword;
+  const showNewPassword = mode === "reset" && codeSent;
 
   const submitLabel = busy
     ? t("login.busy")
-    : showCode
-      ? t("login.submitVerify")
-      : mode === "password"
-        ? t("login.submitLogin")
-        : t("login.submitSendCode");
+    : mode === "reset"
+      ? t(codeSent ? "login.submitReset" : "login.submitSendResetCode")
+      : showCode
+        ? t("login.submitVerify")
+        : mode === "password"
+          ? t("login.submitLogin")
+          : t("login.submitSendCode");
 
   const submitDisabled =
     busy ||
     !emailValid ||
     (showPassword && password.length === 0) ||
-    (showCode && code.length !== 6);
+    (showCode && code.length !== 6) ||
+    (showNewPassword && !newPasswordReady(newPassword, confirmPassword));
+
+  const subtitle =
+    mode === "reset" ? "login.resetSub" : mode === "password" ? "login.subPassword" : "login.subOtp";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -137,13 +156,14 @@ const Login = () => {
       <div className="flex-1 flex items-start sm:items-center justify-center px-5 py-12 sm:py-16">
         <div className="w-full max-w-sm space-y-7">
           <div className="space-y-2">
-            <h1 className="text-[2.5rem] leading-[1.05] text-foreground">{t("login.welcome")}</h1>
-            <p className="text-muted-foreground">
-              {t(mode === "password" ? "login.subPassword" : "login.subOtp")}
-            </p>
+            <h1 className="text-[2.5rem] leading-[1.05] text-foreground">
+              {t(mode === "reset" ? "login.resetTitle" : "login.welcome")}
+            </h1>
+            <p className="text-muted-foreground">{t(subtitle)}</p>
           </div>
 
-          {/* Mod seçici: iki sekme, altı çizili olan açık */}
+          {/* Mod seçici: iki sekme, altı çizili olan açık (sıfırlamada gizli) */}
+          {mode !== "reset" && (
           <div className="flex border-b border-border" role="tablist">
             {([
               { key: "password", label: t("login.tabPassword") },
@@ -164,6 +184,7 @@ const Login = () => {
               </button>
             ))}
           </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
@@ -210,6 +231,15 @@ const Login = () => {
               </div>
             )}
 
+            {showNewPassword && (
+              <NewPasswordFields
+                next={newPassword}
+                confirm={confirmPassword}
+                onNextChange={setNewPassword}
+                onConfirmChange={setConfirmPassword}
+              />
+            )}
+
             <Button
               type="submit"
               disabled={submitDisabled}
@@ -231,10 +261,19 @@ const Login = () => {
             {mode === "password" && !adminStep && (
               <button
                 type="button"
-                onClick={() => switchMode("otp")}
+                onClick={() => switchMode("reset")}
                 className="text-[13px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
               >
                 {t("login.forgot")}
+              </button>
+            )}
+            {mode === "reset" && (
+              <button
+                type="button"
+                onClick={() => switchMode("password")}
+                className="block text-[13px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+              >
+                {t("login.backToLogin")}
               </button>
             )}
           </form>

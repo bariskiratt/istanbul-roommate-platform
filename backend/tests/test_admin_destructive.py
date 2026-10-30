@@ -436,17 +436,23 @@ def test_yonetici_duzenlemesinde_kufur_422_degil_isaretlenir(client):
 
 
 def test_yonetici_pasif_ve_kaldirilmis_ilani_da_duzenleyebilir(client):
-    """Sahibin ucu pasif ilanı 404 sayar; yönetici ucu onu bulmak zorunda."""
+    """Yönetici ucu sahibinin kapattığı ilanı da bulmak zorunda.
+
+    (Sahibi de kendi kapattığı ilanı düzenleyebilir; ilan kapalı kalır.
+    Yöneticinin kaldırdığı ilanı ise yalnız yönetici düzenler.)
+    """
     admin = _make_user(client, ADMIN_EMAIL, "Yönetici")
     ali = _make_user(client, "ali@uni.edu.tr", "Ali")
     listing_id = _make_listing(client, ali["headers"])
     client.delete(f"/api/listings/{listing_id}", headers=ali["headers"])
 
-    assert client.patch(
+    own = client.patch(
         f"/api/listings/{listing_id}",
         headers=ali["headers"],
-        json={"title": "Yeni başlık olsun"},
-    ).status_code == 404
+        json={"title": "Sahibinin başlığı"},
+    )
+    assert own.status_code == 200, own.text
+    assert own.json()["is_active"] is False
 
     res = client.patch(
         f"/api/admin/listings/{listing_id}",

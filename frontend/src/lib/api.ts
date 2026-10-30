@@ -307,8 +307,16 @@ export const updateListing = (id: number, payload: Partial<ListingPayload>) =>
     body: JSON.stringify(payload),
   });
 
+/** Sahibin kapattığı ilanı kapatır (silmez); `republishListing` geri açar. */
 export const deleteListing = (id: number) =>
   request<void>(`/api/listings/${id}`, { method: "DELETE" });
+
+/**
+ * Kapatılmış ilanı yeniden yayına alır. Metin yeniden denetlenir: engellenirse
+ * 422, dolandırıcılık kalıbı varsa yanıt `pending_review: true` döner.
+ */
+export const republishListing = (id: number) =>
+  postJSON<ApiListing>(`/api/listings/${id}/republish`, {});
 
 /** İlanın istediği oda payının adil aralıkla kıyası (ev arkadaşlığı bazlı). */
 export interface ListingFairPrice {
@@ -476,10 +484,22 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
   });
 
 /** Hesabı ve tüm verilerini kalıcı olarak siler. */
-export const deleteAccount = (password: string) =>
+/**
+ * Şifresini unutan kullanıcı: /request-otp ile gelen kodla yeni şifre koyar.
+ * Sunucu tüm oturumları kapatır ve bu cihaz için yeni bir oturum döndürür.
+ */
+export const resetPassword = (email: string, code: string, newPassword: string) =>
+  postJSON<{ token: string; user: ApiUser }>("/api/auth/reset-password", {
+    email,
+    code,
+    new_password: newPassword,
+  });
+
+/** Hesabı siler. Onay: şifre ya da e-postaya gelen kod (şifreyi unutan için). */
+export const deleteAccount = (proof: { password: string } | { code: string }) =>
   request<void>("/api/auth/me", {
     method: "DELETE",
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(proof),
   });
 
 // ---- Swipe ve eşleşme ----
@@ -639,6 +659,28 @@ export const postReport = (
     reason,
     ...(note?.trim() ? { note: note.trim() } : {}),
   });
+
+// ---- Engelleme ----
+//
+// Engel iki yönlüdür: iki kişi birbirinin ilanını, beğenisini ve aradaki
+// sohbeti görmez. "Eşleşmeyi kaldır" da bir engeldir. Satırlar silinmez;
+// engel kalkınca sohbet geri gelir (backend/app/blocks.py).
+
+export interface BlockedUser {
+  user_id: number;
+  name: string;
+  university: string | null;
+  photo: string | null;
+  created_at: string;
+}
+
+export const blockUser = (userId: number) =>
+  postJSON<void>("/api/blocks", { user_id: userId });
+
+export const unblockUser = (userId: number) =>
+  request<void>(`/api/blocks/${userId}`, { method: "DELETE" });
+
+export const fetchBlocks = () => getJSON<BlockedUser[]>("/api/blocks");
 
 // ---- Yönetim paneli ----
 // Tüm /api/admin/* uçları sunucuda require_admin ile korunur: girişsiz 401,

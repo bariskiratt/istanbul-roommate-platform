@@ -428,8 +428,9 @@ to admin-on-admin actions: if two admins could delete each other, one
 compromised mailbox would be enough to wipe the moderation team.
 
 Crucially, this does not remove anyone's right to delete their own account.
-`DELETE /api/auth/me` remains open to admins and requires the password
-(`backend/app/auth.py:1114-1133`). What is blocked is the accidental,
+`DELETE /api/auth/me` remains open to admins and requires a signed-in session
+plus the password or a fresh e-mail code (`delete_account` in
+`backend/app/auth.py`). The admin session itself already took both factors. What is blocked is the accidental,
 one-click-plus-reason-box path — not the deliberate, authenticated one.
 
 There is also a deliberate *absence*: no impersonation endpoint. The reasoning
@@ -1449,12 +1450,19 @@ are findings; they are the boundaries of the current design.
    (`backend/app/listings.py:592`). The Safety copy says this explicitly
    (`frontend/src/i18n/translations.ts:677-678`). Only *account* deletion is
    permanent.
-8. **A user cannot re-publish their own deactivated listing.** Republishing
-   currently goes through an admin (`POST /api/admin/listings/{id}/publish`).
-   Documented honestly in the endpoint docstring at
-   `backend/app/listings.py:568-585`.
-9. **No user-level block or mute.** The only remedies are report and admin
-   suspension.
+8. **Republishing re-runs moderation.** An owner reopens a closed listing with
+   `POST /api/listings/{id}/republish`; the text is checked against today's
+   rules (blocked text gets 422, a scam pattern goes to review) and the call
+   counts against the listing-create quota. Listings an admin removed can't
+   be edited or republished by the owner.
+9. **Blocking hides, it doesn't delete.** A user can block someone (or unmatch,
+   which is the same block) from the chat or the Likes card
+   (`backend/app/blocks.py`). It works both ways: neither sees the other's
+   listings, likes or chat, and no new match can form. Rows stay, so an admin
+   can still read reported messages, and unblocking brings the match back.
+   Blocking someone by an id that doesn't exist returns the same 204 so the
+   endpoint can't count accounts. Single chat messages can be reported from
+   the thread.
 10. **Visitors' IP addresses reach Google and OpenStreetMap.** Fonts load
     from Google Fonts and map tiles from OpenStreetMap. The privacy notice
     discloses both (section 8.4); self-hosting the fonts would remove one.
@@ -1519,8 +1527,10 @@ listed here does not exist.
 ### D. A session is believed to be compromised
 
 - **The user's own move:** `POST /api/auth/change-password` — this deletes every
-  token for that user (`backend/app/auth.py:906-908`), a genuine
-  log-out-everywhere.
+  token for that user, a genuine log-out-everywhere. Someone who doesn't know
+  the password (or suspects it leaked) can do the same with an e-mail code
+  through `POST /api/auth/reset-password`, which also drops every token and
+  opens a new session only on the device that reset it.
 - **The admin's move:** suspend, which drops all tokens
   (`backend/app/admin.py:1336`), then unsuspend. Clumsy, but it is the only
   admin-side session revocation that exists.

@@ -42,6 +42,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/edit-listing/:listingId",
+      "destination": "/index.html"
+    },
+    {
       "source": "/listings",
       "destination": "/index.html"
     },

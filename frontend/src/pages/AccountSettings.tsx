@@ -1,29 +1,62 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, GraduationCap, ShieldCheck, Calendar, Check, Circle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Mail, GraduationCap, ShieldCheck, Calendar, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import PasswordInput from "@/components/PasswordInput";
+import NewPasswordFields from "@/components/NewPasswordFields";
+import { newPasswordReady } from "@/lib/password";
 import BottomNav from "@/components/layout/BottomNav";
 import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
-import { changePassword, deleteAccount } from "@/lib/api";
+import UserAvatar from "@/components/UserAvatar";
+import {
+  changePassword, deleteAccount, fetchBlocks, requestOtp, resetPassword, unblockUser,
+} from "@/lib/api";
 import { parseUtc } from "@/lib/date";
 import { useI18n } from "@/i18n";
 
 const AccountSettings = () => {
   const navigate = useNavigate();
-  const { user: me, logout } = useAuth();
+  const { user: me, login, logout } = useAuth();
   const { t, locale } = useI18n();
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
+  // Mevcut şifresini hatırlamayan (ör. kodla girmiş) kullanıcı, şifre yerine
+  // e-postasına gelen kodla da değiştirebilir ve hesabını silebilir. Eskiden
+  // iki işlem de mevcut şifreyi istiyordu; şifresini unutan kişinin hesabını
+  // silmesinin tek yolu kurucuya yazmaktı.
+  const [pwCode, setPwCode] = useState<string | null>(null);
+  const [sendingCode, setSendingCode] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteCode, setDeleteCode] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Engellediğin kişiler. Engel kalkınca aradaki eşleşme ve mesajlar geri
+  // gelir (sunucuda hiçbiri silinmedi).
+  const queryClient = useQueryClient();
+  const { data: blocks = [] } = useQuery({
+    queryKey: ["blocks"],
+    queryFn: fetchBlocks,
+    enabled: me !== null,
+  });
+  const unblock = useMutation({
+    mutationFn: unblockUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["received-likes"] });
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      toast.success(t("account.unblocked"));
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : t("common.error")),
+  });
 
   if (!me) {
     return (
@@ -33,17 +66,48 @@ const AccountSettings = () => {
     );
   }
 
-  const rules = {
-    length: next.length >= 8,
-    uppercase: /[A-Z]/.test(next),
-    number: /[0-9]/.test(next),
-  };
+  const usingCode = pwCode !== null;
   const canSave =
-    current.length > 0 && rules.length && rules.uppercase && rules.number && next === confirm;
+    (usingCode ? pwCode.length === 6 : current.length > 0) && newPasswordReady(next, confirm);
+
+  /** Kayıtlı adrese tek kullanımlık kod yollar; başarılıysa true. */
+  const sendCode = async (): Promise<boolean> => {
+    setSendingCode(true);
+    try {
+      const res = await requestOtp(me.email);
+      if (res.dev_code) {
+        toast.info(t("login.devCode", { code: res.dev_code }), { duration: 20000 });
+      } else {
+        toast.success(t("account.codeSent", { email: me.email }), {
+          description: t("login.codeSentDesc"),
+          duration: 8000,
+        });
+      }
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.error"));
+      return false;
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const submitPassword = async () => {
     setSaving(true);
     try {
+      if (usingCode) {
+        // Sunucu bütün oturumları kapatır ve bu cihaz için yenisini verir:
+        // kullanıcı burada kalır, diğer cihazlardan çıkar.
+        const { token, user } = await resetPassword(me.email, pwCode, next);
+        login(token, user);
+        toast.success(t("account.passwordUpdated"), {
+          description: t("account.passwordResetDesc"),
+        });
+        setPwCode(null);
+        setNext("");
+        setConfirm("");
+        return;
+      }
       await changePassword(current, next);
       toast.success(t("account.passwordUpdated"), {
         description: t("account.passwordUpdatedDesc"),
@@ -60,7 +124,7 @@ const AccountSettings = () => {
   const submitDelete = async () => {
     setDeleting(true);
     try {
-      await deleteAccount(deletePassword);
+      await deleteAccount(deleteCode !== null ? { code: deleteCode } : { password: deletePassword });
       toast.success(t("account.deleted"));
       logout();
       navigate("/");
@@ -127,41 +191,24 @@ const AccountSettings = () => {
         {/* Şifre değiştirme */}
         <section className="space-y-3">
           <h2 className="text-xl text-foreground">{t("account.changePassword")}</h2>
-          <PasswordInput
-            value={current}
-            onChange={e => setCurrent(e.target.value)}
-            placeholder={t("account.currentPassword")}
-            autoComplete="current-password"
-            className="h-12"
-          />
-          <PasswordInput
-            value={next}
-            onChange={e => setNext(e.target.value)}
-            placeholder={t("account.newPassword")}
-            className="h-12"
-          />
-          {next.length > 0 && (
-            <div className="space-y-1">
-              {([
-                { id: "length", ok: rules.length, key: "ob.ruleLength" },
-                { id: "upper", ok: rules.uppercase, key: "ob.ruleUpper" },
-                { id: "number", ok: rules.number, key: "ob.ruleNumber" },
-              ] as const).map(r => (
-                <p key={r.id} className={`text-[13px] flex items-center gap-1.5 ${r.ok ? "text-accent" : "text-muted-foreground"}`}>
-                  {r.ok ? <Check className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />} {t(r.key)}
-                </p>
-              ))}
-            </div>
+          {usingCode ? (
+            <CodeInput value={pwCode} onChange={setPwCode} />
+          ) : (
+            <PasswordInput
+              value={current}
+              onChange={e => setCurrent(e.target.value)}
+              placeholder={t("account.currentPassword")}
+              aria-label={t("account.currentPassword")}
+              autoComplete="current-password"
+              className="h-12"
+            />
           )}
-          <PasswordInput
-            value={confirm}
-            onChange={e => setConfirm(e.target.value)}
-            placeholder={t("account.repeatPassword")}
-            className="h-12"
+          <NewPasswordFields
+            next={next}
+            confirm={confirm}
+            onNextChange={setNext}
+            onConfirmChange={setConfirm}
           />
-          {confirm.length > 0 && next !== confirm && (
-            <p className="text-[13px] text-destructive">{t("ob.passwordMismatch")}</p>
-          )}
           <Button
             onClick={submitPassword}
             disabled={!canSave || saving}
@@ -170,7 +217,50 @@ const AccountSettings = () => {
           >
             {t(saving ? "common.saving" : "account.updatePassword")}
           </Button>
+          <button
+            type="button"
+            disabled={sendingCode}
+            onClick={async () => {
+              if (usingCode) {
+                setPwCode(null);
+              } else if (await sendCode()) {
+                setPwCode("");
+              }
+            }}
+            className="text-[13px] font-semibold text-secondary hover:underline disabled:opacity-50"
+          >
+            {t(usingCode ? "account.useCurrentPassword" : "account.forgotCurrent")}
+          </button>
           <p className="text-[13px] text-muted-foreground leading-relaxed">{t("account.passwordNote")}</p>
+        </section>
+
+        {/* Engellenen kişiler */}
+        <section className="space-y-3">
+          <h2 className="text-xl text-foreground">{t("account.blockedTitle")}</h2>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">{t("account.blockedDesc")}</p>
+          {blocks.length === 0 ? (
+            <p className="text-[14px] text-muted-foreground">{t("account.blockedEmpty")}</p>
+          ) : (
+            <div className="rounded-2xl border border-border divide-y divide-border">
+              {blocks.map(b => (
+                <div key={b.user_id} className="flex items-center gap-3 p-3">
+                  <UserAvatar name={b.name} photo={b.photo ?? undefined} className="w-9 h-9 text-xs" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] text-foreground truncate">{b.name || t("messages.unnamed")}</p>
+                    {b.university && <p className="text-[12px] text-muted-foreground truncate">{b.university}</p>}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={unblock.isPending}
+                    onClick={() => unblock.mutate(b.user_id)}
+                  >
+                    {t("account.unblock")}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Tehlikeli bölge */}
@@ -188,23 +278,43 @@ const AccountSettings = () => {
               </Button>
             ) : (
               <div className="space-y-3">
-                <PasswordInput
-                  value={deletePassword}
-                  onChange={e => setDeletePassword(e.target.value)}
-                  placeholder={t("account.deletePasswordPlaceholder")}
-                  className="h-12"
-                />
+                {deleteCode !== null ? (
+                  <CodeInput value={deleteCode} onChange={setDeleteCode} />
+                ) : (
+                  <PasswordInput
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    placeholder={t("account.deletePasswordPlaceholder")}
+                    aria-label={t("account.deletePasswordPlaceholder")}
+                    autoComplete="current-password"
+                    className="h-12"
+                  />
+                )}
+                <button
+                  type="button"
+                  disabled={sendingCode}
+                  onClick={async () => {
+                    if (deleteCode !== null) {
+                      setDeleteCode(null);
+                    } else if (await sendCode()) {
+                      setDeleteCode("");
+                    }
+                  }}
+                  className="text-[13px] font-semibold text-secondary hover:underline disabled:opacity-50"
+                >
+                  {t(deleteCode !== null ? "account.useCurrentPassword" : "account.deleteWithCode")}
+                </button>
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"
-                    onClick={() => { setDeleteOpen(false); setDeletePassword(""); }}
+                    onClick={() => { setDeleteOpen(false); setDeletePassword(""); setDeleteCode(null); }}
                     className="flex-1 h-11"
                   >
                     {t("common.cancel")}
                   </Button>
                   <Button
                     onClick={submitDelete}
-                    disabled={deletePassword.length === 0 || deleting}
+                    disabled={(deleteCode !== null ? deleteCode.length !== 6 : deletePassword.length === 0) || deleting}
                     variant="destructive"
                     className="flex-1 h-11 disabled:opacity-50"
                   >
@@ -218,6 +328,28 @@ const AccountSettings = () => {
       </div>
 
       <BottomNav />
+    </div>
+  );
+};
+
+/** E-postaya gelen 6 haneli kod alanı (yalnızca rakam). */
+const CodeInput = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const { t } = useI18n();
+  return (
+    <div className="relative">
+      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        value={value}
+        onChange={e => onChange(e.target.value.replace(/\D/g, ""))}
+        placeholder={t("login.codePlaceholder")}
+        aria-label={t("login.codePlaceholder")}
+        autoFocus
+        className="w-full h-12 pl-12 pr-4 bg-card border border-input rounded-xl text-foreground placeholder:text-muted-foreground/80 placeholder:tracking-normal placeholder:font-normal outline-none focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 transition-colors tracking-[0.3em] font-bold"
+      />
     </div>
   );
 };

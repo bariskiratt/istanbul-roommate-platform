@@ -691,10 +691,15 @@ def admin_flagged(
     rows: list[dict] = []
 
     if kind in ("listing", "all"):
+        # Onay bekleyen ilan, işareti düşse de kuyrukta kalır: sahibi metni
+        # düzenleyince denetim artık işaretlemeyebilir, ama ilan hâlâ
+        # yöneticinin kararını bekliyor. Kuyruktan düşseydi hiçbir yerde
+        # görünmeden sonsuza kadar beklerdi.
         listing_filter = (
             models.Listing.moderation_removed.is_(True)
             if removed_only
             else models.Listing.is_flagged.is_(True)
+            | models.Listing.pending_review.is_(True)
         )
         listings = db.scalars(
             select(models.Listing)

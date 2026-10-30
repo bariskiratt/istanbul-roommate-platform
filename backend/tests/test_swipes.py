@@ -314,3 +314,52 @@ def test_deste_sifirlama_eslesmeyi_ve_sohbeti_korur(client):
     )
     assert res.json() == {"matched": True, "match_id": match_id}
     assert len(client.get("/api/matches", headers=admin["headers"]).json()) == 1
+
+def test_karar_kisinin_butun_bekleyen_begenilerine_uygulanir(client):
+    """Üç ilanı beğenen kişi kuyrukta tek karar ister (rakip raporu #11)."""
+    ayse = _make_user(client, "ayse@uni.edu.tr", "Ayşe")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    veli = _make_user(client, "veli@uni.edu.tr", "Veli")
+    listings = [_make_listing(client, ayse["headers"], title=f"İlan {i}") for i in range(3)]
+    for i, lid in enumerate(listings):
+        client.post(
+            "/api/swipes",
+            headers=ali["headers"],
+            json={"listing_id": lid, "direction": "like", "comment": f"Yorum {i}"},
+        )
+    client.post(
+        "/api/swipes", headers=veli["headers"], json={"listing_id": listings[0], "direction": "like"}
+    )
+
+    queue = client.get("/api/swipes/received", headers=ayse["headers"]).json()
+    assert sorted(r["user"]["id"] for r in queue) == sorted([ali["id"]] * 3 + [veli["id"]])
+
+    ali_swipe = next(r["swipe_id"] for r in queue if r["user"]["id"] == ali["id"])
+    res = client.post(
+        f"/api/swipes/{ali_swipe}/respond", headers=ayse["headers"], json={"accept": True}
+    ).json()
+    assert res["matched"] is True
+
+    # Ali'nin üç beğenisi de yanıtlandı; Veli'ninki bekliyor.
+    queue = client.get("/api/swipes/received", headers=ayse["headers"]).json()
+    assert [r["user"]["id"] for r in queue] == [veli["id"]]
+    # Üç yorum da sohbete taşındı.
+    texts = [
+        m["content"]
+        for m in client.get(
+            f"/api/matches/{res['match_id']}/messages", headers=ayse["headers"]
+        ).json()
+    ]
+    assert sorted(texts) == ["Yorum 0", "Yorum 1", "Yorum 2"]
+
+
+def test_ret_de_kisinin_butun_begenilerine_uygulanir(client):
+    ayse = _make_user(client, "ayse@uni.edu.tr", "Ayşe")
+    ali = _make_user(client, "ali@uni.edu.tr", "Ali")
+    for i in range(2):
+        lid = _make_listing(client, ayse["headers"], title=f"İlan {i}")
+        client.post("/api/swipes", headers=ali["headers"], json={"listing_id": lid, "direction": "like"})
+    swipe_id = client.get("/api/swipes/received", headers=ayse["headers"]).json()[0]["swipe_id"]
+    client.post(f"/api/swipes/{swipe_id}/respond", headers=ayse["headers"], json={"accept": False})
+    assert client.get("/api/swipes/received", headers=ayse["headers"]).json() == []
+    assert client.get("/api/matches", headers=ayse["headers"]).json() == []

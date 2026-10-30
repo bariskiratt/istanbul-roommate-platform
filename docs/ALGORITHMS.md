@@ -883,12 +883,15 @@ losing chat history — re-liking re-finds the same match
 excludes every listing the user has already swiped, via a subquery, and also
 excludes their own listings. The card cannot come back.
 
-**Where de-duplication stops.** The Likes queue
-(`GET /api/swipes/received`, `swipes.py:198-229`) is a list of *swipes*, not of
-people. If one user likes three of your listings, they appear three times. The
-query has no `DISTINCT` on `swiper_id`, and accepting one of the three leaves
-the other two pending — though accepting any of them creates the single match,
-so the duplicates are cosmetic rather than structural.
+**Person level (the Likes screen).** `GET /api/swipes/received` still returns
+one row per *swipe*, because each row carries what was liked and the comment.
+The screen groups those rows by person (`frontend/src/lib/likeGroups.ts`), so
+someone who liked three of your listings is one card with three "what they
+liked" blocks. The decision is per person too: `respond_to_like` applies an
+accept or a reject to every pending like that person left on your listings, so
+the other two do not wait in the queue after the match exists. Accepting
+delivers the comments from all of them, because `_deliver_comments` runs before
+the rows are marked responded.
 
 ### 4.4 Suspension is filtered everywhere, consistently
 
@@ -1066,8 +1069,10 @@ Every tunable in this document, in one place:
 
 ### Matching
 
-23. **The Likes queue lists swipes, not people** (`swipes.py:198-229`); one
-    person who liked three of your listings appears three times.
+23. **The Likes API lists swipes, not people.** The screen groups them by
+    person (`frontend/src/lib/likeGroups.ts`) and the server applies a decision
+    to all of a person's pending likes, but a client that reads
+    `GET /api/swipes/received` directly still sees one row per liked listing.
 24. **No ranking anywhere.** The deck is reverse-chronological
     (`listings.py:332`) and the Likes queue is reverse-chronological
     (`swipes.py:218`). Budget overlap, university, district preference and
