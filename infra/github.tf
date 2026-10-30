@@ -1,23 +1,34 @@
-# GitHub Actions → AWS, saklanan anahtar OLMADAN (OIDC).
+# GitHub Actions'ın AWS kimliği. İki yol var (var.github_oidc):
 #
-# İş akışı her koşuda GitHub'dan kısa ömürlü, imzalı bir kimlik belirteci
-# alır; AWS onu bu sağlayıcıyla doğrular ve aşağıdaki rolü bir saatliğine
-# verir. GitHub'da AWS erişim anahtarı tutulmaz; sızacak bir şey yoktur.
-# Rolü yalnızca bu deponun MAIN dalında koşan iş akışları üstlenebilir: bir
-# PR'daki (çatallardan gelenler dahil) iş akışı AWS'ye giremez.
+# OIDC (klasik hesap, github_oidc = true): saklanan anahtar YOK. İş akışı her
+# koşuda GitHub'dan kısa ömürlü, imzalı bir kimlik belirteci alır; AWS onu bu
+# sağlayıcıyla doğrular ve aşağıdaki rolü bir saatliğine verir. Rolü yalnızca
+# bu deponun MAIN dalında koşan iş akışları üstlenebilir.
+#
+# IAM kullanıcısı (yeni "proje" hesapları, varsayılan): bu hesaplar OIDC
+# sağlayıcısı kurmayı yasaklıyor, bu yüzden iş akışı bir erişim anahtarıyla
+# girer. Anahtar GitHub'da secret olarak durur; GitHub secret'ları PR'lara
+# (çatallardan gelenler dahil) verilmez ve iş akışı yalnızca main'de koşar.
+# Anahtar Terraform'da ÜRETİLMEZ (gizli kısmı state dosyasına yazılırdı):
+#   aws iam create-access-key --user-name evdes-github-deploy
+#
+# Yetkiler iki yolda da aynı: aşağıdaki github_deploy belgesi.
 
 resource "aws_iam_openid_connect_provider" "github" {
+  count          = var.github_oidc ? 1 : 0
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
 }
 
 data "aws_iam_policy_document" "github_trust" {
+  count = var.github_oidc ? 1 : 0
+
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [aws_iam_openid_connect_provider.github[0].arn]
     }
 
     condition {
@@ -36,10 +47,17 @@ data "aws_iam_policy_document" "github_trust" {
 }
 
 resource "aws_iam_role" "github_deploy" {
+  count                = var.github_oidc ? 1 : 0
   name                 = "${var.project}-github-deploy"
   description          = "GitHub Actions (${var.github_repo}, main): model yükleme ve Lambda dağıtımı"
-  assume_role_policy   = data.aws_iam_policy_document.github_trust.json
+  assume_role_policy   = data.aws_iam_policy_document.github_trust[0].json
   max_session_duration = 3600
+}
+
+resource "aws_iam_user" "github_deploy" {
+  count = var.github_oidc ? 0 : 1
+  name  = "${var.project}-github-deploy"
+  path  = "/service/"
 }
 
 # En az yetki: yalnızca bu projenin kovası, ECR deposu ve Lambda fonksiyonu.
@@ -98,7 +116,15 @@ data "aws_iam_policy_document" "github_deploy" {
 }
 
 resource "aws_iam_role_policy" "github_deploy" {
+  count  = var.github_oidc ? 1 : 0
   name   = "deploy-fairprice"
-  role   = aws_iam_role.github_deploy.id
+  role   = aws_iam_role.github_deploy[0].id
+  policy = data.aws_iam_policy_document.github_deploy.json
+}
+
+resource "aws_iam_user_policy" "github_deploy" {
+  count  = var.github_oidc ? 0 : 1
+  name   = "deploy-fairprice"
+  user   = aws_iam_user.github_deploy[0].name
   policy = data.aws_iam_policy_document.github_deploy.json
 }

@@ -2,7 +2,7 @@
 # Terraform'un durum (state) kovasını kurar ve `terraform init` yapar.
 #
 # Bir kez, AWS CLI'da kendi kullanıcınla oturum açtıktan sonra çalıştır
-# (`aws sso login` ya da `aws configure`). Tekrar çalıştırmak zararsız:
+# (`aws login`, `aws sso login` ya da `aws configure`). Tekrar çalıştırmak zararsız:
 # kova varsa dokunmaz, yalnızca init yapar. Ayrıntı: docs/AWS.md.
 #
 # Durum kovası Terraform'un DIŞINDA kurulur, çünkü Terraform durumunu
@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-REGION="${AWS_REGION:-us-west-2}"
+REGION="${AWS_REGION:-us-east-2}"
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 BUCKET="evdes-tfstate-${ACCOUNT}"
 

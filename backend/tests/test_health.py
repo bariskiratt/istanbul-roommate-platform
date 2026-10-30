@@ -101,7 +101,7 @@ def test_reports_model_version_and_lambda_path(client, monkeypatch):
     monkeypatch.setitem(
         STATE, "model_info", {"source": "s3", "version": "20261026-193000-abc1234"}
     )
-    monkeypatch.setenv("FAIRPRICE_URL", "https://abc.execute-api.us-west-2.amazonaws.com/predict")
+    monkeypatch.setenv("FAIRPRICE_URL", "https://abc.execute-api.eu-north-1.amazonaws.com/predict")
     monkeypatch.setenv("FAIRPRICE_AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
     monkeypatch.setenv("FAIRPRICE_AWS_SECRET_ACCESS_KEY", "secret")
 

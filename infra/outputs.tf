@@ -1,6 +1,11 @@
 output "github_role_arn" {
-  description = "GitHub → Settings → Secrets and variables → Actions → Variables → AWS_ROLE_ARN"
-  value       = aws_iam_role.github_deploy.arn
+  description = "github_oidc = true ise: GitHub → Settings → Secrets and variables → Actions → Variables → AWS_ROLE_ARN"
+  value       = var.github_oidc ? aws_iam_role.github_deploy[0].arn : null
+}
+
+output "github_user" {
+  description = "github_oidc = false ise GitHub'ın anahtarı bu kullanıcı için üretilir: aws iam create-access-key --user-name <bu>"
+  value       = var.github_oidc ? null : aws_iam_user.github_deploy[0].name
 }
 
 output "model_bucket" {
