@@ -30,8 +30,11 @@ COPY services/fairprice/handler.py ${LAMBDA_TASK_ROOT}/
 # Boşsa (yerel deneme) MODEL_PATH ile diskteki model kullanılır.
 ARG MODEL_VERSION=""
 ARG MODEL_SHA256=""
+# JOBLIB_MULTIPROCESSING=0: Lambda'da /dev/shm yok; joblib her soğuk
+# başlangıçta bunu deneyip uyarı yazmasın (zaten tek iş parçacığıyla çalışıyor).
 ENV MODEL_VERSION=${MODEL_VERSION} \
     MODEL_SHA256=${MODEL_SHA256} \
-    OMP_NUM_THREADS=1
+    OMP_NUM_THREADS=1 \
+    JOBLIB_MULTIPROCESSING=0
 
 CMD ["handler.handler"]

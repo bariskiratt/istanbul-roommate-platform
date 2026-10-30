@@ -60,8 +60,13 @@ resource "aws_lambda_function" "this" {
   image_uri     = var.image_uri
   architectures = ["x86_64"]
   memory_size   = var.memory_mb
-  timeout       = 10
-  publish       = true
+  # Yeni bir imajın ilk soğuk başlangıcı (Lambda imajı henüz önbelleğe
+  # almamışken pandas/LightGBM importu) 10 sn'yi aşabiliyor: ilk kurulumda
+  # init 10 sn'de kesildi, ancak üçüncü denemede açıldı. Init 10 sn'yi aşınca
+  # Lambda onu bu süre içinde yeniden dener, bu yüzden pay bırakıyoruz.
+  # Kullanıcıyı etkilemez: backend 3 sn'den sonra yerel modelle cevap verir.
+  timeout = 30
+  publish = true
 
   reserved_concurrent_executions = var.reserved_concurrency
 
