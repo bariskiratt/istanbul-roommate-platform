@@ -21,7 +21,7 @@ from app.fairprice import estimate_for_listing
 from app.main import STATE, app
 from app.pricing import feature_signature
 
-URL = "https://abc123.execute-api.us-west-2.amazonaws.com/predict"
+URL = "https://abc123.execute-api.eu-north-1.amazonaws.com/predict"
 ROW = {
     "room": 2,
     "living_room": 1,
@@ -133,12 +133,23 @@ def test_lambda_band_is_used_and_request_is_signed(fake_model, remote_env, lambd
     assert call["url"] == URL
     # Sözleşme ham alanlardır, özellik matrisi değil (pricing.ROW_FIELDS).
     assert call["body"] == {"rows": [ROW]}
-    # API Gateway rotası IAM ister: istek bu bölge ve servis için SigV4 imzalı.
+    # API Gateway rotası IAM ister: istek URL'deki bölge ve bu servis için
+    # SigV4 imzalı.
     auth = call["headers"]["Authorization"]
     assert auth.startswith("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/")
-    assert "/us-west-2/execute-api/aws4_request" in auth
+    assert "/eu-north-1/execute-api/aws4_request" in auth
     assert "X-Amz-Date" in call["headers"]
     assert call["timeout"] == (rent_model.CONNECT_TIMEOUT, rent_model.DEFAULT_TIMEOUT)
+
+
+def test_region_comes_from_url_unless_given(monkeypatch):
+    monkeypatch.setenv("FAIRPRICE_URL", "https://x1.execute-api.ap-southeast-2.amazonaws.com/predict")
+    assert rent_model._region() == "ap-southeast-2"
+    monkeypatch.setenv("FAIRPRICE_AWS_REGION", "eu-west-1")
+    assert rent_model._region() == "eu-west-1"
+    monkeypatch.delenv("FAIRPRICE_AWS_REGION")
+    monkeypatch.setenv("FAIRPRICE_URL", "https://tahmin.example.com/predict")
+    assert rent_model._region() == rent_model.DEFAULT_REGION
 
 
 @pytest.mark.parametrize(

@@ -140,7 +140,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--bucket", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-west-2"))
+    parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-2"))
     args = parser.parse_args(argv)
 
     import boto3

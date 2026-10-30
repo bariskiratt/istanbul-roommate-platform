@@ -40,7 +40,7 @@ the fair-rent model, the non-ML algorithms, the frontend, and a security audit.
 [`docs/README.md`](docs/README.md) says which document answers which question
 and in what order to read them. Deployment is [DEPLOY.md](DEPLOY.md). The
 optional AWS service for the fair-rent model (S3, Lambda, API Gateway,
-Terraform, GitHub OIDC) is [`docs/AWS.md`](docs/AWS.md).
+Terraform, least-privilege CI deploys) is [`docs/AWS.md`](docs/AWS.md).
 
 ## 🧠 Models & method
 
@@ -67,7 +67,7 @@ frontend/            React + TypeScript + Vite + Tailwind + shadcn/ui  →  Verc
 backend/             FastAPI + SQLAlchemy + LightGBM (Docker)          →  Render
                      SQLite locally, Postgres in production
 services/fairprice/  fair-rent model inference (container image)       →  AWS Lambda (optional)
-infra/               Terraform: S3, ECR, Lambda, API Gateway, IAM/OIDC, CloudWatch
+infra/               Terraform: S3, ECR, Lambda, API Gateway, IAM, CloudWatch
 ```
 
 With AWS configured, the backend asks the Lambda for the price band and falls

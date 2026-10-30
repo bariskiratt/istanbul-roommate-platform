@@ -30,7 +30,7 @@ flowchart LR
     CI["CI green on main"] --> DEPLOY["AWS yayını<br/>train → gate → S3<br/>build → ECR → Lambda"]
   end
 
-  DEPLOY -- "OIDC (no stored keys)" --> ROLE["IAM role<br/>evdes-github-deploy"]
+  DEPLOY -- "deploy user key (GitHub secret)<br/>or OIDC role" --> ROLE["IAM identity<br/>evdes-github-deploy"]
   ROLE --> S3[("S3<br/>fair-price/&lt;version&gt;/<br/>fair-price/latest.json")]
   ROLE --> ECR[("ECR<br/>evdes-fairprice")]
   ROLE -- "publish version,<br/>smoke test, move alias" --> LAMBDA["Lambda<br/>evdes-fairprice:live"]
@@ -51,12 +51,21 @@ flowchart LR
 | Image registry | ECR, immutable tags, scan on push, keeps the last 10 images. | `infra/service.tf` |
 | Prediction service | Lambda (container image, 1 GB, 10 s), a `live` alias, warmed every 5 minutes. | `infra/modules/predict-service/lambda.tf`, `services/fairprice/` |
 | HTTP front door | API Gateway HTTP API, `POST /predict`, **IAM authorization**, throttled. | `infra/modules/predict-service/api.tf` |
-| CI identity | GitHub OIDC provider + a role only `main` of this repository can assume. | `infra/github.tf` |
+| CI identity | An IAM user whose key is a GitHub secret (default), or, on a classic account, a GitHub OIDC provider + a role only `main` of this repository can assume (`github_oidc = true`). Same permissions either way. | `infra/github.tf` |
 | Backend identity | IAM user for Render: read models, call `/predict`. Nothing else. | `infra/render.tf` |
 | Observability | Dashboard, two alarms, email via SNS, a $5 monthly budget. | `infra/monitoring.tf`, `infra/modules/predict-service/monitoring.tf` |
 
-The region is `us-west-2` (Oregon): Render's blueprint lands there, so a
-prediction request never leaves the region.
+The region is `us-east-2` (Ohio). evdes runs in one of AWS's newer
+"project" accounts (AWS Settings → Projects), which are locked by an
+organization policy to the single Region assigned at sign-up. Render runs in
+Oregon, so a prediction call crosses the US (~50 ms), well inside the 3 s
+budget. On a classic account, set `region = "us-west-2"` to keep the call in
+Oregon.
+
+These accounts also deny creating IAM identity providers (`iam:*Provider*`),
+which is why GitHub signs in with a deploy user's key instead of OIDC. The
+`github_oidc` switch in `infra/variables.tf` restores the keyless path on a
+classic account.
 
 ## 2. Request path
 
@@ -169,9 +178,13 @@ run *AWS yayını* manually to publish a version that carries it.
 
 ## 5. Security
 
-- **No AWS keys in GitHub.** Workflows get a one-hour role via OIDC. The trust
-  policy only accepts tokens for `repo:bariskiratt/istanbul-roommate-platform:ref:refs/heads/main`,
-  so pull requests (including forks) cannot reach AWS.
+- **GitHub's AWS access is main-only.** The deploy workflow runs only on `main`
+  (after green CI, or by hand), and GitHub never passes repository secrets to
+  pull-request workflows, including forks. With the default deploy user the
+  key is a GitHub secret with the narrow permissions below; with
+  `github_oidc = true` there is no key at all: workflows get a one-hour role
+  whose trust policy only accepts tokens for
+  `repo:bariskiratt/istanbul-roommate-platform:ref:refs/heads/main`.
 - **Least privilege.**
 
   | Identity | Can | Cannot |
@@ -180,8 +193,9 @@ run *AWS yayını* manually to publish a version that carries it.
   | `evdes-fairprice-lambda` | read `fair-price/*`, write its own log group | everything else |
   | `evdes-render-backend` (Render) | read `fair-price/*`, call `POST /predict` | write anything |
 
-- **The only long-lived key** belongs to the Render user (Render has no OIDC).
-  It is created by hand, never by Terraform, so it is not in the state file.
+- **Long-lived keys** belong only to the Render user (Render has no OIDC) and,
+  on project accounts, the GitHub deploy user. Both are created by hand, never
+  by Terraform, so they are not in the state file.
 - **The API is not public.** The route requires IAM authorization; an unsigned
   request gets 403 from API Gateway and never reaches the Lambda. Throttling
   (5 rps, burst 10) and the $5 budget alarm bound the cost of a leaked key.
@@ -190,24 +204,41 @@ run *AWS yayını* manually to publish a version that carries it.
 
 ## 6. One-time setup
 
-You need an AWS account, the AWS CLI v2 and Terraform ≥ 1.10. Steps 1–3 are
-in the console; never create access keys for the root user.
+You need an AWS account, the AWS CLI v2 (2.32.0 or later) and Terraform ≥ 1.10.
+A step-by-step Turkish version of this section is kept with the project files.
 
-1. **Account.** Create the account, enable MFA on the root user, then create a
-   day-to-day admin user in **IAM Identity Center** (with MFA) and sign in with
-   it from the CLI: `aws configure sso`, then `export AWS_PROFILE=<profile>`.
-   `aws sts get-caller-identity` must show that user, not root.
+1. **Account and CLI.** Sign up (AWS Builder ID), add MFA to the Builder ID
+   (AWS Settings → Manage security and sign-in → Security), and read the
+   project's Region (Projects → evdes → Additional info). Sign the CLI in with
+   `aws login --profile evdes`. Terraform may not read `aws login` sessions
+   directly, so add a profile that hands it the same credentials:
+
+   ```ini
+   # ~/.aws/config
+   [profile evdes-tf]
+   credential_process = aws configure export-credentials --profile evdes --format process
+   region = us-east-2
+   ```
+
+   then `export AWS_PROFILE=evdes-tf AWS_REGION=us-east-2`;
+   `aws sts get-caller-identity` must print the project's account. On a classic
+   account, use an IAM Identity Center user (`aws configure sso`), never root
+   keys.
 2. **State bucket + init.** `cd infra && ./bootstrap.sh`. It creates
    `evdes-tfstate-<account>` (versioned, private), copies
    `terraform.tfvars.example` to `terraform.tfvars` and runs `terraform init`.
-   Put your address in `alert_email` in `terraform.tfvars` (that file is
-   git-ignored; the repository is public).
+   Put your address in `alert_email` and check `region` in `terraform.tfvars`
+   (that file is git-ignored; the repository is public).
 3. **First apply.** `terraform apply`. It creates the model bucket, ECR, the
-   GitHub role, the Render user, the alert topic and the budget. Confirm the
+   GitHub deploy user (or role), the Render user, the alert topic and the budget. Confirm the
    subscription email AWS sends you, or alarms will not arrive.
-4. **Connect GitHub.** Repository → Settings → Secrets and variables → Actions →
-   **Variables** → `AWS_ROLE_ARN` = the `github_role_arn` output. It is a
-   variable, not a secret: the ARN is not sensitive.
+4. **Connect GitHub.** Repository → Settings → Secrets and variables → Actions:
+   - **Variables** → `AWS_REGION` = the region (e.g. `us-east-2`). Until it is
+     set, the deploy workflow skips itself.
+   - Deploy user (default): `aws iam create-access-key --user-name evdes-github-deploy`,
+     then **Secrets** → `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+   - OIDC (`github_oidc = true`): **Variables** → `AWS_ROLE_ARN` = the
+     `github_role_arn` output instead; no secrets.
 5. **First model and image.** Actions → **AWS yayını** → Run workflow on `main`
    with both boxes ticked. It trains, uploads and promotes the first model,
    builds the image and pushes it to ECR, then notes that the function does

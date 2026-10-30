@@ -30,6 +30,7 @@ import io
 import json
 import math
 import os
+import re
 import threading
 import time
 
@@ -43,7 +44,9 @@ from app.config import MODEL_PATH
 from app.pricing import feature_signature, predict_band
 
 LATEST_KEY = "fair-price/latest.json"
-DEFAULT_REGION = "us-west-2"  # infra/variables.tf ile aynı
+DEFAULT_REGION = "us-east-2"  # infra/variables.tf ile aynı
+# https://<api-id>.execute-api.<bölge>.amazonaws.com/predict
+_URL_REGION = re.compile(r"\.execute-api\.([a-z0-9-]+)\.amazonaws\.com")
 
 # Lambda tek istekte en fazla bu kadar satır kabul eder (services/fairprice).
 MAX_REMOTE_ROWS = 100
@@ -73,7 +76,12 @@ class BadAnswer(Exception):
 
 
 def _region() -> str:
-    return os.getenv("FAIRPRICE_AWS_REGION", DEFAULT_REGION)
+    """Açıkça verilmişse o; yoksa FAIRPRICE_URL'deki bölge (kova da orada)."""
+    explicit = os.getenv("FAIRPRICE_AWS_REGION", "").strip()
+    if explicit:
+        return explicit
+    match = _URL_REGION.search(os.getenv("FAIRPRICE_URL", ""))
+    return match.group(1) if match else DEFAULT_REGION
 
 
 def _credentials() -> Credentials | None:

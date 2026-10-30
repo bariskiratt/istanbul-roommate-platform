@@ -7,3 +7,11 @@ alert_email = "sen@example.com"
 # 2. aşama: "AWS yayını" iş akışı imajı ECR'ye gönderdikten sonra true yap ve
 # yeniden `terraform apply` çalıştır (docs/AWS.md, Kurulum adım 6).
 enable_predict_service = false
+
+# Hesabının bölgesi (Settings → Projects → <proje> → Additional info → Region).
+# Yeni "proje" hesapları yalnızca bu bölgede kaynak kurabilir.
+region = "us-east-2"
+
+# Klasik (root kullanıcılı) bir hesapta true yapıp GitHub'ı anahtarsız
+# bağlayabilirsin; yeni "proje" hesapları OIDC'ye izin vermiyor.
+github_oidc = false

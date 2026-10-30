@@ -6,11 +6,15 @@
 #       servis kodu        → Lambda imajını derle ve dağıt
 #   - Elle: Actions → AWS yayını → Run workflow (ilk kurulumda iki kutu da açık).
 #
-# AWS'ye anahtarla değil OIDC ile girer: GitHub'da saklanan tek şey rolün
-# ARN'si (Settings → Secrets and variables → Actions → Variables →
-# AWS_ROLE_ARN), o da gizli değil. Değişken tanımlı değilse hiçbir iş koşmaz;
-# AWS kurulmadan bu dosya main'e girebilir. Rolü yalnızca main dalındaki
-# koşular üstlenebilir (infra/github.tf). Kurulum: docs/AWS.md.
+# Ayarlar (Settings → Secrets and variables → Actions), kurulum: docs/AWS.md:
+#   Variables → AWS_REGION          hesabın bölgesi. Tanımlı değilse hiçbir iş
+#                                   koşmaz; AWS kurulmadan bu dosya main'de durabilir.
+#   ve AWS'ye giriş için ikisinden biri (infra/github.tf):
+#   Secrets   → AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+#                                   evdes-github-deploy kullanıcısının anahtarı
+#                                   (yeni "proje" hesapları; OIDC'ye izin vermiyorlar)
+#   Variables → AWS_ROLE_ARN        anahtarsız OIDC rolü (klasik hesap, github_oidc = true)
+# İş akışı yalnızca main'de koşar; GitHub secret'ları PR'lara verilmez.
 #
 # Dağıtım güvenliği: yeni Lambda sürümü önce yayınlanır, `live` takma adı
 # ancak o sürüme yapılan duman testi geçerse ona çevrilir. Test düşerse
@@ -42,7 +46,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # OIDC belirteci (AWS rolü için)
+  id-token: write # OIDC belirteci (AWS_ROLE_ARN kullanılıyorsa)
 
 # Yayınlar sırayla: iki koşu aynı anda latest.json'a ya da `live`a yazmasın.
 concurrency:
@@ -51,7 +55,7 @@ concurrency:
 
 env:
   # infra/variables.tf ve infra/versions.tf'teki adlandırmayla aynı.
-  AWS_REGION: us-west-2
+  AWS_REGION: ${{ vars.AWS_REGION }}
   FUNCTION: evdes-fairprice
   ECR_REPOSITORY: evdes-fairprice
 
@@ -59,7 +63,7 @@ jobs:
   plan:
     name: Ne yayınlanacak
     if: >-
-      vars.AWS_ROLE_ARN != '' && (
+      vars.AWS_REGION != '' && (
         github.event_name == 'workflow_dispatch' ||
         (github.event.workflow_run.event == 'push' &&
          github.event.workflow_run.conclusion == 'success'))
@@ -125,6 +129,9 @@ jobs:
       - id: aws
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # Hangisi tanımlıysa o: anahtar (secret) ya da OIDC rolü (variable).
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - run: python -m scripts.train_model --fast
@@ -154,6 +161,9 @@ jobs:
       - id: aws
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # Hangisi tanımlıysa o: anahtar (secret) ya da OIDC rolü (variable).
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 

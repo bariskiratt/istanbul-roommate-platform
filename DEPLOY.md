@@ -558,7 +558,7 @@ Nothing here is required: without it the backend serves the model trained into
 its own image. With it, models are trained in GitHub Actions and stored in S3,
 and price bands come from an AWS Lambda behind API Gateway, with the
 in-process model as an automatic fallback. Architecture, security and the
-nine setup steps (Terraform apply, the `AWS_ROLE_ARN` repository variable, the
+nine setup steps (Terraform apply, the `AWS_REGION` variable and deploy key in GitHub, the
 four `FAIRPRICE_*` variables below) are in [docs/AWS.md](docs/AWS.md).
 
 ## Environment variables (backend)
@@ -589,4 +589,5 @@ four `FAIRPRICE_*` variables below) are in [docs/AWS.md](docs/AWS.md).
 | `FAIRPRICE_URL` | — | Optional, AWS. The Lambda's `…/predict` URL (Terraform output `predict_url`). Set (with the two keys below) → price bands come from the Lambda, with the in-process model as fallback on any error or a 3 s timeout. Unset → bands are computed in-process. |
 | `FAIRPRICE_AWS_ACCESS_KEY_ID` / `FAIRPRICE_AWS_SECRET_ACCESS_KEY` | — | Key of the `evdes-render-backend` IAM user, which may only read models and call `/predict`. Without them `FAIRPRICE_URL` is ignored. |
 | `FAIRPRICE_TIMEOUT` | `3` | Seconds to wait for the Lambda before answering from the in-process model. |
+| `FAIRPRICE_AWS_REGION` | from `FAIRPRICE_URL` | Region for request signing and the model bucket. Unset → read from the `predict_url` host (`…execute-api.<region>.amazonaws.com`), else `us-east-2`; set it only if the bucket lives elsewhere. |
 | `PHOTO_SCRUB` | `1` | `0` stops the one-time background job that removes location and other metadata from photos uploaded before uploads were re-encoded (section 1.5). Same guard as `PHOTO_SWEEP`. |

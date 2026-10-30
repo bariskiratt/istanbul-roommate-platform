@@ -1,7 +1,13 @@
 variable "region" {
-  description = "Her şeyin kurulacağı bölge. Render servisi Oregon'da (us-west-2): tahmin isteği bölge dışına çıkmasın."
+  description = <<-EOT
+    Her şeyin kurulacağı bölge. AWS'nin yeni "proje" hesapları tek bir bölgeye
+    kilitli: bölge kayıttaki adrese göre atanır (us-east-2, eu-north-1 ya da
+    ap-southeast-2) ve AWS Settings → Projects → <proje> → Additional info
+    bölümünde yazar. evdes hesabınınki us-east-2 (Ohio). Oregon'daki Render'dan
+    Ohio'ya istek ~50 ms ekler. Klasik bir hesapta us-west-2 seçilebilir.
+  EOT
   type        = string
-  default     = "us-west-2"
+  default     = "us-east-2"
 }
 
 variable "project" {
@@ -11,9 +17,21 @@ variable "project" {
 }
 
 variable "github_repo" {
-  description = "AWS'ye yalnızca bu deponun main dalındaki iş akışları girebilir (OIDC)."
+  description = "AWS'ye yalnızca bu deponun main dalındaki iş akışları girebilir (OIDC açıkken)."
   type        = string
   default     = "bariskiratt/istanbul-roommate-platform"
+}
+
+variable "github_oidc" {
+  description = <<-EOT
+    GitHub Actions AWS'ye nasıl girsin (infra/github.tf):
+      false → dar yetkili bir IAM kullanıcısının anahtarıyla (GitHub secret).
+      true  → anahtarsız, OIDC rolüyle.
+    Yeni "proje" hesapları OIDC sağlayıcısı kurmayı yasaklıyor (iam:*Provider*
+    SCP ile reddedilir), bu yüzden varsayılan false. Klasik hesapta true yap.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "alert_email" {
