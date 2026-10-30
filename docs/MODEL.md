@@ -57,7 +57,7 @@ flowchart LR
     E --> F["FastAPI lifespan load<br/>main.py:108-114"]
     F --> G["/api/estimate<br/>main.py:269"]
     F --> H["/api/listings/{id}/fair-price<br/>listings.py:374"]
-    G --> I["× CPI factor<br/>indexing.py:75"]
+    G --> I["× rent index factor<br/>indexing.py:95"]
     H --> I
     I --> J["÷ bedrooms<br/>fairprice.py:97"]
     J --> K["room_low / room_mid / room_high"]
@@ -510,11 +510,11 @@ of five 80/20 folds does in aggregate.
 
 ---
 
-## 7. CPI indexing — dragging 2025 liras into today
+## 7. Rent indexing — dragging 2025 liras into today
 
 ### 7.1 Why it is unavoidable
 
-The training data has no date column. `backend/app/indexing.py:55` records the
+The training data has no date column. `backend/app/indexing.py:66` records the
 best available answer:
 
 ```python
@@ -529,95 +529,96 @@ speaks in February 2025 liras. Serving those numbers unadjusted would tell every
 user their rent is "above the fair range" — not because it is, but because the
 ruler has shrunk.
 
-### 7.2 How the anchor was derived
+### 7.2 Which index, and why it changed in October 2026
 
-`indexing.py:7-18` documents the derivation from TÜİK press bulletins, and it is
-worth reading closely because the arithmetic contains a trap.
+Since October 2026 the factor follows the **TCMB New-Tenant Rent Index
+(Yeni Kiracı Kira Endeksi, YKKE) for İstanbul (TR10)**. Until then it followed
+TÜİK's CPI housing group. The reasons for the switch are in `indexing.py:9-22`:
 
-TÜİK **rebased** its index in 2025: the February 2025 bulletin uses 2003=100,
-the June 2026 bulletin uses 2025=100. Index *levels* across the rebase cannot be
-divided. What survives a rebase are the published *ratios*, so the chain is
-built from ratios:
+1. **It measures the same thing as our data.** YKKE tracks the rent agreed with
+   a *new* tenant; the dataset is asking rents on new listings. TÜİK's rent
+   item measures what *sitting* tenants pay. After the 25% legal cap expired in
+   2024, old contracts started catching up with the market, and TÜİK rent ran
+   ahead of new-tenant rent:
 
-| ratio | value | source |
+   | Jun 2025 → Jun 2026 | change |
+   |---|---|
+   | TÜİK CPI, housing group (used until Oct 2026) | +45,14% |
+   | TCMB YKKE, İstanbul | +33,4% |
+
+   The old anchor (1,656 at June 2026) therefore overstated İstanbul asking
+   rents by about 7%.
+2. **It is İstanbul-only.** TÜİK's series is national.
+3. **It is hedonic** (quality-adjusted), so a month in which bigger or newer
+   flats were valued does not move it.
+4. **The whole chain is published.** The old anchor's Feb→Jun 2025 leg was the
+   midpoint of a derived range; the new chain has no estimated link.
+
+Its weakness (`indexing.py:24-27`): YKKE is built from banks' mortgage
+appraisal reports, so the rent is an appraiser's valuation, not an asking
+price, and the sample leans towards mortgageable (newer) homes. TCMB has
+published it only since February 2026 and may revise past values.
+
+### 7.3 The chain
+
+Each number is the İstanbul figure in TCMB's monthly bulletin
+"Konut Fiyat Endeksi ve Yeni Kiracı Kira Endeksi":
+
+| link | value | where |
 |---|---|---|
-| Feb 2025 vs Dec 2024 | +7,42% | bulletin 54177 |
-| Jun 2025 vs Dec 2024 | +16,67% | bulletin 58289, comparison column |
-| Jun 2026 vs Jun 2025 | +32,11% | bulletin 58289 |
+| Feb 2025 → Feb 2026 (annual change, Feb 2026 bulletin) | +41,0% | `ANCHOR_FACTOR`, `indexing.py:74-75` |
+| Mar, Apr, May, Jun, Jul, Aug, Sep 2026 (monthly) | +2,2 · +1,4 · +3,1 · +2,5 · +1,7 · +4,9 · +3,5% | `MONTHLY_AFTER_ANCHOR`, `indexing.py:79-87` |
 
-Feb 2025 → Jun 2025 = 1,1667 / 1,0742 = **1,086111**
-Feb 2025 → Jun 2026 = 1,086111 × 1,3211 = **1,434861**
+Feb 2025 → Sep 2026 = 1,410 × 1,022 × 1,014 × 1,031 × 1,025 × 1,017 × 1,049 ×
+1,035 = **1,7050**.
 
-That is `HEADLINE_FACTOR` (`indexing.py:59`), and
-`backend/tests/test_indexing.py:18-30` recomputes it from the three published
-ratios so that a future hand-edit cannot silently corrupt it.
+The annual change lands exactly on the data period, which is why the anchor is
+February 2026 and not the first month TCMB published.
+`backend/tests/test_indexing.py` checks that the anchor month is
+`DATA_PERIOD` + 12 months, that the monthly entries reproduce the bulletins'
+index levels (Jul 2026 309,4 → Sep 2026 336,5, within 0,5%), and that no entry
+looks like an annual rate or an index level.
 
-### 7.3 Headline vs housing — and the honest admission
+Comparison values, kept for audit (`indexing.py:43-54`):
 
-`HEADLINE_FACTOR` is **not what gets served**. `indexing.py:20-25` argues it is a
-lower bound, for two reasons:
+| route, Feb 2025 → Sep 2026 | factor |
+|---|---|
+| TÜİK headline CPI | 1,515 (`HEADLINE_FACTOR` = 1,4349 is the published chain to Jun 2026) |
+| **TCMB YKKE İstanbul (served)** | **1,705** |
+| Old method: TÜİK housing group, anchor 1,656 rolled forward with Jul–Sep 2026 (+2,25 · +2,26 · +2,71%) | 1,778 |
 
-1. The housing group rose faster than headline CPI — 45,14% year-on-year in
-   June 2026 (headline 32,11%), 70,81% in February 2025 (headline 39,05%).
-2. TÜİK's rent item measures what *sitting tenants* pay, and those were capped
-   by law for years. Our dataset is **asking** rents on new listings, which are
-   not capped.
-
-The served anchor (`indexing.py:62-63`) is:
-
-```python
-ANCHOR_PERIOD = "2026-06"
-ANCHOR_FACTOR = 1.656
-```
-
-And here the code does something documentation usually fails to do — it labels
-its own number as **partly an estimate** (`indexing.py:27-43`). The housing
-chain cannot be completed because TÜİK did not publish the housing-group
-Feb→Jun 2025 interval, so it is *bounded* instead:
-
-- housing Jun 2026 / Jun 2025 = 1,4514 (published)
-- housing Feb 2025 → Jun 2025 ∈ [1,0861 … 1,1962]
-  - lower: housing moves at headline pace (conservative — housing ran *above*
-    headline throughout)
-  - upper: February 2025's housing monthly rate (+4,58%) sustained for four months
-- ⇒ Feb 2025 → Jun 2026 ∈ [1,576 … 1,736], midpoint **1,656**
-
-1,656 is the midpoint, ~16% above the exact headline chain.
-`indexing.py:40-43` states plainly: *"YAYIMLANMIŞ BİR SAYI DEĞİLDİR"* — it is
-not a published figure. `HEADLINE_FACTOR` is kept in the file purely so the
-decision stays auditable and reversible.
-`backend/tests/test_indexing.py:33-45` asserts the anchor stays inside the
-derived band and above the headline factor.
-
-**This is the single largest source of uncertainty in the whole pipeline.** The
-model's own median error is ~15%; the indexing factor carries a band of roughly
-1,576–1,736, i.e. about ±5% around the midpoint, applied multiplicatively on top
-of every estimate. And that band assumes asking rents track the housing CPI
-group at all — an assumption, not a measurement.
+A side check supports the old Feb→Jun 2025 estimate: from the 2026 annual and
+monthly figures, YKKE İstanbul's implied Feb→Jun 2025 change is ≈1,157, inside
+the old 1,086–1,196 bounds. The old anchor's overshoot came from its
+12-month housing-group leg, not from the estimated part.
 
 ### 7.4 Applying and updating it
 
-`rent_index()` (`indexing.py:75-94`) returns `(factor, period)`:
+`rent_index()` (`indexing.py:95-114`) returns `(factor, period)`:
 
 1. If the `RENT_INDEX_FACTOR` environment variable is set, it wins
-   (`indexing.py:81-86`) — an escape hatch to correct the factor in production
-   without a code change or to pin it in tests. A malformed value falls through
-   to the table rather than taking `/api/estimate` down.
+   (`indexing.py:101-106`) — an escape hatch to correct the factor in
+   production without a code change or to pin it in tests. A malformed value
+   falls through to the table rather than taking `/api/estimate` down.
 2. Otherwise start from `ANCHOR_FACTOR` and compound every month recorded in
-   `MONTHLY_AFTER_ANCHOR` (`indexing.py:67`, applied at `:90-93`).
+   `MONTHLY_AFTER_ANCHOR` (applied at `indexing.py:110-113`).
 
-`MONTHLY_AFTER_ANCHOR` is currently **empty**, so the served factor is exactly
-1,656 for period `2026-06`. Maintenance is one line per TÜİK bulletin, as
-documented at `indexing.py:47-49`. The anchor only needs recomputing if TÜİK
-rebases again.
+The served factor is 1,7050 for period `2026-09`. **Maintenance is one line per
+TCMB bulletin** (published around the 16th of the following month): add the
+first number of the sentence "YKKE ... İstanbul, Ankara ve İzmir'de bir önceki
+aya göre sırasıyla yüzde X" — the İstanbul *monthly* change
+(`indexing.py:56-60`). The anchor only needs recomputing if `DATA_PERIOD`
+changes.
 
 The factor is applied to all three quantiles before anything else happens:
-`main.py:295-297` and `fairprice.py:91-95`. It is also applied to the heat-map's
-neighbourhood medians (`main.py:91`) so the map and the advisor cannot disagree.
-The response carries `index_factor`, `data_period`, `indexed_to` and `indexed`
-(`main.py:318-321`) so the UI can state what was done — including the
-"NOT indexed" variant of the disclaimer
-(`frontend/src/i18n/translations.ts:1018-1019`) for when indexing is switched off.
+`main.py:617-618` and `fairprice.py:86-87`. It is also applied to the heat-map's
+neighbourhood medians (`main.py:100`) so the map and the advisor cannot
+disagree, and the static district pages read the same table at build time
+(`frontend/scripts/rent-index.mjs`, which mirrors `rent_index()`). The response
+carries `index_factor`, `data_period`, `indexed_to` and `indexed` so the UI can
+state what was done — including the "NOT indexed" variant of the disclaimer
+(`frontend/src/i18n/translations.ts`, `fair.disclaimerNotIndexed`) for when
+indexing is switched off.
 
 ---
 
@@ -715,14 +716,15 @@ Things to watch:
    retrain that loses categories silently shrinks the form. Compare
    `len(categories["neighborhood"])` against the current 571.
 4. **New data means a new `DATA_PERIOD`.** If the CSV is replaced with fresher
-   listings, `indexing.py:55` must change and `ANCHOR_FACTOR` must be
-   recomputed from the new base month — otherwise every estimate is inflated
-   twice.
+   listings, `indexing.py:66` must change and the anchor must be re-chosen as
+   the YKKE İstanbul annual change 12 months after the new base month
+   (`tests/test_indexing.py` enforces this) — otherwise every estimate is
+   inflated twice.
 5. **`--fast` and the full run write different metadata.** `--fast` leaves
    `cv_results = None` and `baseline_medape = nan`, and `served_medape` becomes
    the single-split number. Anything reading those fields must tolerate both.
 6. **Run the tests:** `python -m pytest tests/ -q` (381 tests). The indexing
-   tests (`tests/test_indexing.py`) will catch a mangled CPI chain; nothing in
+   tests (`tests/test_indexing.py`) will catch a mangled index chain; nothing in
    the suite validates model accuracy, so the CV table is the only guard there.
 
 ---
@@ -733,13 +735,8 @@ Things to watch:
 
 - **The date is an assumption, not a fact.** The CSV has no date column
   (`indexing.py:3-5`). `DATA_PERIOD = "2025-02"` rests on collection metadata
-  outside the repository. If it is wrong, the CPI factor is wrong, and every
-  estimate is wrong by a constant multiple.
-- **One stale sentence remains about that date.** The root `README.md:44`
-  correctly names the training period as `2025-02`, matching `indexing.py:55`.
-  But `README.md:180` still says "the listing dataset reflects early-2026
-  prices" — it does not; the dataset is February 2025 and is *indexed forward*
-  to June 2026. The code is the authority; that one README line is stale.
+  outside the repository. If it is wrong, the rent index factor is wrong, and
+  every estimate is wrong by a constant multiple.
 - **A quarter of the data is thrown away** (3.020 of 11.388 rows) because rent
   units are ambiguous. Some of those are recoverable real listings.
 - **De-duplication is exact-match only** (`pricing.py:38`). The same flat
@@ -779,16 +776,19 @@ Things to watch:
 
 **Indexing**
 
-- **`ANCHOR_FACTOR = 1.656` is a midpoint estimate, not a published statistic**
-  (`indexing.py:40-43`). The derived band is 1,576–1,736.
-- **It assumes asking rents follow the housing CPI group.** Sitting-tenant rent
-  caps mean that assumption is directionally conservative, but it is untested.
-- **A single national factor is applied to every neighbourhood.** Micro-market
+- **The index is an appraisal series, not an asking-price series.** YKKE
+  rents are set by bank appraisers for mortgage valuations
+  (`indexing.py:24-27`); it is the closest published match to new-listing
+  rents, not an exact one.
+- **A single İstanbul factor is applied to every neighbourhood.** Micro-market
   divergence — one district gentrifying faster than another — is invisible to
   it.
-- **The table needs manual maintenance.** `MONTHLY_AFTER_ANCHOR` is empty
-  (`indexing.py:67`); if nobody adds monthly rates, estimates drift further
-  below reality every month past June 2026.
+- **The table needs manual maintenance.** One line per monthly TCMB bulletin
+  (`indexing.py:56-60`); if nobody adds it, estimates drift below reality
+  every month past the last entry.
+- **Past values can be revised.** The chain mixes figures from different
+  bulletins; level-implied and published monthly changes differ by up to
+  ~0,1 point per month.
 
 **Room split**
 

@@ -581,7 +581,7 @@ four `FAIRPRICE_*` variables below) are in [docs/AWS.md](docs/AWS.md).
 | `S3_REGION` | `auto` | Leave unset for R2. Set it only for AWS S3. |
 | `UPLOADS_DIR` | `data/uploads` | Directory photos are written to while `S3_BUCKET` is unset — local development. On Render's free plan this is inside the container, i.e. photos are lost on redeploy and sleep. |
 | `PORT` / `HOST` | `8000` / `127.0.0.1` | Server address (Render supplies `PORT`). |
-| `RENT_INDEX_FACTOR` | (from table) | Pins the CPI multiplier manually instead of using `app/indexing.py`. |
+| `RENT_INDEX_FACTOR` | (from table) | Pins the rent index multiplier manually instead of using `app/indexing.py`. |
 | `API_DOCS` | `0` | `1` opens the interactive API docs: `/docs`, `/redoc` and `/openapi.json`. Unset → all three answer 404, which is what production should do. Set it only on your own machine. |
 | `EXTRA_PHOTO_HOSTS` | — | Comma-separated hosts (https only) that listing and profile photos may point at besides this API's own `/uploads/`. Unset → only uploaded photos are accepted. A host added here must also be added to `img-src` in `frontend/vercel.json`, or browsers will not load its images. |
 | `PHOTO_SWEEP` | `1` | `0` stops the background job that deletes uploaded photos no record uses (section 1.5). It never runs when `S3_BUCKET` is set and `DATABASE_URL` is not. |

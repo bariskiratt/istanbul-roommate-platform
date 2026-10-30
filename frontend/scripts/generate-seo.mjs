@@ -7,7 +7,7 @@
  * gerektirmez, anında yüklenir ve başka hiçbir yerde bulunmayan bir veriyi
  * taşır — mahalle bazında kira medyanı.
  *
- * TEK KAYNAK: TÜFE çarpanı backend/app/indexing.py'den OKUNUR, buraya
+ * TEK KAYNAK: kira endeksi çarpanı backend/app/indexing.py'den OKUNUR, buraya
  * kopyalanmaz. İki yerde ayrı sayı tutmak, birini güncelleyip diğerini
  * unutmak demektir; bu projede aynı hata (harita endekslenmemişti) zaten
  * bir kez yaşandı.
@@ -19,6 +19,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { locative } from "./locative.mjs";
+import { rentIndex } from "./rent-index.mjs";
 import { slug, slugDropsCharacters } from "./slug.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,17 +37,7 @@ const MIN_LISTINGS = 8;
 // ---- kaynak veriler -------------------------------------------------------
 
 function indexFactor() {
-  // ANCHOR_FACTOR = 1.656  satırını yakalar.
-  const src = readFileSync(INDEXING, "utf8");
-  const m = src.match(/^ANCHOR_FACTOR\s*=\s*([\d.]+)/m);
-  if (!m) throw new Error("indexing.py içinde ANCHOR_FACTOR bulunamadı");
-  const period = src.match(/^ANCHOR_PERIOD\s*=\s*"([\d-]+)"/m);
-  const data = src.match(/^DATA_PERIOD\s*=\s*"([\d-]+)"/m);
-  return {
-    factor: Number(m[1]),
-    indexedTo: period ? period[1] : "?",
-    dataPeriod: data ? data[1] : "?",
-  };
+  return rentIndex(readFileSync(INDEXING, "utf8"));
 }
 
 function readCsv() {
@@ -186,7 +177,7 @@ ${body}
 <footer>
 <p><a href="/">evdes.tr</a> — İstanbul'daki üniversite öğrencileri için ev arkadaşı platformu.
 Veriler ${esc(FACTOR.dataPeriod)} dönemine ait ${esc(String(TOTAL_LISTINGS))} ilandan hesaplandı ve
-TÜİK konut endeksiyle ${esc(FACTOR.indexedTo)} düzeyine taşındı.</p>
+TCMB'nin İstanbul yeni kiracı kira endeksiyle ${esc(FACTOR.indexedTo)} düzeyine taşındı.</p>
 </footer>
 </main></body></html>
 `;
@@ -305,8 +296,9 @@ ilanla temsil gücünü kaybeder; sayıyı fikir vermesi için gösteriyoruz, ö
 (ortalama değil — birkaç lüks ilan ortalamayı yukarı çeker, medyanı çekmez).
 İlçe rakamı ise mahallelerin ilan sayısıyla ağırlıklı medyanıdır, yani çok ilanı
 olan bir mahalle sonucu daha çok belirler. Veriler ${esc(FACTOR.dataPeriod)}
-dönemine ait ilanlardan gelir ve TÜİK konut endeksiyle bugüne taşınır
-(×${FACTOR.factor}); endeksleme enflasyonu izler, semtin kendi hareketini değil.
+dönemine ait ilanlardan gelir ve TCMB'nin İstanbul yeni kiracı kira endeksiyle
+bugüne taşınır (×${FACTOR.factor.toFixed(3)}); endeksleme İstanbul genelindeki kira
+artışını izler, semtin kendi hareketini değil.
 Bu bir tahmindir, ekspertiz değildir.</p>
 
 <h2>${esc(locative(d.name))} ev arkadaşı bul</h2>
@@ -459,5 +451,5 @@ ${urls
 
 console.log(
   `✅ SEO: ${districts.length} semt sayfası + dizin + sitemap ` +
-    `(çarpan ×${FACTOR.factor}, ${FACTOR.dataPeriod} → ${FACTOR.indexedTo})`,
+    `(çarpan ×${FACTOR.factor.toFixed(4)}, ${FACTOR.dataPeriod} → ${FACTOR.indexedTo})`,
 );

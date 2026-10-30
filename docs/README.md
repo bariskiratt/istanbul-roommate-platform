@@ -22,7 +22,7 @@ does.
 | Document | The question it answers | Size |
 |---|---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | *How is the system put together?* Deployment shape, the life of a single request, process startup and the in-memory `STATE`, the database schema, the home-grown migration system, a module-by-module tour of `backend/app/`, and the test strategy. | ~980 lines |
-| [MODEL.md](MODEL.md) | *How does it decide a rent is fair?* The raw dataset, feature engineering, why the answer is a band and not a number, quantile LightGBM, honest evaluation against a neighbourhood-median baseline, CPI indexing, and the flat-rent → room-share split. | ~800 lines |
+| [MODEL.md](MODEL.md) | *How does it decide a rent is fair?* The raw dataset, feature engineering, why the answer is a band and not a number, quantile LightGBM, honest evaluation against a neighbourhood-median baseline, rent indexing (TCMB new-tenant rent index), and the flat-rent → room-share split. | ~800 lines |
 | [ALGORITHMS.md](ALGORITHMS.md) | *What about everything that isn't the model?* The budget heatmap over 968 neighbourhood polygons, transfer-weighted alternative-neighbourhood search over the rail network, the Turkish-aware moderation rule engine, and the match/likes logic. | ~990 lines |
 | [FRONTEND.md](FRONTEND.md) | *How is the client built?* The stack piece by piece (Vite, Tailwind + design tokens, shadcn/ui, TanStack Query, react-router, i18n), the API layer, a page-by-page tour, and what the tests cover. | ~1050 lines |
 | [SECURITY.md](SECURITY.md) | *Who can do what, and what breaks under attack?* Threat model, trust boundaries, identity, authorization, content safety, cryptography — plus the results of an adversarial audit against a local instance: 17 findings (6 high, 5 medium, 6 low) and where each stands now, what held under attack, what is accepted risk, and an incident runbook. | ~1540 lines |
@@ -65,8 +65,8 @@ By what you are trying to do:
   and the admin guard) before you touch anything that reads or writes another
   user's data.
 - **"I need to retrain or fix the price model."** MODEL.md end to end; §9 is the
-  retraining procedure and §7 is the CPI factor you will have to update as TÜİK
-  publishes.
+  retraining procedure and §7 is the rent index factor you will have to update
+  as TCMB publishes each month.
 - **"The heatmap / district suggestions / moderation look wrong."** ALGORITHMS.md
   — one numbered section per algorithm, and §5 tells you where the tunable
   constants live.
@@ -162,18 +162,18 @@ including why it is only meaningful next to a baseline: MODEL.md §6.
 the low / mid / high edges of the fair band. Why a band is the honest answer:
 MODEL.md §1 and §4.
 
-**CPI (TÜFE) indexing** — the training data's price level is February 2025
-(`DATA_PERIOD = "2025-02"`, `backend/app/indexing.py:55`), so under Turkish
+**Rent indexing** — the training data's price level is February 2025
+(`DATA_PERIOD = "2025-02"`, `backend/app/indexing.py:66`), so under Turkish
 inflation the raw prediction is in stale liras. Every prediction is therefore
 multiplied by an index factor before it reaches the user
-(`backend/app/fairprice.py:91-94`). The factor is `ANCHOR_FACTOR = 1.656`
-anchored at June 2026 (`indexing.py:62-63`), compounded by one entry per newly
-published TÜİK bulletin in `MONTHLY_AFTER_ANCHOR` (`indexing.py:67`, applied at
-`:88-92`), and overridable without a code change via the `RENT_INDEX_FACTOR`
-environment variable (`indexing.py:81-86`). The anchor is a bounded *estimate*,
-not a published number, and the module docstring shows the derivation
-(`indexing.py:20-45`). MODEL.md §7 walks through it, including the rebasing trap
-that makes the two bulletins' index levels non-comparable.
+(`backend/app/fairprice.py:86-87`). The index is TCMB's new-tenant rent index
+(Yeni Kiracı Kira Endeksi) for İstanbul: `ANCHOR_FACTOR = 1.410` is its
+February 2026 annual change, i.e. exactly February 2025 → February 2026
+(`indexing.py:74-75`), compounded by one monthly entry per TCMB bulletin in
+`MONTHLY_AFTER_ANCHOR` (`indexing.py:79-87`, applied at `:110-113`) — ×1.705
+at 2026-09 — and overridable without a code change via the `RENT_INDEX_FACTOR`
+environment variable (`indexing.py:101-106`). MODEL.md §7 explains why this
+index replaced TÜİK's CPI housing group in October 2026.
 
 **Room share (oda payı)** — the model predicts the rent of a *whole flat*, but
 nobody here rents a whole flat; they rent a room in one. So the band is divided

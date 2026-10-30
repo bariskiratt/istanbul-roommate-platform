@@ -77,7 +77,7 @@ classic account.
    The contract is the raw fields, **not** the feature matrix: both sides build
    features with the same `app/pricing.py`, so the service can never receive a
    matrix that does not match its model.
-2. The Lambda answers the **raw flat-rent band** (training-period lira). CPI
+2. The Lambda answers the **raw flat-rent band** (training-period lira). Rent
    indexing and the per-room split stay in the backend, so product rules can
    change without redeploying the service.
 3. The backend validates the answer (row count, `0 < low ≤ mid ≤ high`). Any

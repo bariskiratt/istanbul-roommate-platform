@@ -615,7 +615,7 @@ async def estimate(payload: EstimateRequest):
         }],
     )
 
-    # Model eğitim dönemi liralarıyla konuşur; TÜFE ile bugüne endeksle.
+    # Model eğitim dönemi liralarıyla konuşur; kira endeksiyle bugüne taşı.
     factor, indexed_to = rent_index()
     low, mid, high = low * factor, mid * factor, high * factor
 

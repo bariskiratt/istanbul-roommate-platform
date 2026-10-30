@@ -21,8 +21,8 @@ API locally with `API_DOCS=1` to see them)
 | **Location picker** | 38 districts and 539 neighbourhoods served from `/api/locations`, filtered to the names the price model recognises so no choice is offered that cannot be priced. Search ignores Turkish diacritics — *besiktas* finds *Beşiktaş*. |
 | **Interface language** | Turkish and English, switchable at any time. Turkish is the source language; a missing English key falls back to it rather than rendering blank. Numbers and dates follow the selected locale. Server messages (errors, moderation rejections) follow it too: the frontend sends the selected language as `Accept-Language` and the API answers in it, Turkish when the header is absent. |
 | **Filters** | The deck can be narrowed by district (several at once), listing type, price, rooms, amenities — furnished, elevator, parking, internet/heating included, balcony, natural gas — and lifestyle: non-smoking and pet-friendly (the house rules on house listings), and the poster's own alcohol and sleep answers. Filters only use what the card already shows; an unknown answer does not match. Amenity filters apply to house listings; personal listings are out of their scope rather than filtered out. There is no gender filter: listings do not record who lives there yet, and the owner's gender is not shown. |
-| **Fair rent advisor** | LightGBM quantile regression predicts a fair **range** (q25–q75) for the whole flat, then derives the **per-room share** — because listers rent out one room, not the flat. Estimates are indexed to today with monthly CPI (TÜFE). |
-| **Budget heatmap** | 968 neighbourhood polygons coloured green/yellow/red for a given budget; Turkish-aware address matching links polygons to price data. Prices carry the same CPI indexing as the advisor, so the two features quote the same year. Neighbourhoods resting on fewer than 8 listings are drawn faded — coloured, but marked as a weak signal. |
+| **Fair rent advisor** | LightGBM quantile regression predicts a fair **range** (q25–q75) for the whole flat, then derives the **per-room share** — because listers rent out one room, not the flat. Estimates are indexed to today with the central bank's monthly new-tenant rent index for İstanbul (TCMB YKKE). |
+| **Budget heatmap** | 968 neighbourhood polygons coloured green/yellow/red for a given budget; Turkish-aware address matching links polygons to price data. Prices carry the same rent indexing as the advisor, so the two features quote the same month. Neighbourhoods resting on fewer than 8 listings are drawn faded — coloured, but marked as a weak signal. |
 | **Alternative districts** | Transfer-weighted shortest paths over the rail network (station = 1, transfer = +5) suggest affordable neighborhoods near an expensive target — network cost, not straight-line distance (the Bosphorus problem). Shown in the map's neighbourhood panel when a cheaper neighbourhood within about 45 minutes by rail fits the budget. |
 | **Swipe & match** | Swipes are persisted; a match is created on mutual like, or when a lister accepts from the "Likes" queue. |
 | **Chat** | Per-match messaging (participants only), 4-second polling. Messages are encrypted at rest (see below). |
@@ -49,12 +49,12 @@ Details in [`docs/MODEL.md`](docs/MODEL.md). Summary:
 - **Fair rent (module 1):** target `log(rent)`; LightGBM quantile regression
   (q25/q50/q75) yields an interval instead of a point estimate. The served
   model's median error is **15.3%** against a ~25% neighbourhood-median
-  baseline. Outputs are **CPI-indexed** from the training period (2025-02) to
-  the present. The multiplier is derived in `app/indexing.py` by chaining
-  published TÜİK rates across the 2025 rebasing; it follows the housing group
-  rather than headline CPI, because rent outran the headline, and the exact
-  chain for housing is not published — so the anchor is an estimate inside
-  documented bounds, and the file says so.
+  baseline. Outputs are **indexed** from the training period (2025-02) to
+  the present with TCMB's new-tenant rent index for İstanbul: its February 2026
+  annual change, then one monthly change per bulletin (`app/indexing.py`).
+  That index replaced TÜİK's CPI housing group in October 2026, because CPI
+  rent tracks sitting tenants, whose rents have been catching up after the
+  legal cap ended and so ran well ahead of new-tenant rents.
 - **Budget heatmap (module 2):** ~600 B per request (geometry downloaded once
   and cached client-side).
 - **Alternative districts (module 3):** rail network from
@@ -89,7 +89,7 @@ app/reports.py    user reports + admin guard (require_admin)
 app/uploads.py    photo upload + static serving
 app/pricing.py    feature engineering (shared by training, backend & Lambda)
 app/rent_model.py where the model comes from (S3 or image) and who computes the band (Lambda or local)
-app/indexing.py   CPI (TÜFE) indexing of model output
+app/indexing.py   rent index (TCMB YKKE İstanbul) applied to model output
 app/admin.py      admin panel endpoints (/api/admin/*)
 app/locations.py  district -> neighbourhood list, filtered to model coverage
 app/content_limits.py  per-user quotas on content endpoints
