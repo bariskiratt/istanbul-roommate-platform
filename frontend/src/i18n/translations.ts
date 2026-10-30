@@ -107,7 +107,7 @@ const tr = {
     "Bu oda için adil aralık {low} – {high} TL (orta {mid} TL); istenen {asking} TL, yani {sign}{dev}% farklı.",
   "fair.shared":
     "{bedrooms} yatak odası = {occupants} kişi; {areas} ortak kullanılıyor. Daire geneli {flatLow}–{flatHigh} TL, kişi payı bu sayının {occupants}'e bölünmüşü.",
-  "fair.footnote": "İlçe geneli tahmin. Modelin medyan sapması %{err}, fiyatlar TÜFE ile bugüne taşındı.",
+  "fair.footnote": "İlçe geneli tahmin. Modelin medyan sapması %{err}, fiyatlar TCMB İstanbul kira endeksiyle bugüne taşındı.",
   "fair.footnoteNotIndexed":
     "İlçe geneli tahmin. Modelin medyan sapması %{err}, fiyatlar {period} düzeyinde, güncellenmedi.",
   "fair.checkTitle": "Adil fiyat danışmanı",
@@ -128,7 +128,7 @@ const tr = {
   "fair.wholeFlat": "Dairenin tamamı için adil aralık:",
   "fair.deviation": "İstenen {asking} TL, oda payı orta tahmininden {sign}{dev}% farklı.",
   "fair.disclaimer":
-    "{period} piyasa verisi, TÜFE ile {indexed} düzeyine endekslendi (×{factor}). Modelin medyan sapması %{err}. Bu bir tahmindir, ekspertiz değildir.",
+    "{period} piyasa verisi, TCMB İstanbul yeni kiracı kira endeksiyle {indexed} düzeyine taşındı (×{factor}). Modelin medyan sapması %{err}. Bu bir tahmindir, ekspertiz değildir.",
   "fair.disclaimerNotIndexed":
     "{period} piyasa verisi — güncel fiyat düzeyine ENDEKSLENMEDİ, bugünkü kiraların altında kalabilir. Modelin medyan sapması %{err}. Bu bir tahmindir, ekspertiz değildir.",
   "fair.unknownNeighborhood":
@@ -1018,7 +1018,7 @@ const tr = {
   "landing.stepsSub": "Kayıttan ilk mesaja üç adım.",
   "landing.whyTitle": "Öğrencilerin ilk sorduğu üç şey",
   "landing.why1Prompt": "Kira adil mi?",
-  "landing.why1Answer": "Model, istenen oda payını o semtin adil aralığıyla karşılaştırır. Fiyatlar TÜFE ile bugüne taşınır.",
+  "landing.why1Answer": "Model, istenen oda payını o semtin adil aralığıyla karşılaştırır. Fiyatlar TCMB'nin İstanbul kira endeksiyle bugüne taşınır.",
   "landing.why2Prompt": "Karşımdaki gerçekten öğrenci mi?",
   "landing.why2Answer": "Hesap yalnızca .edu.tr adresiyle açılır. Kartındaki üniversite adı e-postandan gelir, elle değiştirilemez.",
   "landing.why3Prompt": "Bütçem hangi semte yeter?",
@@ -1191,7 +1191,7 @@ const en: Record<TranslationKey, string> = {
     "The fair range for this room is {low} – {high} TL (mid {mid} TL); the asking price is {asking} TL, i.e. {sign}{dev}% off.",
   "fair.shared":
     "{bedrooms} bedrooms = {occupants} people; {areas} are shared. The whole flat runs {flatLow}–{flatHigh} TL, and each share is that divided by {occupants}.",
-  "fair.footnote": "District-level estimate. The model's median error is {err}%, and prices are CPI-indexed to today.",
+  "fair.footnote": "District-level estimate. The model's median error is {err}%, and prices are indexed to today with the central bank's Istanbul rent index.",
   "fair.footnoteNotIndexed":
     "District-level estimate. The model's median error is {err}%, and prices are at the {period} level, not updated.",
   "fair.checkTitle": "Fair-price advisor",
@@ -1212,7 +1212,7 @@ const en: Record<TranslationKey, string> = {
   "fair.wholeFlat": "Fair range for the whole flat:",
   "fair.deviation": "The asking price of {asking} TL is {sign}{dev}% off the mid room-share estimate.",
   "fair.disclaimer":
-    "Market data from {period}, CPI-indexed to {indexed} (×{factor}). The model's median error is {err}%. This is an estimate, not a professional appraisal.",
+    "Market data from {period}, indexed to {indexed} with the central bank's Istanbul new-tenant rent index (×{factor}). The model's median error is {err}%. This is an estimate, not a professional appraisal.",
   "fair.disclaimerNotIndexed":
     "Market data from {period} — NOT indexed to current prices, so it may sit below today's rents. The model's median error is {err}%. This is an estimate, not a professional appraisal.",
   "fair.unknownNeighborhood":
@@ -2078,7 +2078,7 @@ const en: Record<TranslationKey, string> = {
   "landing.stepsSub": "Three steps from sign-up to your first message.",
   "landing.whyTitle": "The three things students ask first",
   "landing.why1Prompt": "Is the rent fair?",
-  "landing.why1Answer": "A model compares the asking share with the fair range for that area, indexed to today's prices with CPI.",
+  "landing.why1Answer": "A model compares the asking share with the fair range for that area, indexed to today's prices with the central bank's Istanbul rent index.",
   "landing.why2Prompt": "Is the other person really a student?",
   "landing.why2Answer": "Accounts open only with a .edu.tr address. The university on your card comes from your email and can't be edited.",
   "landing.why3Prompt": "Which neighbourhoods fit my budget?",

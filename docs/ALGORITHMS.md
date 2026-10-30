@@ -47,7 +47,7 @@ flowchart LR
   A["mahalle_geojson.json<br/>968 polygons"] --> C{"name matching<br/>heatmap.annotate_features"}
   B["neighborhood_market_values.csv<br/>539 rows"] --> C
   C --> D["489 polygons carry a price<br/>479 carry null"]
-  D --> E["CPI indexing<br/>× 1.656"]
+  D --> E["rent indexing<br/>× 1.705"]
   E --> F["STATE: geojson + prices[] + counts[]"]
   F --> G["/api/geojson<br/>geometry, once"]
   F --> H["/api/heatmap?budget=…<br/>status codes, per request"]
@@ -207,8 +207,8 @@ Kazlıçeşme is not a 137.500 ₺ neighbourhood. It is a district in the middle
 a large waterfront redevelopment, and the six listings that survived the
 cleaning filters in `build_market_values.py:35-39` happen to be luxury units in
 new towers. Six samples cannot tell "this area is expensive" apart from "six
-expensive flats happened to be listed here". After CPI indexing (§1.6) the map
-shows this polygon at **227.700 ₺** (measured), which is nonsense as a
+expensive flats happened to be listed here". After rent indexing (§1.6) the map
+shows this polygon at **≈234.400 ₺** (137.500 × 1,705), which is nonsense as a
 representative rent.
 
 Three options were available:
@@ -232,15 +232,16 @@ The general principle worth taking away: *the threshold does not change the
 estimate, it changes how loudly the estimate is stated.* The same principle
 drives the fair-price band in [`MODEL.md`](MODEL.md).
 
-### 1.6 CPI indexing, applied in exactly one place
+### 1.6 Rent indexing, applied in exactly one place
 
 The listings dataset is priced in **February 2025** lira
-(`backend/app/indexing.py:55`). Everything the user sees must be in today's
-lira. `rent_index()` (`indexing.py:75-94`) returns the multiplier — currently
-`1.656` for the 2026-06 anchor (`indexing.py:62-63`), overridable at runtime
-via `RENT_INDEX_FACTOR` (`indexing.py:81-86`). How that number was derived from
-TÜİK bulletins, including the part that is an estimate rather than a published
-figure, is documented at length in `indexing.py:1-50`.
+(`backend/app/indexing.py:66`). Everything the user sees must be in today's
+lira. `rent_index()` (`indexing.py:95-114`) returns the multiplier — currently
+`1.705` for 2026-09: the TCMB new-tenant rent index for İstanbul, chained from
+the February 2026 annual change (`indexing.py:74-75`) and the monthly changes
+after it (`indexing.py:79-87`), overridable at runtime via `RENT_INDEX_FACTOR`
+(`indexing.py:101-106`). Why that index and not TÜİK CPI is documented in
+`indexing.py:1-60` and MODEL.md §7.
 
 `index_market_prices()` (`heatmap.py:150-169`) multiplies every polygon's
 `avg_price` in place and returns how many it touched (489, measured).
@@ -956,7 +957,7 @@ Every tunable in this document, in one place:
 | `MIN_LISTINGS` (map confidence) | 8 | `backend/app/heatmap.py:24` | 1.5 |
 | `MIN_LISTINGS` (CSV build) | 3 | `backend/scripts/build_market_values.py:20` | 1.3 |
 | `MIN_RENT` / `MAX_RENT` | 3.000 / 500.000 ₺ | `backend/scripts/build_market_values.py:16-17` | 1.5 |
-| `ANCHOR_FACTOR` | 1.656 | `backend/app/indexing.py:63` | 1.6 |
+| `ANCHOR_FACTOR` (+ `MONTHLY_AFTER_ANCHOR`) | 1.410 → 1.705 at 2026-09 | `backend/app/indexing.py:75-87` | 1.6 |
 | `WALK_KM` | 1.2 km | `backend/app/transit.py:26` | 2.4 |
 | `MAX_HOPS` | 12 | `backend/app/transit.py:30` | 2.3 |
 | `TRANSFER_COST` | 5 | `backend/app/transit.py:34` | 2.3 |
@@ -1003,10 +1004,10 @@ Every tunable in this document, in one place:
 7. **`avg_price` is a median of asking rents.** Not transacted rents, not
    negotiated rents, and — per `MODEL.md` — from a dataset whose price column
    required aggressive cleaning.
-8. **The CPI factor is partly an estimate.** `ANCHOR_FACTOR = 1.656` is the
-   midpoint of a bounded range, not a published figure; `indexing.py:27-43`
-   documents the derivation and `HEADLINE_FACTOR` preserves the auditable
-   lower bound.
+8. **The rent index is İstanbul-wide and appraisal-based.** One factor
+   (TCMB new-tenant rent index, İstanbul) scales every neighbourhood alike, and
+   its rents come from bank appraisals rather than listings; `indexing.py:1-60`
+   documents the choice. It needs one new line per monthly TCMB bulletin.
 
 ### Alternative neighbourhoods
 

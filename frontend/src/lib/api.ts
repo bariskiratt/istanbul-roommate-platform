@@ -117,7 +117,7 @@ export interface EstimateResponse {
   room_share: number;
   median_error_pct: number;
   known_neighborhood: boolean;
-  /** TÜFE endeksleme bilgisi */
+  /** Kira endeksi bilgisi (TCMB YKKE İstanbul; bkz. backend/app/indexing.py) */
   index_factor: number;
   data_period: string;
   indexed_to: string;

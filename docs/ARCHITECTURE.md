@@ -264,7 +264,7 @@ attached to the app (`backend/app/main.py:70-144`, wired at
 | Schema | `backend/app/main.py:77` | `init_db()` → `create_all` + `run_migrations` (`backend/app/db.py:61-73`) |
 | Neighbourhood geometry | `backend/app/main.py:78-80` | parses `data/raw/mahalle_geojson.json` (4.1 MB, **968 features**) |
 | Market prices | `backend/app/main.py:81-82` | joins the price CSV onto the geometry (`backend/app/heatmap.py:67-103`) |
-| CPI indexing | `backend/app/main.py:91` | rescales every neighbourhood price to today (`backend/app/heatmap.py:150-168`) |
+| Rent indexing | `backend/app/main.py:100` | rescales every neighbourhood price to today (`backend/app/heatmap.py:150-168`) |
 | Fair-price model | `backend/app/main.py:108-114` | `joblib.load` of a 6.2 MB artifact — **optional** |
 | Location list | `backend/app/main.py:118-119` | district → neighbourhood tree for the listing form |
 | Transit graph | `backend/app/main.py:124-137` | rail network + accessibility index — **optional** |
@@ -726,7 +726,7 @@ change.** The second file is `backend/app/migrate.py`.
 | `app/uploads.py` | 502 | photo upload, storage (disk or S3/R2 bucket) and serving |
 | `app/pricing.py` | 84 | feature engineering shared by training and serving |
 | `app/fairprice.py` | 131 | per-room fair share for a stored listing |
-| `app/indexing.py` | 94 | CPI factor applied to model output |
+| `app/indexing.py` | 114 | rent index factor applied to model output |
 | `app/heatmap.py` | 169 | GeoJSON↔CSV join, budget colouring |
 | `app/transit.py` | 289 | rail graph, accessibility, alternative districts |
 | `app/locations.py` | 72 | district→neighbourhood list for the form |
@@ -833,7 +833,7 @@ cd backend && source venv/bin/activate && python -m pytest tests/ -q
 | `tests/test_message_crypto.py` | 14 | message encryption |
 | `tests/test_auth.py` | 13 | registration, OTP, sessions |
 | `tests/test_messages.py` | 11 | chat endpoints |
-| `tests/test_indexing.py` | 10 | CPI factor |
+| `tests/test_indexing.py` | 11 | rent index factor |
 | `tests/test_like_comments.py` | 21 | liked photo or card, comments into the chat |
 | `tests/test_swipes.py` | 10 | swipes and matching |
 | `tests/test_reports.py` | 9 | user reports |
@@ -979,12 +979,12 @@ Stated plainly, because a document that only lists strengths is not useful.
     Their text was overwritten in place, and the migration cannot invent it
     (`backend/app/migrate.py:93-96`, `backend/app/admin.py:15-18`).
 
-11. **The rent index is partly an estimate, not a published figure.**
-    `ANCHOR_FACTOR = 1.656` is the midpoint of a derived band, roughly 16% above
-    the exact headline-CPI chain, and the module says so in detail
-    (`backend/app/indexing.py:27-45`). `HEADLINE_FACTOR` keeps the verifiable
-    number visible so the decision can be audited or reverted, and
-    `RENT_INDEX_FACTOR` can override it without a code change.
+11. **The rent index needs a monthly line and is not a listing index.**
+    The factor chains published TCMB new-tenant rent index figures for
+    İstanbul (`backend/app/indexing.py:1-60`), but that index is built from
+    bank appraisals, applies one factor to every neighbourhood, and goes stale
+    unless someone adds each month's bulletin. `RENT_INDEX_FACTOR` can override
+    it without a code change.
 
 12. **Half the map has no price data.** 489 of 968 neighbourhoods matched the
     market-value CSV (50.5%) in the boot log above; the rest render as

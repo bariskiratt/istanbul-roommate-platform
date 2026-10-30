@@ -1,7 +1,8 @@
 """Kira endeksi çarpanı testleri.
 
-Çarpan, TÜİK bültenlerinden zincirlenerek bulunan bir çıpa (ANCHOR_FACTOR) ve
-çıpadan sonraki aylık oranların çarpımıdır (bkz. app/indexing.py).
+Çarpan, TCMB Yeni Kiracı Kira Endeksi'nin (İstanbul) yıllık değişiminden gelen
+bir çıpa (ANCHOR_FACTOR) ve çıpadan sonraki aylık oranların çarpımıdır
+(bkz. app/indexing.py).
 """
 
 import pytest
@@ -15,39 +16,65 @@ def _temiz_ortam(monkeypatch):
     monkeypatch.delenv("RENT_INDEX_FACTOR", raising=False)
 
 
-def test_cipa_tuik_bultenlerinden_zincirlenen_degerle_ayni():
-    """Çıpa, bültenlerdeki üç orandan yeniden hesaplanabilmeli.
+def test_cipa_ykke_istanbul_yillik_degisimi():
+    """Çıpa, TCMB Şubat 2026 bültenindeki İstanbul YKKE yıllık değişimidir.
 
-    Sayı ileride elle değiştirilirse (ör. yanlış birim girilirse) bu test
-    kaynağa dönmeye zorlar.
+    Yıllık değişim Şubat 2025 → Şubat 2026'yı verir; bu yüzden çıpa ayı veri
+    döneminin TAM 12 ay sonrası olmalı. Veri seti değişip DATA_PERIOD
+    kayarsa bu test çıpanın da yeniden seçilmesini zorlar.
+    """
+    istanbul_subat26_yillik = 41.0   # TCMB YKKE bülteni, Şubat 2026
+
+    assert indexing.ANCHOR_FACTOR == pytest.approx(1 + istanbul_subat26_yillik / 100)
+    yil, ay = indexing.DATA_PERIOD.split("-")
+    assert indexing.ANCHOR_PERIOD == f"{int(yil) + 1}-{ay}"
+
+
+def test_aylik_oranlar_bulten_seviyeleriyle_tutarli():
+    """Tablodaki aylık oranlar, bültenlerin endeks seviyelerine uymalı.
+
+    TCMB YKKE İstanbul (2023=100): Temmuz 2026 309,4 · Eylül 2026 336,5.
+    Temmuz seviyesinden Ağustos ve Eylül aylıklarıyla ilerlenince Eylül'e
+    yuvarlama payı içinde varılmalı. Bir ay yanlış girilirse (ör. 4,9 yerine
+    49 ya da Ankara'nın sayısı) bu test kırılır.
+    """
+    temmuz, eylul = 309.4, 336.5
+    m = indexing.MONTHLY_AFTER_ANCHOR
+
+    tahmin = temmuz * (1 + m["2026-08"] / 100) * (1 + m["2026-09"] / 100)
+
+    assert tahmin == pytest.approx(eylul, rel=0.005)
+
+
+def test_aylik_oranlar_aylik_gorunuyor():
+    """Aylık oran yerine yıllık oran ya da endeks seviyesi girilmesin.
+
+    İstanbul yeni kiracı kiraları ayda %0–5 arası hareket ediyor; %35,5
+    (yıllık) ya da 336,5 (seviye) gibi bir değer yanlış sütundur.
+    """
+    for ay, oran in indexing.MONTHLY_AFTER_ANCHOR.items():
+        assert -5 < oran < 10, f"{ay}: {oran} aylık oran gibi görünmüyor"
+
+
+def test_kira_manset_tufenin_ustunde_artti():
+    """Haziran 2026'ya kadar kira zinciri manşet TÜFE zincirinin üstünde.
+
+    HEADLINE_FACTOR TÜİK bültenlerindeki üç orandan yeniden hesaplanır; sayı
+    elle bozulursa bu test kaynağa dönmeye zorlar.
     """
     sub25_vs_ara24 = 1.0742   # Şubat 2025 bülteni
     haz25_vs_ara24 = 1.1667   # Haziran 2025 (Haziran 2026 bülteninin karşılaştırması)
     haz26_vs_haz25 = 1.3211   # Haziran 2026 bülteni
+    assert indexing.HEADLINE_FACTOR == pytest.approx(
+        haz26_vs_haz25 * (haz25_vs_ara24 / sub25_vs_ara24), abs=1e-5
+    )
 
-    beklenen = haz26_vs_haz25 * (haz25_vs_ara24 / sub25_vs_ara24)
+    kira = indexing.ANCHOR_FACTOR
+    for ay, oran in indexing.MONTHLY_AFTER_ANCHOR.items():
+        if ay <= "2026-06":
+            kira *= 1 + oran / 100
 
-    assert indexing.HEADLINE_FACTOR == pytest.approx(beklenen, abs=1e-5)
-
-
-def test_servis_edilen_cipa_konut_bandinin_icinde():
-    """Konut ana grubuna dayalı çıpa, türetilen sınırların dışına çıkmamalı.
-
-    Sınırlar (bkz. app/indexing.py): konut Haziran 2026/Haziran 2025 = 1,4514
-    çarpı Şubat→Haziran 2025 için 1,0861 (alt) … 1,1962 (üst).
-    """
-    konut_haz26_vs_haz25 = 1.4514
-    alt = konut_haz26_vs_haz25 * 1.086111
-    ust = konut_haz26_vs_haz25 * 1.0458**4
-
-    assert alt < indexing.ANCHOR_FACTOR < ust
-    # Manşet TÜFE her koşulda alt sınır: kira ondan hızlı arttı.
-    assert indexing.ANCHOR_FACTOR > indexing.HEADLINE_FACTOR
-
-
-def test_veri_donemi_ve_cipa_tutarli():
-    assert indexing.DATA_PERIOD == "2025-02"
-    assert indexing.ANCHOR_PERIOD > indexing.DATA_PERIOD
+    assert kira > indexing.HEADLINE_FACTOR
 
 
 def test_cipadan_sonraki_aylar_carpilir(monkeypatch):
@@ -74,12 +101,22 @@ def test_cipadan_onceki_ay_yok_sayilir(monkeypatch):
 
 
 def test_carpan_makul_bantta():
-    """16 aylık Türkiye enflasyonu için 1.3-1.8 dışındaki değer birim hatasıdır.
+    """Veri döneminden bu yana ortalama aylık artış %0,5–5 arasında olmalı.
 
-    (ör. yüzdeyi çarpan sanıp 43.49 yazmak ya da tabloyu boş bırakmak.)
+    Bunun dışı birim hatasıdır (ör. yüzdeyi çarpan sanıp 41.0 yazmak ya da
+    aylık yerine yıllık oran girmek). Ay sayısına göre ölçeklendiği için her
+    yeni bültenle elle genişletmek gerekmez.
     """
-    factor, _ = rent_index()
-    assert 1.30 < factor < 1.80
+    factor, indexed_to = rent_index()
+
+    def ay_no(donem: str) -> int:
+        yil, ay = donem.split("-")
+        return int(yil) * 12 + int(ay)
+
+    aylar = ay_no(indexed_to) - ay_no(indexing.DATA_PERIOD)
+    aylik = factor ** (1 / aylar) - 1
+
+    assert 0.005 < aylik < 0.05
 
 
 def test_ortam_degiskeni_tabloyu_ezer(monkeypatch):
@@ -92,13 +129,11 @@ def test_ortam_degiskeni_tabloyu_ezer(monkeypatch):
     assert is_configured()
 
 
-def test_bozuk_ortam_degiskeni_cipaya_duser(monkeypatch):
+def test_bozuk_ortam_degiskeni_tabloya_duser(monkeypatch):
+    tablo = rent_index()
     monkeypatch.setenv("RENT_INDEX_FACTOR", "abc")
 
-    factor, indexed_to = rent_index()
-
-    assert factor == pytest.approx(indexing.ANCHOR_FACTOR)
-    assert indexed_to == indexing.ANCHOR_PERIOD
+    assert rent_index() == tablo
 
 
 def test_harita_fiyatlari_da_endekslenir():
