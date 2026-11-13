@@ -127,7 +127,7 @@ jobs:
       # Backend ve Lambda ile aynı sabit sürümler: model pickle'ı ikisinde de açılsın.
       - run: pip install -r requirements.txt
       - id: aws
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           # Hangisi tanımlıysa o: anahtar (secret) ya da OIDC rolü (variable).
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -159,7 +159,7 @@ jobs:
         with:
           ref: ${{ needs.plan.outputs.sha }}
       - id: aws
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           # Hangisi tanımlıysa o: anahtar (secret) ya da OIDC rolü (variable).
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
