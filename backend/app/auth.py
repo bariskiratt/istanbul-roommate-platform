@@ -164,20 +164,28 @@ def _client_ip(request: Request) -> str:
     değilsen (varsayılan) doğrudan soketin adresi kullanılır.
     """
     if config.TRUST_PROXY_HEADERS:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            # EN SAĞDAKİ değer alınır, en soldaki DEĞİL.
-            #
-            # X-Forwarded-For soldan sağa büyür: her vekil kendinden önceki
-            # adresi sona ekler. İstemci de kendi başlığını gönderebilir, o
-            # yüzden SOLDAKİ değer saldırgan tarafından uydurulabilir —
-            # soldan okumak IP limitini tamamen anlamsız kılardı (her istekte
-            # başka bir "IP" yazıp sınırsız deneme yapılabilirdi).
-            #
-            # Bu kurulumda uygulamanın önünde TEK vekil var (Render), yani
-            # bize ulaşan zincirin son elemanını yazan odur ve güvenilirdir.
-            # Vekil sayısı değişirse burası da değişmeli.
-            return forwarded.split(",")[-1].strip()[:64] or "bilinmiyor"
+        # EN SAĞDAKİ değer alınır, en soldaki DEĞİL.
+        #
+        # X-Forwarded-For soldan sağa büyür: her vekil kendinden önceki
+        # adresi sona ekler. İstemci de kendi başlığını gönderebilir, o
+        # yüzden SOLDAKİ değer saldırgan tarafından uydurulabilir —
+        # soldan okumak IP limitini tamamen anlamsız kılardı (her istekte
+        # başka bir "IP" yazıp sınırsız deneme yapılabilirdi).
+        #
+        # request.client.host'a GÜVENİLMEZ: uvicorn --forwarded-allow-ips '*'
+        # onu X-Forwarded-For'un EN SOLDAKİ (uydurulabilir) değerine ayarlar.
+        # Ham başlığı kendimiz okuruz. Birden çok X-Forwarded-For satırı
+        # gelebilir (getlist); en son satırın en sağ parçası bize en yakın
+        # güvenilir hop'tur.
+        #
+        # Bu kurulumda uygulamanın önünde TEK vekil var (Render), yani
+        # bize ulaşan zincirin son elemanını yazan odur ve güvenilirdir.
+        # Vekil sayısı değişirse burası da değişmeli.
+        forwarded_values = request.headers.getlist("x-forwarded-for")
+        if forwarded_values:
+            ip = forwarded_values[-1].split(",")[-1].strip()[:64]
+            if ip:
+                return ip
     return request.client.host if request.client else "bilinmiyor"
 
 

@@ -120,9 +120,21 @@ ADMIN_EMAILS = {
 #
 # X-Forwarded-For KOŞULSUZ okunamaz: başlık istemci tarafından uydurulabilir,
 # yani her istekte farklı bir değer göndererek IP limiti tamamen atlanır.
-# Bu yüzden varsayılan KAPALI; yalnızca gerçekten vekil arkasındaysan ve o
+# Bu yüzden vekil arkasında DEĞİLKEN kapalı olmalı; vekil arkasındaysan ve o
 # vekil başlığı kendisi yazıyorsa TRUST_PROXY_HEADERS=1 ver.
-TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "0") == "1"
+#
+# GÜVENLİ VARSAYILAN (derinlemesine savunma): ÜRETİMDE (DATABASE_URL tanımlı)
+# uygulama DAİMA Render'ın ters vekilinin arkasındadır, bu yüzden varsayılan
+# AÇIK. Değişken panelde unutulsa bile IP, uydurulabilir request.client.host'a
+# düşmez: uvicorn --forwarded-allow-ips '*' onu X-Forwarded-For'un EN SOLDAKİ
+# (yani istemcinin yazdığı, sahte) değerine ayarlar; açıkken app/auth._client_ip
+# başlığı kendisi okuyup EN SAĞDAKİ (Render'ın eklediği gerçek) değeri alır.
+# Yerelde/CI'da (DATABASE_URL yok) vekil olmadığından varsayılan KAPALI kalır.
+# Açıkça verilen bir değer (0/1) her zaman bu varsayılanı ezer.
+_TRUST_PROXY_DEFAULT = "1" if os.getenv("DATABASE_URL", "").strip() else "0"
+TRUST_PROXY_HEADERS = (
+    os.getenv("TRUST_PROXY_HEADERS", _TRUST_PROXY_DEFAULT) == "1"
+)
 
 # API belgesi: Swagger (/docs), ReDoc (/redoc) ve şema (/openapi.json).
 #

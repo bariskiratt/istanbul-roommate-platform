@@ -1,0 +1,34 @@
+# Haftalık bağımlılık güncelleme PR'leri (güvenlik yaması dahil).
+#
+# Güvenlik testi bulgusu: bağımlılıklarda yeni bir CVE çıktığında bunu
+# öğrenmenin otomatik bir yolu yoktu. Dependabot hem sürüm güncellemelerini
+# PR olarak açar hem de (depo ayarlarında "Dependabot alerts/security updates"
+# açıksa) bilinen açıklar için öncelikli yama PR'i gönderir.
+#
+# NOT: Backend requirements.txt `uv pip compile` ile üretiliyor; Dependabot'un
+# pip güncellemesini requirements.in'den yeniden derlemek gerekebilir. PR'ler
+# yine de CI'dan (backend+frontend) geçmeden main'e giremez.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"

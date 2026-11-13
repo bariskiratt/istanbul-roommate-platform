@@ -15,10 +15,35 @@ Uygulama açılışında bir kez çağrılır (main.py lifespan).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+
+# Aşağıdaki tanımlayıcılar _SCHEMA'dan gelen SABİTLERDİR (kullanıcı girdisi
+# DEĞİL), ama DDL'e string olarak gömüldükleri için yine de doğrulanırlar:
+# ileride dinamik/dışarıdan bir değer bu yola sızarsa sessizce enjekte edilmek
+# yerine burada açıkça hata versin (fail-closed). SQL tanımlayıcısı parametre
+# (bind) ile gönderilemediği için izin-listesi tek güvenli yöntemdir.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SQL_TYPE_RE = re.compile(r"^[A-Za-z0-9 ()]+$")
+_REFERENCES_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\([A-Za-z_][A-Za-z0-9_]*\)$")
+# str DEFAULT doğrudan SQL'e yazılır: yalnızca tırnaklı basit sabit, TRUE/FALSE
+# ya da rakam kabul edilir (tırnak içinde ';' ya da tırnak kaçışı yok).
+_DEFAULT_LITERAL_RE = re.compile(r"^('[^';\\]*'|TRUE|FALSE|\d+)$")
+
+
+def _safe_identifier(name: str) -> str:
+    """Tablo/sütun adını doğrular; güvensizse hata fırlatır.
+
+    RuntimeError (ValueError değil): bu bir kullanıcı girdisi doğrulaması değil,
+    açılışta koşan bir iç değişmez (invariant) — mesaj loglara/operatöre gider,
+    HTTP yanıtına değil, bu yüzden localized() ile sarılmaz.
+    """
+    if not _IDENTIFIER_RE.fullmatch(name):
+        raise RuntimeError(f"Güvensiz SQL tanımlayıcısı: {name!r}")
+    return name
 
 
 @dataclass(frozen=True)
@@ -137,7 +162,7 @@ def _existing_columns(conn, table: str, dialect: str) -> set[str]:
         )
         return {row[0] for row in rows}
     if dialect == "sqlite":
-        rows = conn.execute(text(f'PRAGMA table_info("{table}")'))
+        rows = conn.execute(text(f'PRAGMA table_info("{_safe_identifier(table)}")'))
         return {row[1] for row in rows}
     # Bilinmeyen sürücü: SQLAlchemy'nin genel denetleyicisine düş.
     return {col["name"] for col in inspect(conn).get_columns(table)}
@@ -145,6 +170,8 @@ def _existing_columns(conn, table: str, dialect: str) -> set[str]:
 
 def _default_literal(default: bool | str, dialect: str) -> str:
     if isinstance(default, str):
+        if not _DEFAULT_LITERAL_RE.fullmatch(default):
+            raise RuntimeError(f"Güvensiz DEFAULT sabiti: {default!r}")
         return default
     if dialect == "postgresql":
         return "TRUE" if default else "FALSE"
@@ -157,14 +184,20 @@ def _add_column_sql(table: str, column: _Column, dialect: str) -> str:
     # aynı anda açılırsa ikincisi "column already exists" ile patlamasın —
     # yoksa uygulama hiç ayağa kalkmaz. SQLite bu sözdizimini desteklemez,
     # orada sütun listesi kontrolü tek başına yeterli.
+    table = _safe_identifier(table)
+    name = _safe_identifier(column.name)
+    if not _SQL_TYPE_RE.fullmatch(column.sql_type):
+        raise RuntimeError(f"Güvensiz SQL tipi: {column.sql_type!r}")
     exists_guard = " IF NOT EXISTS" if dialect == "postgresql" else ""
     parts = [
         f'ALTER TABLE "{table}" ADD COLUMN{exists_guard} '
-        f"{column.name} {column.sql_type}"
+        f"{name} {column.sql_type}"
     ]
     if column.default is not None:
         parts.append(f"DEFAULT {_default_literal(column.default, dialect)}")
     if column.references:
+        if not _REFERENCES_RE.fullmatch(column.references):
+            raise RuntimeError(f"Güvensiz REFERENCES: {column.references!r}")
         parts.append(f"REFERENCES {column.references}")
     return " ".join(parts)
 
