@@ -1474,7 +1474,20 @@ are findings; they are the boundaries of the current design.
     until an admin approves it (`Listing.pending_review`). Weaker scam
     signals, and every scam signal in chat, still only flag, so scam
     listings phrased another way *will* get published and depend on user
-    reports.
+    reports — unless listing approval holds them (item 12).
+12. **Listing photos are checked by a person, not a machine.** Since
+    November 2026 `LISTING_REVIEW=all` (`backend/app/listing_review.py`)
+    holds every new listing, republish and text/photo edit until an admin
+    approves it, because nothing automatic looks at photos. That is the
+    whole photo defence: it scales with one admin's time. Before switching to
+    `first` (only a person's listings until one is approved), the gaps are:
+    no automatic image check (nudity, violence, text or phone numbers in the
+    image), no duplicate-photo detection (the same flat photos reused across
+    accounts, or lifted from other sites), reports never hide a listing
+    automatically, and profile photos are not reviewed at all (they show on
+    deck cards and on Likes). Uploads already get re-encoded with all
+    metadata (including GPS) stripped and are checked by content, not file
+    extension.
 
 ---
 

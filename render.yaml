@@ -70,6 +70,16 @@ services:
       # Vekil arkasında OLMAYAN bir kurulumda AÇMA: başlık uydurulabilir.
       - key: TRUST_PROXY_HEADERS
         value: "1"
+      # İlan onayı (app/listing_review.py). "all": her yeni ilan, yeniden
+      # yayın ve yayındaki ilanın metin/fotoğraf değişikliği yönetici onayına
+      # düşer; onay bekleyen ilan için ADMIN_EMAILS'e en fazla yarım saatte bir
+      # posta gider. "first": yalnızca kullanıcının ilk ilanı onaya düşer,
+      # yöneticinin bir ilanını onayladığı kişi sonrakileri beklemeden yayınlar
+      # (hacim büyüyünce). "flagged": yalnız dolandırıcılık kalıbı bekler
+      # (eski davranış). Değer burada yazılı: modu değiştirmek bir PR'dır ve
+      # CI'dan geçer; panelden yapılan değişikliği blueprint eşitlemesi ezer.
+      - key: LISTING_REVIEW
+        value: "all"
       # Fotoğraf deposu: Cloudflare R2 (S3 uyumlu). Boş bırakılırsa fotoğraflar
       # konteyner diskine yazılır ve ücretsiz planda HER yeniden dağıtımda ve
       # servis her uykuya geçtiğinde SİLİNİR. Değerler panelden girilir

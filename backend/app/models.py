@@ -173,6 +173,17 @@ class Listing(Base):
     # (işareti temizle ya da yayına al) ikisini birlikte çevirir. Sahibinin
     # kendi kapattığı ilandan (is_active False, bu alan False) bu yüzden ayrı.
     pending_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Bir yöneticinin bu ilanı (metni VE fotoğraflarıyla) EN SON onayladığı an.
+    # Hiç silinmez/sıfırlanmaz: "first" onay modunda (app.listing_review)
+    # kullanıcının güvenilir sayılmasının dayanağıdır — yöneticinin en az bir
+    # ilanını onayladığı kişi sonraki ilanlarını beklemeden yayınlar.
+    # NULL = hiç onaylanmadı (bu sütundan önceki ilanlar da NULL'dır).
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Yöneticinin onay bekleyen ilanı REDDETME sebebi. Yönetici notundan
+    # (review_note) farklı olarak SAHİBİNE GÖSTERİLİR: "İlanlarım"da ilanın
+    # neden yayına girmediğini görür, düzeltip yeniden gönderir. Yeniden
+    # gönderince (republish) ya da ilan onaylanınca temizlenir.
+    rejection_reason: Mapped[str | None] = mapped_column(String(500))
     # Denetimin verdiği sebep kodları, virgülle ayrılmış ("kufur,taciz:tehdit").
     # İşaretlemenin gerekçesi kaydedilmezse yönetici neye baktığını bilemez.
     # Bu sütun eklenmeden önce işaretlenmiş kayıtlarda NULL kalır.

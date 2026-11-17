@@ -291,11 +291,18 @@ export interface ApiListing extends ListingPayload {
   /** Yalnızca giriş yapmış istekte dolu. Eski sunucu alanı hiç göndermeyebilir. */
   owner_profile?: OwnerProfile | null;
   /**
-   * Dolandırıcılık kalıbı (IBAN + acele, görmeden kapora) taşıdığı için
-   * yayına girmeden yönetici onayı bekliyor. Yalnızca sahibinin kendi
-   * listesinde (mine) ve ilan açma yanıtında true olabilir.
+   * Yayına girmeden yönetici onayı bekliyor: sunucunun onay modu her ilanı
+   * bekletebilir (varsayılan), dolandırıcılık kalıbı (IBAN + acele, görmeden
+   * kapora) ise her modda bekletir. Yalnızca sahibinin kendi listesinde
+   * (mine) ve ilan açma/düzenleme yanıtında true olabilir.
    */
   pending_review?: boolean;
+  /**
+   * Yönetici ilanı reddettiyse sebebi. Yalnız sahibinin kapalı ilanında
+   * dolu olur; sahibi düzeltip yeniden gönderince temizlenir. Eski sunucu
+   * alanı hiç göndermez.
+   */
+  rejection_reason?: string | null;
 }
 
 export const createListing = (payload: ListingPayload) =>
@@ -802,10 +809,13 @@ export interface FlaggedItem {
    */
   active_before_removal: boolean | null;
   /**
-   * Yalnız ilan: dolandırıcılık kalıbı yüzünden yayına girmeden onay
-   * bekliyor. Bu ilanda "Temiz" demek onu YAYINA ALIR.
+   * Yalnız ilan: yayına girmeden onay bekliyor (onay modu ya da
+   * dolandırıcılık kalıbı yüzünden). Bu ilanda "clear" onu YAYINA ALIR,
+   * "reject" sebebiyle sahibine geri gönderir.
    */
   pending_review?: boolean;
+  /** Yalnız ilan: fotoğraflar (onay kararı onlara bakılarak verilir). Eski sunucu göndermez. */
+  photos?: string[];
   /** Denetimin gerekçe kodları ("iletisim_bilgisi:telefon" gibi). Eski kayıtlarda boş. */
   flag_reasons: string[];
   /** Sunucunun ürettiği Türkçe cümle; İngilizce arayüz kodlardan kendi metnini üretir. */
@@ -820,7 +830,7 @@ export interface FlaggedItem {
 export interface FlaggedReviewResult {
   kind: FlaggedKind;
   id: number;
-  action: "clear" | "remove";
+  action: "clear" | "remove" | "reject";
   is_flagged: boolean;
   is_active: boolean | null;
   moderation_removed: boolean;
@@ -935,7 +945,8 @@ export const fetchFlagged = (
 export const reviewFlagged = (
   kind: FlaggedKind,
   itemId: number,
-  action: "clear" | "remove",
+  // reject: yalnız onay bekleyen ilan; note (sebep) zorunlu ve sahibine gösterilir.
+  action: "clear" | "remove" | "reject",
   note?: string,
 ) =>
   postJSON<FlaggedReviewResult>(`/api/admin/flagged/${kind}/${itemId}/review`, {

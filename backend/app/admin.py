@@ -200,6 +200,9 @@ class FlaggedOut(BaseModel):
     # Yalnız ilan: yayına girmeden onay bekliyor. "clear" bu ilanı YAYINA
     # ALIR; arayüz düğmeyi buna göre adlandırır.
     pending_review: bool = False
+    # Yalnız ilan: fotoğraflar. Onay kararı fotoğraflara bakılmadan
+    # verilemez (otomatik denetim yalnız metne bakıyor); mesajda boş liste.
+    photos: list[str] = []
     flag_reasons: list[str]
     flag_reasons_text: str | None
     # Kaldırma kararının izi (status=removed kuyruğunda dolu olur).
@@ -210,14 +213,17 @@ class FlaggedOut(BaseModel):
 
 
 class ReviewIn(BaseModel):
-    action: Literal["clear", "remove"]
+    # reject: yalnız ONAY BEKLEYEN ilan için. İlan yayına girmez, sahibine
+    # sebebiyle geri döner; sahibi düzeltip yeniden gönderebilir. "remove"
+    # ise yönetici kaldırmasıdır: sahibi ilanı bir daha göremez.
+    action: Literal["clear", "remove", "reject"]
     note: str | None = Field(None, max_length=500)
 
 
 class ReviewOut(BaseModel):
     kind: FlagKind
     id: int
-    action: Literal["clear", "remove"]
+    action: Literal["clear", "remove", "reject"]
     is_flagged: bool
     is_active: bool | None
     moderation_removed: bool
@@ -288,6 +294,8 @@ class AdminListingOut(ListingOut):
     reviewed_by: int | None
     reviewed_at: datetime | None
     review_note: str | None
+    # Yöneticinin bu ilanı en son onayladığı an (app.listing_review).
+    approved_at: datetime | None = None
 
 
 class ListingPublishOut(BaseModel):
@@ -563,6 +571,8 @@ def _admin_listing_row(row: models.Listing) -> dict:
         "reviewed_by": row.reviewed_by,
         "reviewed_at": row.reviewed_at,
         "review_note": row.review_note,
+        "approved_at": row.approved_at,
+        "rejection_reason": row.rejection_reason,
     }
 
 
@@ -728,6 +738,7 @@ def admin_flagged(
                         else bool(row.active_before_removal)
                     ),
                     "pending_review": bool(row.pending_review),
+                    "photos": list(row.photos or []),
                     "flag_reasons": codes,
                     "flag_reasons_text": text,
                     "reviewed_by": row.reviewed_by,
@@ -806,6 +817,13 @@ def review_flagged(
     kalırken yanıt content_removed:False dönüyor, üstelik kaldırma kararının
     reviewed_by/reviewed_at izi de üzerine yazılıyordu. Kaldırmayı geri
     almanın tek yolu POST /api/admin/{kind}/{id}/restore'dur.
+
+    ONAY BEKLEYEN İLAN (app.listing_review) için iki karar var:
+      clear  -> onaylar: ilan yayına girer, approved_at yazılır.
+      reject -> reddeder: ilan yayına GİRMEZ, kapalı kalır ve sebep
+                (note, ZORUNLU) sahibine "İlanlarım"da gösterilir. Sahibi
+                düzeltip yeniden gönderebilir. "remove"dan farkı bu: kaldırılan
+                ilanı sahibi bir daha göremez, reddedileni düzeltebilir.
     """
     model = models.Listing if kind == "listing" else models.Message
     row = db.get(model, item_id)
@@ -823,12 +841,35 @@ def review_flagged(
     note = payload.note.strip() if payload.note else None
     content_removed = False
 
+    if payload.action == "reject":
+        if kind != "listing" or not row.pending_review:
+            raise HTTPException(
+                status_code=400,
+                detail=localized(
+                    "Yalnızca onay bekleyen bir ilan reddedilebilir. "
+                    "Yayındaki içerik için 'remove' kullan."
+                ),
+            )
+        if not note:
+            raise HTTPException(
+                status_code=422,
+                detail=localized(
+                    "Ret sebebi zorunlu: ilan sahibi neyi düzelteceğini "
+                    "bu metinden öğrenecek."
+                ),
+            )
+        row.is_active = False
+        row.pending_review = False
+        row.rejection_reason = note
+
     if payload.action == "clear" and kind == "listing" and row.pending_review:
         # Onay bekleyen ilan: işareti temizlemek onaylamaktır, ilan yayına
         # girer. Sahibi bu arada geri çektiyse pending_review zaten False'tur
         # ve buraya girilmez.
         row.is_active = True
         row.pending_review = False
+        row.approved_at = _utcnow()
+        row.rejection_reason = None
 
     if payload.action == "remove":
         if kind == "listing":
@@ -1167,6 +1208,8 @@ def publish_listing(
         row.is_active = True
         # Onay bekleyen ilanı yayına almak onu onaylamaktır.
         row.pending_review = False
+        row.approved_at = _utcnow()
+        row.rejection_reason = None
         _record_action(db, admin, "listing_publish", "listing", row.id)
         db.commit()
         db.refresh(row)

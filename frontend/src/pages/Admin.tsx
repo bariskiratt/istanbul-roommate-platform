@@ -81,6 +81,8 @@ const doneKeys: Record<AdminActionKind, TranslationKey> = {
   restoreListing: "admin.doneRestoreListing",
   restoreMessage: "admin.doneRestoreMessage",
   clear: "admin.doneClear",
+  approveListing: "admin.doneApprove",
+  rejectListing: "admin.doneReject",
   suspend: "admin.doneSuspend",
   unsuspend: "admin.doneUnsuspend",
   deleteUser: "admin.doneDeleteUser",
@@ -194,6 +196,9 @@ type AdminAction =
   // eylemden ÖNCE söyler.
   | { kind: "restoreMessage"; label: string; itemId: number; unrecoverable: boolean }
   | { kind: "clear"; label: string; itemKind: FlaggedKind; itemId: number }
+  | { kind: "approveListing"; label: string; itemId: number }
+  // Yalnız onay bekleyen ilan: sebebiyle sahibine geri döner.
+  | { kind: "rejectListing"; label: string; itemId: number }
   | { kind: "suspend"; label: string; userId: number }
   | { kind: "unsuspend"; label: string; userId: number }
   // Kalıcı: hesap ve bağlı verisi gider, geri getirilemez.
@@ -519,9 +524,14 @@ const FlaggedCard = ({
   // gönderemiyor (sunucu 422 ile reddediyor, bkz. moderation.SYSTEM_MARKERS).
   const textUnrecoverable =
     removed && item.kind === "message" && item.content === REMOVED_CONTENT;
-  // Dolandırıcılık kalıbı yüzünden yayına hiç girmemiş, onay bekleyen ilan:
-  // "Temiz" onu yayına alır, düğme de bunu söyler.
+  // Yayına hiç girmemiş, onay bekleyen ilan: "Onayla" onu yayına alır,
+  // "Reddet" sebebiyle sahibine geri gönderir.
   const pending = !removed && item.kind === "listing" && item.pending_review === true;
+  // Onay modu her ilanı bekletir; denetim işareti (ör. dolandırıcılık kalıbı)
+  // yalnız bazılarında vardır. İşaretsiz bekleyen ilanda "İşaretli" rozeti
+  // ve "gerekçe kaydedilmemiş" satırı yanıltıcı olurdu.
+  const flagged = item.flag_reasons.length > 0;
+  const photos = item.kind === "listing" ? (item.photos ?? []) : [];
 
   return (
     <div className="card-listing p-5 space-y-3">
@@ -544,22 +554,45 @@ const FlaggedCard = ({
               : `${t("admin.senderLabel", { name: item.author_name ?? "" })}, ${t("admin.matchLabel", { id: item.match_id ?? 0 })}`}
           </p>
         </div>
-        <Chip tone={removed ? "danger" : "warn"}>
-          {t(removed ? "admin.badgeRemoved" : "admin.badgeFlagged")}
-        </Chip>
+        {(removed || flagged || !pending) && (
+          <Chip tone={removed ? "danger" : "warn"}>
+            {t(removed ? "admin.badgeRemoved" : "admin.badgeFlagged")}
+          </Chip>
+        )}
       </div>
+
+      {/* Onay kararı fotoğraflara bakılmadan verilemez: otomatik denetim
+          yalnız metne bakıyor. Küçük resme tıklayınca tam boyu yeni sekmede
+          açılır. */}
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2" aria-label={t("admin.photosLabel")}>
+          {photos.map((src, i) => (
+            <a
+              key={src}
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-xl overflow-hidden border border-border bg-muted aspect-square"
+              title={t("admin.photoOpen", { n: i + 1 })}
+            >
+              <img src={src} alt={t("admin.photoAlt", { n: i + 1 })} loading="lazy" className="w-full h-full object-cover" />
+            </a>
+          ))}
+        </div>
+      )}
 
       <p className="text-sm text-foreground break-words rounded-2xl bg-muted/50 p-3">
         {contentText(item.content, t)}
       </p>
 
       {/* Kaldırılan içerik denetim işareti taşımayabilir (karar rapordan da
-          verilebiliyor); gerekçe yoksa "kaydedilmemiş" demek yanıltıcı olur. */}
-      {(!removed || item.flag_reasons.length > 0) && <FlagReasons reasons={item.flag_reasons} />}
+          verilebiliyor); gerekçe yoksa "kaydedilmemiş" demek yanıltıcı olur.
+          Onay modunda bekleyen işaretsiz ilan için de aynısı geçerli. */}
+      {(flagged || (!removed && !pending)) && <FlagReasons reasons={item.flag_reasons} />}
 
       {pending && (
         <div className="rounded-2xl border border-border bg-muted/50 px-3 py-2">
-          <p className="text-xs text-foreground">{t("admin.pendingNote")}</p>
+          <p className="text-xs text-foreground">{t(flagged ? "admin.pendingNote" : "admin.pendingReviewNote")}</p>
         </div>
       )}
 
@@ -610,8 +643,20 @@ const FlaggedCard = ({
           <>
             <ActionButton
               label={t(pending ? "admin.actionApprove" : "admin.actionClear")}
-              onClick={() => onAction({ kind: "clear", label, itemKind: item.kind, itemId: item.id })}
+              onClick={() =>
+                onAction(
+                  pending
+                    ? { kind: "approveListing", label, itemId: item.id }
+                    : { kind: "clear", label, itemKind: item.kind, itemId: item.id },
+                )
+              }
             />
+            {pending && (
+              <ActionButton
+                label={t("admin.actionReject")}
+                onClick={() => onAction({ kind: "rejectListing", label, itemId: item.id })}
+              />
+            )}
             <ActionButton
               destructive
               label={t("admin.actionRemove")}
@@ -959,6 +1004,10 @@ const Admin = () => {
           return restoreRemoved("message", a.itemId, note);
         case "clear":
           return reviewFlagged(a.itemKind, a.itemId, "clear", note);
+        case "approveListing":
+          return reviewFlagged("listing", a.itemId, "clear", note);
+        case "rejectListing":
+          return reviewFlagged("listing", a.itemId, "reject", note);
         case "suspend":
           return suspendUser(a.userId, note);
         case "unsuspend":

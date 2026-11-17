@@ -211,6 +211,9 @@ const Profile = () => {
             <div className="space-y-3">
               {myListings.length > 0 ? myListings.map(listing => {
                 const closed = !listing.is_active && !listing.pending_review;
+                // Yönetici reddetti: kapalı, sebebi sahibine gösterilir.
+                // Düzeltip "Tekrar onaya gönder" ile yeniden gönderir.
+                const rejected = closed && Boolean(listing.rejection_reason);
                 return (
                 <div key={listing.id} className="rounded-2xl border border-border p-2 flex items-center gap-3">
                   {listing.photos[0] ? (
@@ -231,7 +234,11 @@ const Profile = () => {
                           {t("profile.pending")}
                         </span>
                       )}
-                      {closed && <span className="ml-2 font-semibold text-muted-foreground">{t("profile.closed")}</span>}
+                      {rejected ? (
+                        <span className="ml-2 font-semibold text-destructive">{t("profile.rejected")}</span>
+                      ) : (
+                        closed && <span className="ml-2 font-semibold text-muted-foreground">{t("profile.closed")}</span>
+                      )}
                     </p>
                     <p className="font-display text-[17px] leading-snug text-foreground truncate">{listing.title}</p>
                     <p className="text-[13px] text-muted-foreground">
@@ -240,13 +247,18 @@ const Profile = () => {
                         ? `${n(listing.rent ?? 0)} TL`
                         : `${n(listing.budget_min ?? 0)}–${n(listing.budget_max ?? 0)} TL`}
                     </p>
+                    {rejected && (
+                      <p className="mt-1 text-[13px] text-destructive break-words">
+                        {t("profile.rejectedReason", { reason: listing.rejection_reason ?? "" })}
+                      </p>
+                    )}
                     {closed && (
                       <button
                         onClick={() => republish.mutate(listing.id)}
                         disabled={republish.isPending}
                         className="mt-1 text-[13px] font-semibold text-secondary hover:underline disabled:opacity-50"
                       >
-                        {t("profile.republish")}
+                        {t(rejected ? "profile.resubmit" : "profile.republish")}
                       </button>
                     )}
                   </div>
