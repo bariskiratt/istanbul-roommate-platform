@@ -10,7 +10,7 @@ cloudpickle==3.1.2
 joblib==1.6.0
 lightgbm==4.7.0
 narwhals==2.27.1
-numpy==2.5.3
+numpy==2.5.4
 pandas==3.0.6
 python-dateutil==2.9.0.post0
 scikit-learn==1.9.1
