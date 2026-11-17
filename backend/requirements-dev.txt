@@ -3,4 +3,4 @@
 -r requirements-test.txt
 
 # Model eğitimi (scripts/train_model.py — CV karşılaştırması)
-xgboost>=2.0
+xgboost>=3.4.1
