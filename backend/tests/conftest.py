@@ -60,6 +60,24 @@ def _dev_otp(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _listing_review_flagged(monkeypatch):
+    """Testlerin çoğu açtığı ilanın hemen yayına girdiğini varsayar.
+
+    Üretimin varsayılanı her ilanı yönetici onayına düşürmek (app.
+    listing_review, mod "all"); o davranış ve "first" modu
+    tests/test_listing_review.py'de ayrıca sınanır. Geri kalan testler
+    onay modundan önceki davranışla ("flagged": yalnız dolandırıcılık
+    kalıbı bekler) koşar ki her biri ilanı önce onaylatmak zorunda kalmasın.
+    """
+    from app import listing_review
+
+    monkeypatch.setenv("LISTING_REVIEW", "flagged")
+    listing_review.reset_notice_throttle()
+    yield
+    listing_review.reset_notice_throttle()
+
+
+@pytest.fixture(autouse=True)
 def _disable_moderation_ai(monkeypatch):
     """İçerik denetiminin yapay zeka katmanı testlerde kapalı kalsın.
 

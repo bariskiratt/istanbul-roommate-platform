@@ -7,14 +7,14 @@ içerik denetiminden (app.moderation) geçer.
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import joinedload
 
-from app import content_limits, dealbreakers, models, moderation
+from app import content_limits, dealbreakers, listing_review, models, moderation
 from app.auth import get_current_user, get_optional_user
 from app.blocks import blocked_ids, is_blocked
 from app.db import get_db
@@ -368,6 +368,10 @@ class ListingOut(BaseModel):
     # sahibinin kendi listesinde (mine=1) görünür; genel listeler yalnız
     # yayındaki ilanları döndürür.
     pending_review: bool = False
+    # Yönetici onay bekleyen ilanı reddettiyse sebebi (bkz. models.Listing).
+    # Yalnız sahibinin kapalı ilanında dolu olur: reddedilen ilan hiçbir genel
+    # listede görünmez, yayına girdiği an da temizlenir.
+    rejection_reason: str | None = None
     created_at: datetime
     owner_id: int | None = None
     owner_name: str | None = None
@@ -396,19 +400,28 @@ def _hide_owner(row: models.Listing) -> ListingOut:
 @router.post("", status_code=201, response_model=ListingOut)
 def create_listing(
     payload: ListingIn,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı."""
+    """İlan oluşturma giriş ister — anonim ilan spam'ine kapalı.
+
+    Yayına girmeden yönetici onayı bekleyip beklemeyeceğini
+    app.listing_review belirler (varsayılan: her ilan bekler).
+    """
     # Giriş ŞARTI tek başına yetmiyordu: tek jetonla yüzlerce ilan açılıp
     # deste ve arama sonuçları doldurulabiliyordu (bulgu H3).
     content_limits.check("listing_create", user.id)
 
     result = _moderate(payload.title, payload.description)
     # Dolandırıcılık kalıbı taşıyan ilan reddedilmez ama yönetici onaylayana
-    # kadar yayına da girmez (bkz. moderation.HOLD_FOR_REVIEW). Yanıttaki
-    # pending_review arayüze "incelemeye alındı" dedirtir.
-    held = moderation.holds_for_review(result)
+    # kadar yayına da girmez (bkz. moderation.HOLD_FOR_REVIEW). Onay modu
+    # (app.listing_review) temiz ilanı da bekletebilir: fotoğraflara bakan
+    # otomatik bir denetim yok. Yanıttaki pending_review arayüze "incelemeye
+    # alındı" dedirtir.
+    held = moderation.holds_for_review(result) or listing_review.requires_review(
+        db, user
+    )
     row = models.Listing(
         **payload.model_dump(),
         owner_id=user.id,
@@ -420,6 +433,8 @@ def create_listing(
     db.add(row)
     db.commit()
     db.refresh(row)
+    if held:
+        listing_review.notify_admins(background, db)
     return row
 
 
@@ -592,6 +607,7 @@ class ListingUpdate(BaseModel):
 def update_listing(
     listing_id: int,
     payload: ListingUpdate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: models.User | None = Depends(get_optional_user),
 ):
@@ -602,6 +618,11 @@ def update_listing(
     kapattığı ilanı da yeniden yayınlamadan önce güncelleyebilmeli.
     Yöneticinin kaldırdığı ilan düzenlenemez (404): kaldırma kararının
     konusu olan metin, karar geri alınmadan değişmemeli.
+
+    Onay modu (app.listing_review) gerektiriyorsa yayındaki ilanın METNİ ya
+    da FOTOĞRAFLARI değişince ilan yeniden onaya düşer: aksi hâlde kural,
+    ilanı temiz fotoğraflarla onaylatıp sonra fotoğrafları değiştirerek
+    atlatılırdı. Kira, oda sayısı ve özellikler onaysız güncellenir.
     """
     row = db.get(models.Listing, listing_id)
     if row is None or row.moderation_removed:
@@ -634,7 +655,12 @@ def update_listing(
     # başlık veya açıklama değişirse yeni hâl bir bütün olarak denetlenir.
     new_title = updates.get("title", row.title)
     new_description = updates.get("description", row.description)
-    if new_title != row.title or new_description != row.description:
+    text_changed = new_title != row.title or new_description != row.description
+    photos_changed = "photos" in updates and list(updates["photos"]) != list(
+        row.photos or []
+    )
+    held_now = False
+    if text_changed:
         result = _moderate(new_title, new_description)
         row.is_flagged = result.flagged
         row.flag_reasons = moderation.reasons_csv(result)
@@ -646,6 +672,19 @@ def update_listing(
         if moderation.holds_for_review(result) and row.is_active:
             row.is_active = False
             row.pending_review = True
+            held_now = True
+
+    # Fotoğraf ya da metin değişikliği onay modunda yayındaki ilanı yeniden
+    # onaya düşürür. Kapalı ilan kapalı kalır; yeniden yayınlarken
+    # (republish_listing) aynı kural uygulanır.
+    if (
+        (text_changed or photos_changed)
+        and row.is_active
+        and listing_review.requires_review(db, user)
+    ):
+        row.is_active = False
+        row.pending_review = True
+        held_now = True
 
     # İlçe değişip mahalle gönderilmediyse eski ilçenin mahallesi kalmasın;
     # adil fiyat yanlış mahalleye bakardı. (null "dokunma" sayıldığı için
@@ -669,6 +708,8 @@ def update_listing(
     if removed:
         delete_unused_photos(db, removed)
     db.refresh(row)
+    if held_now:
+        listing_review.notify_admins(background, db)
     return row
 
 
@@ -708,6 +749,7 @@ def deactivate_listing(
 @router.post("/{listing_id}/republish", response_model=ListingOut)
 def republish_listing(
     listing_id: int,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -724,6 +766,10 @@ def republish_listing(
 
     Kapatıp açma döngüsü yeni ilan açmakla aynı kotaya sayılır
     (content_limits "listing_create"): her yayın denetimden geçiyor.
+
+    Onay modu (app.listing_review) gerektiriyorsa yeniden yayın da onaya
+    düşer. Yöneticinin REDDETTİĞİ ilan da buradan, düzeltildikten sonra
+    yeniden gönderilir; ret sebebi o an temizlenir.
     """
     row = db.get(models.Listing, listing_id)
     if row is None or row.moderation_removed:
@@ -741,11 +787,16 @@ def republish_listing(
 
     content_limits.check("listing_create", user.id)
     result = _moderate(row.title, row.description)
-    held = moderation.holds_for_review(result)
+    held = moderation.holds_for_review(result) or listing_review.requires_review(
+        db, user
+    )
     row.is_flagged = result.flagged
     row.flag_reasons = moderation.reasons_csv(result)
     row.is_active = not held
     row.pending_review = held
+    row.rejection_reason = None
     db.commit()
     db.refresh(row)
+    if held:
+        listing_review.notify_admins(background, db)
     return row

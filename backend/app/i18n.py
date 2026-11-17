@@ -179,6 +179,14 @@ EN: dict[str, str | tuple[str, str]] = {
 
     # ---- yönetici paneli ----
     "Silme gerekçesi boş olamaz.": "The deletion reason can't be empty.",
+    "Yalnızca onay bekleyen bir ilan reddedilebilir. "
+    "Yayındaki içerik için 'remove' kullan.":
+        "Only a listing awaiting approval can be rejected. "
+        "Use 'remove' for live content.",
+    "Ret sebebi zorunlu: ilan sahibi neyi düzelteceğini "
+    "bu metinden öğrenecek.":
+        "A rejection reason is required: it is how the owner learns "
+        "what to fix.",
     "Rapor bulunamadı.": "Report not found.",
     "İçerik bulunamadı.": "Content not found.",
     "Bu içerik yönetici tarafından kaldırılmış; işaret temizlemek "

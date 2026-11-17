@@ -115,6 +115,12 @@ _SCHEMA: dict[str, tuple[_Column, ...]] = {
         _Column("active_before_removal", "BOOLEAN"),
         # Yayın öncesi yönetici onayı — eski ilanların hiçbiri beklemiyor.
         _Column("pending_review", "BOOLEAN", default=False),
+        # Yönetici onayı (app.listing_review). VARSAYILAN YOK: eski ilanları
+        # hiçbir yönetici onaylamadı; "onaylandı" saymak "first" modunda
+        # sahiplerini hak etmedikleri halde güvenilir yapardı.
+        _Column("approved_at", "TIMESTAMP"),
+        # Sahibine gösterilen ret sebebi — eski ilanların hiçbiri reddedilmedi.
+        _Column("rejection_reason", "VARCHAR(500)"),
     ),
     "messages": (
         _Column("is_flagged", "BOOLEAN", default=False),

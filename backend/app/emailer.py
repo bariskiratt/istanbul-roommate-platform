@@ -71,6 +71,11 @@ def send_otp_email(to: str, code: str, *, admin_login: bool = False) -> bool:
         # Brevo istatistiklerinde işlemsel postaları ayırt etmek için.
         "tags": ["otp"],
     }
+    return _send(payload)
+
+
+def _send(payload: dict) -> bool:
+    """Brevo'ya tek gönderim; başarı durumunu döner (istisna fırlatmaz)."""
     try:
         res = requests.post(
             BREVO_URL,
@@ -90,3 +95,47 @@ def send_otp_email(to: str, code: str, *, admin_login: bool = False) -> bool:
     except requests.RequestException as exc:
         print(f"⚠️  Brevo'ya ulaşılamadı: {type(exc).__name__}: {exc}", flush=True)
         return False
+
+
+def site_url() -> str:
+    """Postalardaki bağlantıların tabanı (arayüzün adresi)."""
+    return os.getenv("SITE_URL", "https://evdes.tr").rstrip("/")
+
+
+def send_review_notice(to: list[str], pending_count: int) -> bool:
+    """Yöneticilere "onay bekleyen ilan var" postası (app.listing_review).
+
+    Postada KULLANICI METNİ YOKTUR — ne ilan başlığı ne sahibin adı. Bilerek:
+    postaya kullanıcı girdisi koymak HTML/bağlantı enjeksiyonu kapısı açar ve
+    onay bekleyen (henüz kimsenin bakmadığı) içeriği yöneticinin gelen
+    kutusuna taşır. Yalnızca sayı ve panelin adresi gider.
+    """
+    if not email_enabled() or not to:
+        return False
+    sender_name = os.getenv("EMAIL_FROM_NAME", DEFAULT_SENDER_NAME)
+    panel = f"{site_url()}/admin"
+    count = max(int(pending_count), 1)
+    subject = f"Onay bekleyen {count} ilan var"
+    payload = {
+        "sender": {"name": sender_name, "email": os.environ["EMAIL_FROM"]},
+        "to": [{"email": addr} for addr in to],
+        "subject": subject,
+        "textContent": (
+            f"{subject}.\n\n"
+            "İlanlar sen onaylayana kadar destede görünmüyor. Onaylamak ya da "
+            f"sebebini yazıp reddetmek için yönetici paneli: {panel}\n\n"
+            "Bu posta en fazla yarım saatte bir gönderilir.\n\n"
+            "evdes.tr"
+        ),
+        "htmlContent": (
+            "<div style='font-family:sans-serif;max-width:420px;margin:auto'>"
+            "<h2 style='margin:0 0 16px'>evdes.tr</h2>"
+            f"<p><strong>{subject}.</strong></p>"
+            "<p>İlanlar sen onaylayana kadar destede görünmüyor.</p>"
+            f"<p><a href='{panel}'>Yönetici paneline git</a></p>"
+            "<p style='color:#666'>Bu posta en fazla yarım saatte bir gönderilir.</p>"
+            "</div>"
+        ),
+        "tags": ["listing-review"],
+    }
+    return _send(payload)

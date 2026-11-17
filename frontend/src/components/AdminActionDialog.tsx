@@ -18,6 +18,8 @@ export type AdminActionKind =
   | "restoreListing"
   | "restoreMessage"
   | "clear"
+  | "approveListing"
+  | "rejectListing"
   | "suspend"
   | "unsuspend"
   | "deleteUser";
@@ -36,6 +38,11 @@ interface ActionConfig {
    */
   reasonLabelKey?: TranslationKey;
   reasonPlaceholderKey?: TranslationKey;
+  /**
+   * Onay düğmesinin metni. Verilmezse genel "Onayla" basılır; ama ret
+   * penceresinde kırmızı bir "Onayla" düğmesi "ilanı onayla" diye okunur.
+   */
+  confirmKey?: TranslationKey;
 }
 
 const configs: Record<AdminActionKind, ActionConfig> = {
@@ -66,6 +73,25 @@ const configs: Record<AdminActionKind, ActionConfig> = {
     destructive: false,
   },
   clear: { titleKey: "admin.dlgClearTitle", descKey: "admin.dlgClearDesc", input: "note", destructive: false },
+  // Onay bekleyen ilan: "clear" ile aynı uç, ama söylediği şey farklı
+  // ("işaret kalktı" değil "ilan yayına girdi").
+  approveListing: {
+    titleKey: "admin.dlgApproveTitle",
+    descKey: "admin.dlgApproveDesc",
+    input: "note",
+    destructive: false,
+  },
+  // Sebep ZORUNLU: sahibine "İlanlarım"da aynen gösterilir; neyi
+  // düzelteceğini oradan öğrenir. Sunucu da boş sebebi 422 ile reddeder.
+  rejectListing: {
+    titleKey: "admin.dlgRejectTitle",
+    descKey: "admin.dlgRejectDesc",
+    input: "reason",
+    destructive: true,
+    reasonLabelKey: "admin.dlgRejectReasonLabel",
+    reasonPlaceholderKey: "admin.dlgRejectReasonPlaceholder",
+    confirmKey: "admin.dlgRejectConfirm",
+  },
   suspend: { titleKey: "admin.dlgSuspendTitle", descKey: "admin.dlgSuspendDesc", input: "reason", destructive: true },
   unsuspend: {
     titleKey: "admin.dlgUnsuspendTitle",
@@ -277,7 +303,7 @@ const AdminActionDialog = ({
                     : ""
                 }`}
               >
-                {pending ? t("admin.dlgWorking") : t("admin.dlgConfirm")}
+                {pending ? t("admin.dlgWorking") : t(config.confirmKey ?? "admin.dlgConfirm")}
               </Button>
             </div>
           </motion.div>

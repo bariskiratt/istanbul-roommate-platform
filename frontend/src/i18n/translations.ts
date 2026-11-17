@@ -331,7 +331,10 @@ const tr = {
   "profile.personal": "Oda arıyor",
   "profile.active": "Aktif",
   "profile.pending": "İncelemede",
-  "profile.pendingHint": "İlanında ödeme ya da kapora ile ilgili bir ifade var; bir yönetici baktıktan sonra yayına girer.",
+  "profile.pendingHint": "Bir yönetici ilanına ve fotoğraflarına baktıktan sonra yayına girer.",
+  "profile.rejected": "Reddedildi",
+  "profile.rejectedReason": "Yönetici notu: {reason}",
+  "profile.resubmit": "Düzelttim, tekrar onaya gönder",
   "profile.removeListing": "İlanı kapat",
   "profile.confirmRemove": "\"{title}\" ilanını kapatmak istiyor musun? Destede görünmez; istediğinde buradan yeniden yayınlayabilirsin.",
   "profile.removed": "İlan kapatıldı",
@@ -445,7 +448,7 @@ const tr = {
   "create.successDesc": "\"{title}\" başarıyla yayınlandı.",
   "create.pendingTitle": "İlan incelemeye alındı",
   "create.pendingDesc":
-    "İlanında ödeme ya da kapora ile ilgili bir ifade var. Dolandırıcılığa karşı bir yönetici baktıktan sonra yayına girer; İlanlarım'da \"İncelemede\" yazar.",
+    "Bir yönetici ilanına ve fotoğraflarına baktıktan sonra yayına girer; o zamana kadar İlanlarım'da \"İncelemede\" yazar.",
   "create.editTitle": "Düzenleme",
   "create.save": "Değişiklikleri kaydet",
   "create.updatedTitle": "İlan güncellendi",
@@ -698,7 +701,7 @@ const tr = {
     "Kayıt yalnızca .edu.tr uzantılı üniversite e-postasıyla yapılır. Adres, e-postana gönderilen tek kullanımlık kodla doğrulanmadan hesap açılmaz; her hesap tek bir .edu.tr adresine bağlıdır.",
   "safety.card2Title": "Otomatik içerik denetimi",
   "safety.card2Desc":
-    "Her ilan ve her mesaj yayınlanmadan önce denetimden geçer. Kural tabanlı katman her zaman açıktır: küfür, hakaret ve dolandırıcılık kalıplarını yakalar, ağır içerikleri baştan engeller. Kusursuz değildir — bazı içerikleri kaçırabilir, masum bir metni de yanlışlıkla engelleyebilir. Yapay zeka katmanı yalnızca sunucuda yapılandırıldığında devreye girer; bu katman açıkken denetlenen ilan ve mesaj metinlerinin tamamı sınıflandırma için Anthropic'e iletilir. Denetim, metin kaydedilmeden önce düz metin üzerinde çalışır; şifreleme yalnızca veritabanındaki kaydı korur.",
+    "Her ilan ve her mesaj yayınlanmadan önce denetimden geçer. Kural tabanlı katman her zaman açıktır: küfür, hakaret ve dolandırıcılık kalıplarını yakalar, ağır içerikleri baştan engeller. İlanlara ayrıca fotoğraflarıyla birlikte bir yönetici bakar: yeni hesapların ilanları onaylanana kadar destede görünmez. Kusursuz değildir — bazı içerikleri kaçırabilir, masum bir metni de yanlışlıkla engelleyebilir. Yapay zeka katmanı yalnızca sunucuda yapılandırıldığında devreye girer; bu katman açıkken denetlenen ilan ve mesaj metinlerinin tamamı sınıflandırma için Anthropic'e iletilir. Denetim, metin kaydedilmeden önce düz metin üzerinde çalışır; şifreleme yalnızca veritabanındaki kaydı korur.",
   "safety.card3Title": "Eşleşmeden mesaj yok",
   "safety.card3Desc":
     "Kimse sana doğrudan yazamaz. Mesajlaşma yalnızca iki taraf da birbirini beğendiğinde, yani eşleşme oluştuğunda açılır.",
@@ -761,6 +764,12 @@ const tr = {
     "Dolandırıcılık kalıbı (IBAN ile acele ya da evi görmeden kapora) bulundu; ilan yayına girmedi. Gerçek bir ilansa onayla, değilse kaldır.",
   "admin.pendingSummary": "{count} ilan yayına girmek için onayını bekliyor (İşaretlenenler sekmesi).",
   "admin.actionApprove": "Onayla, yayına al",
+  "admin.actionReject": "Reddet",
+  "admin.pendingReviewNote":
+    "Yeni ilan, henüz yayında değil. Fotoğraflara ve metne bak: uygunsa onayla; düzeltilmesi gereken bir şey varsa sebebini yazıp reddet, sahibi düzeltip tekrar gönderebilir. Kural dışıysa kaldır.",
+  "admin.photosLabel": "İlanın fotoğrafları",
+  "admin.photoOpen": "{n}. fotoğrafı tam boy aç",
+  "admin.photoAlt": "İlan fotoğrafı {n}",
   "admin.badgeSuspended": "Askıda",
   "admin.badgeAdmin": "Yönetici",
   "admin.targetListing": "İlan",
@@ -834,6 +843,15 @@ const tr = {
   "admin.dlgRestoreMessageTitle": "Mesajı geri al",
   "admin.dlgRestoreMessageDesc":
     "Saklanan özgün metin sohbete geri konur. Metin saklanmamışsa (bu özellik eklenmeden önce kaldırılmış eski mesajlar) ya da saklanan değer artık çözülemiyorsa geri gelmez; o durumda kayıt yalnızca kuyruktan düşer ve sonuç ekranında bunu bildiririz.",
+  "admin.dlgApproveTitle": "İlanı onayla",
+  "admin.dlgApproveDesc":
+    "İlan fotoğraflarıyla birlikte yayına girer ve destede görünmeye başlar. Kararın (yönetici, tarih, not) kaydedilir.",
+  "admin.dlgRejectTitle": "İlanı reddet",
+  "admin.dlgRejectDesc":
+    "İlan yayına girmez ve sahibine geri döner. Yazdığın sebep ona İlanlarım'da aynen gösterilir; düzeltip tekrar gönderebilir. Kural dışı içerik için reddetmek yerine kaldır.",
+  "admin.dlgRejectReasonLabel": "Ret sebebi (ilan sahibi görecek)",
+  "admin.dlgRejectConfirm": "Reddet, sahibine gönder",
+  "admin.dlgRejectReasonPlaceholder": "Örn. Fotoğraflar bu evin değil; evin kendi fotoğraflarını yükle.",
   "admin.dlgClearTitle": "İşareti kaldır",
   "admin.dlgClearDesc":
     "İçerik temiz sayılır ve kuyruktan düşer. Metne dokunulmaz; yalnızca işaret kalkar ve kararın (yönetici, tarih, not) kaydedilir.",
@@ -869,6 +887,8 @@ const tr = {
   "admin.doneRestoreMessageUnrecoverable":
     "Geri alınacak bir metin yok: bu mesaj, özgün metin saklanmaya başlamadan önce kaldırılmış. Kayıt değişmedi; mesaj kaldırılmış kalıyor ve Kaldırılanlar kuyruğunda görünmeye devam ediyor.",
   "admin.doneClear": "İşaret kaldırıldı.",
+  "admin.doneApprove": "İlan onaylandı, yayında.",
+  "admin.doneReject": "İlan reddedildi; sahibi sebebi görecek.",
   "admin.doneSuspend": "Kullanıcı askıya alındı.",
   "admin.doneUnsuspend": "Askı kaldırıldı.",
   "admin.actionFailed": "İşlem tamamlanamadı",
@@ -1453,7 +1473,10 @@ const en: Record<TranslationKey, string> = {
   "profile.personal": "Looking for a room",
   "profile.active": "Active",
   "profile.pending": "In review",
-  "profile.pendingHint": "Your listing mentions a payment or deposit; it goes live after an admin has looked at it.",
+  "profile.pendingHint": "It goes live once an admin has looked at your listing and its photos.",
+  "profile.rejected": "Rejected",
+  "profile.rejectedReason": "Admin's note: {reason}",
+  "profile.resubmit": "Fixed it, send for review again",
   "profile.removeListing": "Close listing",
   "profile.confirmRemove": "Close \"{title}\"? It disappears from the deck, and you can republish it from here whenever you like.",
   "profile.removed": "Listing closed",
@@ -1567,7 +1590,7 @@ const en: Record<TranslationKey, string> = {
   "create.successDesc": "\"{title}\" was published successfully.",
   "create.pendingTitle": "Listing sent for review",
   "create.pendingDesc":
-    "Your listing mentions a payment or deposit. To guard against scams it goes live after an admin has looked at it; My listings shows it as \"In review\".",
+    "It goes live once an admin has looked at your listing and its photos; until then My listings shows it as \"In review\".",
   "create.editTitle": "Editing",
   "create.save": "Save changes",
   "create.updatedTitle": "Listing updated",
@@ -1817,7 +1840,7 @@ const en: Record<TranslationKey, string> = {
     "You can only sign up with a university email ending in .edu.tr. No account is created until the address is confirmed with a one-time code sent to it, and each account is tied to a single .edu.tr address.",
   "safety.card2Title": "Automated content review",
   "safety.card2Desc":
-    "Every listing and every message is screened before it goes live. The rule-based layer is always on: it catches profanity, abuse and scam patterns and blocks the worst outright. It isn't perfect — it can miss things, and it can wrongly block an innocent piece of text. The AI layer only kicks in when it is configured on the server; while it is on, the full text of the listings and messages being screened is sent to Anthropic for classification. Screening runs on the plain text before it is stored; encryption only protects the record in the database.",
+    "Every listing and every message is screened before it goes live. The rule-based layer is always on: it catches profanity, abuse and scam patterns and blocks the worst outright. An admin also looks at listings together with their photos: listings from new accounts don't appear in the deck until they are approved. It isn't perfect — it can miss things, and it can wrongly block an innocent piece of text. The AI layer only kicks in when it is configured on the server; while it is on, the full text of the listings and messages being screened is sent to Anthropic for classification. Screening runs on the plain text before it is stored; encryption only protects the record in the database.",
   "safety.card3Title": "No messages without a match",
   "safety.card3Desc":
     "Nobody can message you out of the blue. Chat only opens once both sides have liked each other — that is, once you match.",
@@ -1880,6 +1903,12 @@ const en: Record<TranslationKey, string> = {
     "A scam pattern was found (IBAN with urgency, or a deposit before viewing); the listing never went live. Approve it if it is genuine, otherwise remove it.",
   "admin.pendingSummary": "{count} listings are waiting for your approval to go live (Flagged tab).",
   "admin.actionApprove": "Approve and publish",
+  "admin.actionReject": "Reject",
+  "admin.pendingReviewNote":
+    "New listing, not live yet. Check the photos and the text: approve it if it's fine; if something needs fixing, reject it with a reason and the owner can fix and resend it. Remove it if it breaks the rules.",
+  "admin.photosLabel": "Listing photos",
+  "admin.photoOpen": "Open photo {n} at full size",
+  "admin.photoAlt": "Listing photo {n}",
   "admin.badgeSuspended": "Suspended",
   "admin.badgeAdmin": "Admin",
   "admin.targetListing": "Listing",
@@ -1949,6 +1978,15 @@ const en: Record<TranslationKey, string> = {
   "admin.dlgRestoreMessageTitle": "Restore message",
   "admin.dlgRestoreMessageDesc":
     "The stored original text goes back into the chat. If no text was stored (messages removed before this feature existed) or the stored value can no longer be decrypted, it does not come back; those records only leave the queue and we tell you so afterwards.",
+  "admin.dlgApproveTitle": "Approve listing",
+  "admin.dlgApproveDesc":
+    "The listing goes live with its photos and starts showing in the deck. Your decision (admin, time, note) is recorded.",
+  "admin.dlgRejectTitle": "Reject listing",
+  "admin.dlgRejectDesc":
+    "The listing does not go live and goes back to its owner. The reason you write is shown to them word for word in My listings; they can fix it and resend. For content that breaks the rules, remove it instead.",
+  "admin.dlgRejectReasonLabel": "Reason (the owner will see this)",
+  "admin.dlgRejectConfirm": "Reject and send back",
+  "admin.dlgRejectReasonPlaceholder": "E.g. These photos aren't of this flat; upload photos of the flat itself.",
   "admin.dlgClearTitle": "Clear flag",
   "admin.dlgClearDesc":
     "The content counts as clean and leaves the queue. The text itself is untouched; only the flag is lifted and your decision (admin, time, note) is recorded.",
@@ -1977,6 +2015,8 @@ const en: Record<TranslationKey, string> = {
   "admin.doneRestoreMessageUnrecoverable":
     "There is no text to bring back: this message was removed before original texts were kept. Nothing changed — the message stays removed and keeps showing up in the Removed queue.",
   "admin.doneClear": "Flag cleared.",
+  "admin.doneApprove": "Listing approved and live.",
+  "admin.doneReject": "Listing rejected; the owner will see the reason.",
   "admin.doneSuspend": "User suspended.",
   "admin.doneUnsuspend": "Suspension lifted.",
   "admin.actionFailed": "The action could not be completed",

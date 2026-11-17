@@ -265,6 +265,29 @@ Four limits worth knowing before you rely on this:
   returns 400, which puts it out of reach of the panel — leave those rows in
   the removed queue unless you have a reason not to.
 
+### 1.4.1) Listing approval (`LISTING_REVIEW`)
+
+Nothing automatic looks at listing **photos**: the content checker reads
+text only. So by default (`LISTING_REVIEW=all`, pinned in `render.yaml`) every
+new listing waits for an admin before it reaches the deck, and so does a live
+listing whose text or photos change, and a closed listing that is republished.
+Rent, room count and features change without review.
+
+- The owner sees "İncelemede" in My listings.
+- The admin sees the listing **with its photos** in the Flagged tab and picks
+  **Onayla** (goes live), **Reddet** (does not go live; the reason you type is
+  shown to the owner, who can fix it and resend) or **Kaldır** (rule-breaking
+  content; the owner no longer sees it).
+- Admins (`ADMIN_EMAILS`) get one email at most every 30 minutes while
+  listings are waiting (needs `BREVO_API_KEY` + `EMAIL_FROM`). The email
+  carries only the count and a link, no user text.
+
+When one person can no longer check every listing, switch to
+`LISTING_REVIEW=first` in `render.yaml`: a person's listings wait only until an
+admin has approved one of them; anyone with a removed listing goes back to
+waiting. `docs/SECURITY.md` lists what else is worth adding before relying on
+less review (automatic photo checks, duplicate-photo detection).
+
 ### 1.5) Photo storage — Cloudflare R2
 
 **Why.** Render's free plan has no persistent disk, and the container's
@@ -574,6 +597,8 @@ four `FAIRPRICE_*` variables below) are in [docs/AWS.md](docs/AWS.md).
 | `BREVO_API_KEY` | — | Brevo API key (real OTP emails). Unset → no email is sent; only dev-mode OTP works. |
 | `EMAIL_FROM` | — | Sender address verified in Brevo. Email sending requires both this and `BREVO_API_KEY`. |
 | `EMAIL_FROM_NAME` | `evdes.tr` | Display name on outgoing OTP emails. Unset → the default name is used; nothing breaks. |
+| `LISTING_REVIEW` | `all` (also pinned by `render.yaml`) | Which listings wait for an admin before going live (`app/listing_review.py`, section 1.4.1). `all`: every new listing, every republish, and every text or photo change to a live listing. `first`: only a person's listings until an admin has approved one of them. `flagged`: only scam patterns (the old behaviour). Scam patterns wait in every mode; admins' own listings never wait. Unknown values count as `all`. |
+| `SITE_URL` | `https://evdes.tr` | Frontend address used in the "listings waiting for approval" email to admins (link to `/admin`). |
 | `ADMIN_EMAILS` | — (none) | Comma-separated admin accounts. Membership in this list *is* the authorization check for the whole moderation panel — report queue, flagged private message text, user suspension, listing takedown — and these accounts sign in with password **and** an emailed code (section 1.4). Listed addresses are also exempt from the `.edu.tr` sign-up rule. Unset → nobody is an admin; in production (`DATABASE_URL` set) the API **refuses to start** and the previous deploy keeps serving. |
 | `S3_BUCKET` | — | Photo bucket name (section 1.5). Set → photos are stored in the bucket. Unset → photos are written to `UPLOADS_DIR` and lost on redeploy and sleep. |
 | `S3_ENDPOINT_URL` | — | S3 API endpoint. For R2: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Unset → AWS S3. |
