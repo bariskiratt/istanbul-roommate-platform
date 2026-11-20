@@ -11,7 +11,7 @@
 # Mevcut sabitler korunur; tüm paketleri en son sürüme çekmek için komuta
 # --upgrade ekle, sonra testleri koş.
 # Eğitim ve test bağımlılıkları requirements-dev.txt'te — imaja girmezler.
-pandas>=2.0
+pandas>=3.1.1
 numpy>=1.26
 fastapi>=0.110
 uvicorn[standard]>=0.27
